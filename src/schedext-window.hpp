@@ -69,6 +69,7 @@ class SchedExtWindow final : public QMainWindow {
     void on_apply() noexcept;
     void on_disable() noexcept;
     void on_sched_changed() noexcept;
+    void on_sched_profile_changed() noexcept;
 
     const std::string_view m_config_path{"/etc/scx_loader.toml"};
     scx::loader::ConfigPtr m_scx_config;

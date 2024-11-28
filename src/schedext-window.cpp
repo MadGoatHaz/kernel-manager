@@ -175,6 +175,10 @@ SchedExtWindow::SchedExtWindow(QWidget* parent)
                    << "Lowlatency"
                    << "Powersave";
     m_ui->schedext_profile_combo_box->addItems(sched_profiles);
+    connect(m_ui->schedext_profile_combo_box,
+        QOverload<int>::of(&QComboBox::currentIndexChanged),
+        this,
+        &SchedExtWindow::on_sched_profile_changed);
 
     m_ui->current_sched_label->setText(QString::fromStdString(get_current_scheduler()));
 
@@ -222,6 +226,23 @@ void SchedExtWindow::on_disable() noexcept {
     m_ui->apply_button->setEnabled(true);
 }
 
+void SchedExtWindow::on_sched_profile_changed() noexcept {
+    const auto& current_selected = m_ui->schedext_combo_box->currentText().toStdString();
+    const auto& current_profile  = m_ui->schedext_profile_combo_box->currentText().toStdString();
+    const auto& scx_mode = get_scx_mode_from_str(current_profile);
+
+    auto sched_args = QStringList();
+    if (auto scx_flags_for_mode = m_scx_config->scx_flags_for_mode(current_selected, scx_mode); scx_flags_for_mode) {
+        if (!scx_flags_for_mode->empty()) {
+            sched_args << std::move(*scx_flags_for_mode);
+        }
+    } else {
+        QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Cannot get scx flags from scx_loader configuration!"));
+    }
+
+    m_ui->schedext_flags_edit->setText(sched_args.join(' '));
+}
+
 void SchedExtWindow::on_sched_changed() noexcept {
     const auto& scheduler = m_ui->schedext_combo_box->currentText();
 
@@ -236,6 +257,7 @@ void SchedExtWindow::on_sched_changed() noexcept {
         m_ui->scheduler_profile_select_label->setVisible(false);
         m_ui->schedext_profile_combo_box->setVisible(false);
     }
+    on_sched_profile_changed();
 }
 
 void SchedExtWindow::on_apply() noexcept {
@@ -250,20 +272,9 @@ void SchedExtWindow::on_apply() noexcept {
     const auto& current_selected = m_ui->schedext_combo_box->currentText().toStdString();
     const auto& current_profile  = m_ui->schedext_profile_combo_box->currentText().toStdString();
     const auto& extra_flags      = m_ui->schedext_flags_edit->text().trimmed().toStdString();
-
     const auto& scx_mode = get_scx_mode_from_str(current_profile);
 
     auto sched_args = QStringList();
-    if (auto scx_flags_for_mode = m_scx_config->scx_flags_for_mode(current_selected, scx_mode); scx_flags_for_mode) {
-        if (!scx_flags_for_mode->empty()) {
-            sched_args << std::move(*scx_flags_for_mode);
-        }
-    } else {
-        QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Cannot get scx flags from scx_loader configuration!"));
-    }
-
-    // NOTE: maybe we should also take into consideration these custom flags,
-    // but then the question how it should be displayed/handled
     if (!extra_flags.empty()) {
         sched_args << QString::fromStdString(extra_flags).split(' ');
     }
