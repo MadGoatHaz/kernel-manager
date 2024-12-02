@@ -46,6 +46,7 @@ terminal=""
 declare -A terminals=(
     ["alacritty"]="alacritty -e $cmd || LIBGL_ALWAYS_SOFTWARE=1 alacritty -e $cmd"
     ["kitty"]="kitty $cmd"
+    ["ptyxis"]="ptyxis -- $cmd"
     ["konsole"]="konsole -e $cmd"
     ["gnome-terminal"]="gnome-terminal --wait -- $cmd"
     ["xfce4-terminal"]="xfce4-terminal --disable-server --command '$cmd'"
@@ -54,7 +55,7 @@ declare -A terminals=(
     ["st"]="st $cmd"
     ["foot"]="foot $cmd"
 )
-declare -a term_order=("alacritty" "kitty" "konsole" "gnome-terminal" "xfce4-terminal" "lxterminal" "xterm" "st" "foot")
+declare -a term_order=("alacritty" "kitty" "ptyxis" "konsole" "gnome-terminal" "xfce4-terminal" "lxterminal" "xterm" "st" "foot")
 
 if [ -z "$terminal" ] || ! command -v "$terminal" &> /dev/null; then
 for entry in ${term_order[@]}; do
