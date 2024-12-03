@@ -35,10 +35,6 @@
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 #endif
 
-#include <QDBusConnection>
-#include <QDBusMessage>
-#include <QDBusVariant>
-
 #include "config-option-lib-cxxbridge/scx_loader_config.h"
 
 #if defined(__clang__)
@@ -74,19 +70,14 @@ auto convert_std_vec_into_stringlist(std::vector<std::string>&& std_vec) -> QStr
 namespace scx::loader {
 
 auto get_supported_scheds() noexcept -> std::optional<QStringList> {
-    QDBusMessage message = QDBusMessage::createMethodCall(
-        "org.scx.Loader",
-        "/org/scx/Loader",
-        "org.freedesktop.DBus.Properties",
-        "Get");
-    message << "org.scx.Loader" << "SupportedSchedulers";
-    QDBusMessage reply = QDBusConnection::systemBus().call(message);
-    if (reply.type() == QDBusMessage::ErrorMessage) {
-        fmt::print(stderr, "Failed to get supported schedulers: {}\n", reply.errorMessage().toStdString());
-        return std::nullopt;
+    try {
+        auto rust_vec  = ::scx_loader::get_supported_scheds();
+        auto flags_vec = convert_rust_vec_string(std::move(rust_vec));
+        return convert_std_vec_into_stringlist(std::move(flags_vec));
+    } catch (const std::exception& e) {
+        fmt::print(stderr, "Failed to get supported schedulers: {}\n", e.what());
     }
-
-    return reply.arguments().at(0).value<QDBusVariant>().variant().toStringList();
+    return std::nullopt;
 }
 
 auto Config::init_config(std::string_view filepath) noexcept -> std::optional<Config> {

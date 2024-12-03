@@ -45,6 +45,9 @@ mod ffi {
 
         /// Disables auto start of scheduler, and stops current scheduler
         fn disable_scheduler(&mut self, config_path: &str) -> Result<()>;
+
+        /// Returns a list of the schedulers currently supported by the Scheduler Loader.
+        fn get_supported_scheds() -> Result<Vec<String>>;
     }
 }
 
@@ -124,6 +127,10 @@ pub trait LoaderClient {
 
     /// Stops the currently running scheduler.
     fn stop_scheduler(&self) -> zbus::Result<()>;
+
+    /// Returns a list of the schedulers currently supported by the Scheduler Loader.
+    #[zbus(property)]
+    fn supported_schedulers(&self) -> zbus::Result<Vec<String>>;
 }
 
 impl Config {
@@ -256,6 +263,15 @@ impl Config {
 
         Ok(())
     }
+}
+
+pub fn get_supported_scheds() -> Result<Vec<String>> {
+    let rt = Runtime::new().context("Failed to initialize tokio runtime")?;
+    return rt.block_on(async move {
+        let connection = Connection::system().await?;
+        let loader_client = LoaderClientProxy::new(&connection).await?;
+        anyhow::Ok(loader_client.supported_schedulers().await?)
+    });
 }
 
 /// Initialize config from first found config path, overwise fallback to default config
