@@ -5,10 +5,13 @@
 // This software may be used and distributed according to the terms of the
 // GNU General Public License version 2.
 
+use crate::utils;
+
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -24,15 +27,6 @@ mod ffi {
         /// will be created.
         fn init_config_file(config_path: &str) -> Result<Box<Config>>;
 
-        /// Write the config to the file.
-        fn write_config_file(&self, filepath: &str) -> Result<()>;
-
-        /// Retrieves default scheduler if set, overwise returns Err
-        fn get_default_scheduler(&self) -> Result<String>;
-
-        /// Retrieves default mode if set, overwise returns Auto
-        fn get_default_mode(&self) -> u32;
-
         /// Get the scx flags for the given sched mode
         fn get_scx_flags_for_mode(
             &self,
@@ -40,12 +34,17 @@ mod ffi {
             sched_mode: u32,
         ) -> Result<Vec<String>>;
 
-        /// Set the default scheduler with default mode
-        fn set_scx_sched_with_mode(&mut self, supported_sched: &str, sched_mode: u32)
-            -> Result<()>;
+        /// Applies the scx scheduler with arguments/mode
+        fn apply_scheduler_change(
+            &mut self,
+            scx_name: &str,
+            scx_mode: u32,
+            extra_flags: &str,
+            config_path: &str,
+        ) -> Result<()>;
 
         /// Disables auto start of scheduler, and stops current scheduler
-        fn disable_scx_sched(&mut self, config_path: &str) -> Result<()>;
+        fn disable_scheduler(&mut self, config_path: &str) -> Result<()>;
     }
 }
 
@@ -118,11 +117,17 @@ fn init_config_file(config_path: &str) -> Result<Box<Config>> {
     default_path = "/org/scx/Loader"
 )]
 pub trait LoaderClient {
+    /// Method for switching to the specified scheduler with the provided arguments.
+    /// This method will stop the currently running scheduler (if any) and
+    /// then start the new scheduler with the given arguments.
+    fn switch_scheduler_with_args(&self, scx_name: &str, scx_args: &[String]) -> zbus::Result<()>;
+
     /// Stops the currently running scheduler.
     fn stop_scheduler(&self) -> zbus::Result<()>;
 }
 
 impl Config {
+    /// Write the config to the file.
     fn write_config_file(&self, filepath: &str) -> Result<()> {
         let toml_content = toml::to_string(self)?;
 
@@ -130,22 +135,6 @@ impl Config {
         file_obj.write_all(toml_content.as_bytes())?;
 
         Ok(())
-    }
-
-    fn get_default_scheduler(&self) -> Result<String> {
-        if let Some(default_sched) = &self.default_sched {
-            Ok(get_name_from_scx(default_sched).to_owned())
-        } else {
-            anyhow::bail!("Default scheduler is not set")
-        }
-    }
-
-    fn get_default_mode(&self) -> u32 {
-        if let Some(sched_mode) = &self.default_mode {
-            sched_mode.clone() as u32
-        } else {
-            SchedMode::Auto as u32
-        }
     }
 
     fn get_scx_flags_for_mode(
@@ -159,16 +148,19 @@ impl Config {
         Ok(args)
     }
 
-    fn set_scx_sched_with_mode(&mut self, supported_sched: &str, sched_mode: u32) -> Result<()> {
-        let scx_sched = get_scx_from_str(supported_sched)?;
-        let sched_mode: SchedMode = sched_mode.try_into()?;
-
+    /// Set the default scheduler with default mode
+    fn set_scx_sched_with_mode(
+        &mut self,
+        scx_sched: SupportedSched,
+        sched_mode: SchedMode,
+    ) -> Result<()> {
         self.default_sched = Some(scx_sched);
         self.default_mode = Some(sched_mode);
 
         Ok(())
     }
 
+    /// Disables auto start of scheduler, and stops current scheduler
     fn disable_scx_sched(&mut self, config_path: &str) -> Result<()> {
         // for us to correctly disable it:
         // 1. set `default_sched` to None
@@ -190,6 +182,77 @@ impl Config {
 
             anyhow::Ok(())
         })?;
+
+        Ok(())
+    }
+
+    fn switch_scheduler_with_args(&self, scx_name: &str, scx_args: &[String]) -> Result<()> {
+        let rt = Runtime::new().context("Failed to initialize tokio runtime")?;
+        rt.block_on(async move {
+            let connection = Connection::system().await?;
+            let loader_client = LoaderClientProxy::new(&connection).await?;
+            loader_client.switch_scheduler_with_args(scx_name, scx_args).await?;
+
+            anyhow::Ok(())
+        })?;
+
+        Ok(())
+    }
+
+    fn apply_scheduler_change(
+        &mut self,
+        scx_name: &str,
+        scx_mode: u32,
+        extra_flags: &str,
+        config_path: &str,
+    ) -> Result<()> {
+        // stop/disable 'scx.service' if its running/enabled on the system,
+        // overwise it will conflict
+        disable_scx_service();
+
+        let scx_sched = get_scx_from_str(scx_name)?;
+        let scx_mode: SchedMode = scx_mode.try_into()?;
+
+        let mut sched_args: Vec<String> = vec![];
+        if !extra_flags.is_empty() {
+            // NOTE: should be Vec instead of str
+            let mut extra_args: Vec<_> = extra_flags.split(' ').map(String::from).collect();
+            sched_args.append(&mut extra_args);
+        }
+
+        println!("Applying scx '{scx_name}' with args: {}", sched_args.join(" ").to_owned());
+        if let Err(scx_err) = self.switch_scheduler_with_args(scx_name, &sched_args) {
+            println!("Failed to switch '{scx_name}' with args: {sched_args:?}: {scx_err}");
+        }
+
+        // enable scx_loader service if not enabled yet, it fully replaces scx.service
+        if !is_scx_loader_service_enabled() {
+            println!("Enabling scx_loader service");
+            spawn_child_process("/usr/bin/systemctl", &["enable", "-f", "scx_loader"]);
+        }
+
+        // change default scheduler and default scheduler mode
+        self.set_scx_sched_with_mode(scx_sched, scx_mode)
+            .context("Cannot set default scx scheduler with mode")?;
+
+        // write scx_loader configuration to the temp file
+        let tmp_config_path = "/tmp/scx_loader.toml";
+        self.write_config_file(tmp_config_path)
+            .context("Cannot write scx_loader config to file")?;
+
+        // copy scx_loader configuration from the temp file to the actual path with root permissions
+        spawn_child_process("/usr/bin/pkexec", &["/usr/bin/cp", tmp_config_path, config_path]);
+
+        Ok(())
+    }
+
+    fn disable_scheduler(&mut self, config_path: &str) -> Result<()> {
+        // write scx_loader configuration to the temp file
+        let tmp_config_path = "/tmp/scx_loader.toml";
+        self.disable_scx_sched(tmp_config_path).context("Cannot disable scx_loader")?;
+
+        // copy scx_loader configuration from the temp file to the actual path with root permissions
+        spawn_child_process("/usr/bin/pkexec", &["/usr/bin/cp", tmp_config_path, config_path]);
 
         Ok(())
     }
@@ -337,6 +400,36 @@ fn get_name_from_scx(supported_sched: &SupportedSched) -> &'static str {
         SupportedSched::Rusty => "scx_rusty",
         SupportedSched::Lavd => "scx_lavd",
         SupportedSched::Flash => "scx_flash",
+    }
+}
+
+fn spawn_child_process(cmd: &str, args: &[&str]) {
+    let status = Command::new(cmd).args(args).status().expect("failed to execute child process");
+
+    if !status.success() {
+        println!("child process failed with exit code: {status:?}");
+    }
+}
+
+fn is_scx_loader_service_enabled() -> bool {
+    return utils::exec("systemctl is-enabled scx_loader") == "enabled";
+}
+
+fn is_scx_service_enabled() -> bool {
+    return utils::exec("systemctl is-enabled scx") == "enabled";
+}
+
+fn is_scx_service_active() -> bool {
+    return utils::exec("systemctl is-active scx") == "active";
+}
+
+fn disable_scx_service() {
+    if is_scx_service_enabled() {
+        spawn_child_process("/usr/bin/systemctl", &["disable", "--now", "-f", "scx"]);
+        println!("Disabling scx service");
+    } else if is_scx_service_active() {
+        spawn_child_process("/usr/bin/systemctl", &["stop", "-f", "scx"]);
+        println!("Stoping scx service");
     }
 }
 

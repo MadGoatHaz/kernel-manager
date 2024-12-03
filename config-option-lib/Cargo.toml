@@ -13,7 +13,7 @@ cxx = { version = "1", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 zbus = { version = "4", features = ["tokio"], default-features = false }
-tokio = { version = "1.39", features = ["macros", "sync", "rt-multi-thread", "process"] }
+tokio = { version = "1.39", features = ["macros", "sync", "rt-multi-thread"] }
 
 [build-dependencies]
 cxx-build = "1"

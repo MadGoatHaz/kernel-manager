@@ -69,14 +69,6 @@ auto read_kernel_file(std::string_view file_path) noexcept -> std::string {
     return file_content;
 }
 
-void spawn_child_process(QString&& cmd, QStringList&& args) noexcept {
-    QProcess child_proc;
-    child_proc.start(std::move(cmd), std::move(args));
-    if (!child_proc.waitForFinished() || child_proc.exitCode() != 0) {
-        qWarning() << "child process failed with exit code: " << child_proc.exitCode();
-    }
-}
-
 auto get_current_scheduler() noexcept -> std::string {
     using namespace std::string_view_literals;
 
@@ -91,31 +83,6 @@ auto get_current_scheduler() noexcept -> std::string {
         return std::string{"unknown"sv};
     }
     return current_sched;
-}
-
-auto is_scx_loader_service_enabled() noexcept -> bool {
-    using namespace std::string_view_literals;
-    return utils::exec("systemctl is-enabled scx_loader"sv) == "enabled"sv;
-}
-
-auto is_scx_service_enabled() noexcept -> bool {
-    using namespace std::string_view_literals;
-    return utils::exec("systemctl is-enabled scx"sv) == "enabled"sv;
-}
-
-auto is_scx_service_active() noexcept -> bool {
-    using namespace std::string_view_literals;
-    return utils::exec("systemctl is-active scx"sv) == "active"sv;
-}
-
-void disable_scx_service() noexcept {
-    if (is_scx_service_enabled()) {
-        spawn_child_process("/usr/bin/systemctl", {"disable", "--now", "-f", "scx"});
-        fmt::print("Disabling scx service\n");
-    } else if (is_scx_service_active()) {
-        spawn_child_process("/usr/bin/systemctl", {"stop", "-f", "scx"});
-        fmt::print("Stoping scx service\n");
-    }
 }
 
 constexpr auto get_scx_mode_from_str(std::string_view scx_mode) noexcept -> scx::SchedMode {
@@ -212,15 +179,9 @@ void SchedExtWindow::on_disable() noexcept {
     m_ui->disable_button->setEnabled(false);
     m_ui->apply_button->setEnabled(false);
 
-    // write scx_loader configuration to the temp file
-    const auto tmp_config_path = std::string{"/tmp/scx_loader.toml"};
-    if (!m_scx_config->disable_scx_sched(tmp_config_path)) {
+    if (!m_scx_config->disable_scheduler(m_config_path)) {
         QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Cannot disable scx_loader"));
     }
-
-    // copy scx_loader configuration from the temp file to the actual path with root permissions
-    auto config_path = QString::fromStdString(std::string(m_config_path));
-    spawn_child_process("/usr/bin/pkexec", {QStringLiteral("/usr/bin/cp"), QString::fromStdString(tmp_config_path), config_path});
 
     m_ui->disable_button->setEnabled(true);
     m_ui->apply_button->setEnabled(true);
@@ -229,7 +190,7 @@ void SchedExtWindow::on_disable() noexcept {
 void SchedExtWindow::on_sched_profile_changed() noexcept {
     const auto& current_selected = m_ui->schedext_combo_box->currentText().toStdString();
     const auto& current_profile  = m_ui->schedext_profile_combo_box->currentText().toStdString();
-    const auto& scx_mode = get_scx_mode_from_str(current_profile);
+    const auto& scx_mode         = get_scx_mode_from_str(current_profile);
 
     auto sched_args = QStringList();
     if (auto scx_flags_for_mode = m_scx_config->scx_flags_for_mode(current_selected, scx_mode); scx_flags_for_mode) {
@@ -264,47 +225,15 @@ void SchedExtWindow::on_apply() noexcept {
     m_ui->disable_button->setEnabled(false);
     m_ui->apply_button->setEnabled(false);
 
-    // stop/disable 'scx.service' if its running/enabled on the system,
-    // overwise it will conflict
-    disable_scx_service();
-
     // TODO(vnepogodin): refactor that
     const auto& current_selected = m_ui->schedext_combo_box->currentText().toStdString();
     const auto& current_profile  = m_ui->schedext_profile_combo_box->currentText().toStdString();
     const auto& extra_flags      = m_ui->schedext_flags_edit->text().trimmed().toStdString();
-    const auto& scx_mode = get_scx_mode_from_str(current_profile);
+    const auto& scx_mode         = get_scx_mode_from_str(current_profile);
 
-    auto sched_args = QStringList();
-    if (!extra_flags.empty()) {
-        sched_args << QString::fromStdString(extra_flags).split(' ');
-    }
-
-    fmt::print("Applying scx '{}' with args: {}\n", current_selected, sched_args.join(' ').toStdString());
-    auto sched_reply = scx::loader::switch_scheduler_with_args(current_selected, sched_args);
-    if (!sched_reply) {
-        qDebug() << "Failed to switch '" << current_selected << "' with args:" << sched_args;
-    }
-
-    // enable scx_loader service if not enabled yet, it fully replaces scx.service
-    if (!is_scx_loader_service_enabled()) {
-        fmt::print("Enabling scx_loader service\n");
-        spawn_child_process("/usr/bin/systemctl", {"enable", "-f", "scx_loader"});
-    }
-
-    // change default scheduler and default scheduler mode
-    if (!m_scx_config->set_scx_sched_with_mode(current_selected, scx_mode)) {
+    if (!m_scx_config->apply_scheduler_change(current_selected, scx_mode, extra_flags, m_config_path)) {
         QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Cannot set default scx scheduler with mode! Scheduler %1 with mode %2").arg(QString::fromStdString(current_selected), QString::fromStdString(current_profile)));
     }
-
-    // write scx_loader configuration to the temp file
-    const auto tmp_config_path = std::string{"/tmp/scx_loader.toml"};
-    if (!m_scx_config->write_config_file(tmp_config_path)) {
-        QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Cannot write scx_loader config to file"));
-    }
-
-    // copy scx_loader configuration from the temp file to the actual path with root permissions
-    auto config_path = QString::fromStdString(std::string(m_config_path));
-    spawn_child_process("/usr/bin/pkexec", {QStringLiteral("/usr/bin/cp"), QString::fromStdString(tmp_config_path), config_path});
 
     m_ui->disable_button->setEnabled(true);
     m_ui->apply_button->setEnabled(true);

@@ -15,6 +15,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 pub mod scx_loader_config;
+pub mod utils;
 
 use std::fs;
 use std::io::Write;

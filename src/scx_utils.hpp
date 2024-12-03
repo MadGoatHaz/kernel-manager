@@ -89,17 +89,14 @@ class Config {
     /// doesn't exist config with default values will be created.
     static auto init_config(std::string_view filepath) noexcept -> std::optional<Config>;
 
-    /// @brief Writes the config to the file.
-    auto write_config_file(std::string_view filepath) noexcept -> bool;
-
     /// @brief Returns the scx flags for the given sched mode.
     auto scx_flags_for_mode(std::string_view scx_sched, SchedMode sched_mode) noexcept -> std::optional<QStringList>;
 
-    /// @brief Sets the default scheduler with default mode.
-    auto set_scx_sched_with_mode(std::string_view scx_sched, SchedMode sched_mode) noexcept -> bool;
+    /// @brief Applies the scx scheduler with arguments/mode.
+    auto apply_scheduler_change(std::string_view scx_sched, SchedMode sched_mode, std::string_view extra_flags, std::string_view filepath) noexcept -> bool;
 
     /// @brief Disables auto start of scheduler, and stops current scheduler.
-    auto disable_scx_sched(std::string_view filepath) noexcept -> bool;
+    auto disable_scheduler(std::string_view filepath) noexcept -> bool;
 
     // explicitly deleted
     Config() = delete;

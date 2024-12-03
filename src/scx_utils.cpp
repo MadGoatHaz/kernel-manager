@@ -143,32 +143,23 @@ auto Config::scx_flags_for_mode(std::string_view scx_sched, SchedMode sched_mode
     return std::nullopt;
 }
 
-auto Config::set_scx_sched_with_mode(std::string_view scx_sched, SchedMode sched_mode) noexcept -> bool {
+auto Config::apply_scheduler_change(std::string_view scx_sched, SchedMode sched_mode, std::string_view extra_flags, std::string_view filepath) noexcept -> bool {
     try {
         const ::rust::Str scx_sched_rust(scx_sched.data(), scx_sched.size());
-        m_config->set_scx_sched_with_mode(scx_sched_rust, static_cast<std::uint32_t>(sched_mode));
+        const ::rust::Str extra_flags_rust(extra_flags.data(), extra_flags.size());
+        const ::rust::Str filepath_rust(filepath.data(), filepath.size());
+        m_config->apply_scheduler_change(scx_sched_rust, static_cast<std::uint32_t>(sched_mode), extra_flags_rust, filepath_rust);
         return true;
     } catch (const std::exception& e) {
-        fmt::print(stderr, "Failed to set default scx scheduler with mode: {}\n", e.what());
+        fmt::print(stderr, "Failed to apply scx scheduler change: {}\n", e.what());
     }
     return false;
 }
 
-auto Config::write_config_file(std::string_view filepath) noexcept -> bool {
+auto Config::disable_scheduler(std::string_view filepath) noexcept -> bool {
     try {
         const ::rust::Str filepath_rust(filepath.data(), filepath.size());
-        m_config->write_config_file(filepath_rust);
-        return true;
-    } catch (const std::exception& e) {
-        fmt::print(stderr, "Failed to set default scx scheduler with mode: {}\n", e.what());
-    }
-    return false;
-}
-
-auto Config::disable_scx_sched(std::string_view filepath) noexcept -> bool {
-    try {
-        const ::rust::Str filepath_rust(filepath.data(), filepath.size());
-        m_config->disable_scx_sched(filepath_rust);
+        m_config->disable_scheduler(filepath_rust);
         return true;
     } catch (const std::exception& e) {
         fmt::print(stderr, "Failed to disable scx scheduler: {}\n", e.what());
