@@ -73,12 +73,6 @@ namespace scx::loader {
 // Gets supported schedulers by scx_loader
 auto get_supported_scheds() noexcept -> std::optional<QStringList>;
 
-// Gets currently running scheduler by scx_loader
-auto get_current_scheduler() noexcept -> std::optional<QString>;
-
-// Switches scheduler with specified args
-auto switch_scheduler_with_args(std::string_view scx_sched, QStringList sched_args) noexcept -> bool;
-
 /// @brief Manages configuration of scx_loader.
 ///
 /// This structure holds pointer to object from Rust code, which represents

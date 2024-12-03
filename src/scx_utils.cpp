@@ -89,37 +89,6 @@ auto get_supported_scheds() noexcept -> std::optional<QStringList> {
     return reply.arguments().at(0).value<QDBusVariant>().variant().toStringList();
 }
 
-auto get_current_scheduler() noexcept -> std::optional<QString> {
-    QDBusMessage message = QDBusMessage::createMethodCall(
-        "org.scx.Loader",
-        "/org/scx/Loader",
-        "org.freedesktop.DBus.Properties",
-        "Get");
-    message << "org.scx.Loader" << "CurrentScheduler";
-    QDBusMessage reply = QDBusConnection::systemBus().call(message);
-    if (reply.type() == QDBusMessage::ErrorMessage) {
-        fmt::print(stderr, "Failed to get current scheduler: {}\n", reply.errorMessage().toStdString());
-        return std::nullopt;
-    }
-
-    return reply.arguments().at(0).value<QDBusVariant>().variant().toString();
-}
-
-auto switch_scheduler_with_args(std::string_view scx_sched, QStringList sched_args) noexcept -> bool {
-    QDBusMessage message = QDBusMessage::createMethodCall(
-        "org.scx.Loader",
-        "/org/scx/Loader",
-        "org.scx.Loader",
-        "SwitchSchedulerWithArgs");
-    message << QString::fromStdString(std::string{scx_sched}) << sched_args;
-    QDBusMessage reply = QDBusConnection::systemBus().call(message);
-    if (reply.type() == QDBusMessage::ErrorMessage) {
-        fmt::print(stderr, "Failed to switch scheduler with args: {}\n", reply.errorMessage().toStdString());
-        return false;
-    }
-    return true;
-}
-
 auto Config::init_config(std::string_view filepath) noexcept -> std::optional<Config> {
     try {
         const ::rust::Str filepath_rust(filepath.data(), filepath.size());
