@@ -12,8 +12,9 @@ anyhow = { version = "1", default-features = false, features = ["std"] }
 cxx = { version = "1", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
-zbus = { version = "4", features = ["tokio"], default-features = false }
+zbus = { version = "5", features = ["tokio"], default-features = false }
 tokio = { version = "1.39", features = ["macros", "sync", "rt-multi-thread"] }
+scx_loader = { git = "https://github.com/sched-ext/scx", rev = "b9a505cd1d6275818777ac3760abf04287b6758c", version = "1.0.7" }
 
 [build-dependencies]
 cxx-build = "1"
