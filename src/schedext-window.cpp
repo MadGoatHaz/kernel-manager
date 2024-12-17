@@ -94,6 +94,8 @@ constexpr auto get_scx_mode_from_str(std::string_view scx_mode) noexcept -> scx:
         return scx::SchedMode::LowLatency;
     } else if (scx_mode == "Powersave"sv) {
         return scx::SchedMode::PowerSave;
+    } else if (scx_mode == "Server"sv) {
+        return scx::SchedMode::Server;
     }
     return scx::SchedMode::Auto;
 }
@@ -140,7 +142,8 @@ SchedExtWindow::SchedExtWindow(QWidget* parent)
     sched_profiles << "Auto"
                    << "Gaming"
                    << "Lowlatency"
-                   << "Powersave";
+                   << "Powersave"
+                   << "Server";
     m_ui->schedext_profile_combo_box->addItems(sched_profiles);
     connect(m_ui->schedext_profile_combo_box,
         QOverload<int>::of(&QComboBox::currentIndexChanged),

@@ -226,6 +226,7 @@ fn convert_from_raw_mode(raw_mode: u32) -> Result<SchedMode> {
         1 => Ok(SchedMode::Gaming),
         2 => Ok(SchedMode::PowerSave),
         3 => Ok(SchedMode::LowLatency),
+        4 => Ok(SchedMode::Server),
         _ => anyhow::bail!("SchedMode with such value doesn't exist"),
     }
 }
