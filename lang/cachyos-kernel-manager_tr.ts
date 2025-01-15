@@ -187,90 +187,103 @@
         <translation>Yamalar</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="457"/>
         <source>Bore - Burst-Oriented Response Enhancer</source>
-        <translation>BORE - Ani Yüke Odaklı Tepki Arttırıcı</translation>
+        <translation type="vanished">BORE - Ani Yüke Odaklı Tepki Arttırıcı</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="458"/>
+        <location filename="../src/conf-window.cpp" line="484"/>
         <source>RC - Release Candidate</source>
         <translation>RC - Çıkış sürümü adayı</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="536"/>
+        <location filename="../src/conf-window.cpp" line="487"/>
+        <source>EEVDF</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="488"/>
+        <source>BMQ (BitMap Queue)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="563"/>
         <source>Select one or more patch files</source>
         <translation>Bir veya daha fazla yama dosyası seç</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="538"/>
+        <location filename="../src/conf-window.cpp" line="565"/>
         <source>Patch file (*.patch)</source>
         <translation>Yama dosyası (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="558"/>
+        <location filename="../src/conf-window.cpp" line="585"/>
         <source>Enter URL patch</source>
         <translation>URL yaması gir</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="559"/>
+        <location filename="../src/conf-window.cpp" line="586"/>
         <source>Patch URL:</source>
         <translation>Yama için URL:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="682"/>
+        <location filename="../src/conf-window.cpp" line="709"/>
         <source>Save file as</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="684"/>
-        <location filename="../src/conf-window.cpp" line="701"/>
+        <location filename="../src/conf-window.cpp" line="711"/>
+        <location filename="../src/conf-window.cpp" line="728"/>
         <source>Config file (*.toml)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="691"/>
+        <location filename="../src/conf-window.cpp" line="718"/>
         <source>Failed to save config options to file: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="699"/>
+        <location filename="../src/conf-window.cpp" line="726"/>
         <source>Load from</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="709"/>
+        <location filename="../src/conf-window.cpp" line="736"/>
         <source>Failed to load config options from file: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="745"/>
+        <location filename="../src/conf-window.cpp" line="772"/>
         <source>Config file(%1) is outdated</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="459"/>
+        <location filename="../src/conf-window.cpp" line="485"/>
         <source>RT - Realtime kernel</source>
         <translation>RT - Gerçek zamanlı çekirdek</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="344"/>
+        <location filename="../src/conf-window.cpp" line="370"/>
         <source>Do you want to install build packages?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="460"/>
+        <location filename="../src/conf-window.cpp" line="482"/>
+        <source>CachyOS default scheduler (BORE+Cachy Sauce)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="483"/>
+        <source>BORE - Burst-Oriented Response Enhancer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="486"/>
         <source>RT-Bore</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="461"/>
         <source>Sched-Ext - BPF extensible scheduler class</source>
-        <translation>Sched-Ext - BPF genişletilebilir zamanlayıcı sınıfı</translation>
-    </message>
-    <message>
-        <location filename="../src/conf-window.cpp" line="456"/>
-        <source>CachyOS - BORE + SCHED-EXT</source>
-        <translation type="unfinished"></translation>
+        <translation type="vanished">Sched-Ext - BPF genişletilebilir zamanlayıcı sınıfı</translation>
     </message>
 </context>
 <context>

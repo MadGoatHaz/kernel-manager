@@ -187,88 +187,93 @@
         <translation>Патчи</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="457"/>
-        <source>Bore - Burst-Oriented Response Enhancer</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="../src/conf-window.cpp" line="458"/>
+        <location filename="../src/conf-window.cpp" line="484"/>
         <source>RC - Release Candidate</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="459"/>
+        <location filename="../src/conf-window.cpp" line="485"/>
         <source>RT - Realtime kernel</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="456"/>
-        <source>CachyOS - BORE + SCHED-EXT</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="../src/conf-window.cpp" line="344"/>
+        <location filename="../src/conf-window.cpp" line="370"/>
         <source>Do you want to install build packages?</source>
         <translation>Вы хотите установить собранные пакеты?</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="460"/>
+        <location filename="../src/conf-window.cpp" line="482"/>
+        <source>CachyOS default scheduler (BORE+Cachy Sauce)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="483"/>
+        <source>BORE - Burst-Oriented Response Enhancer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="486"/>
         <source>RT-Bore</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="461"/>
-        <source>Sched-Ext - BPF extensible scheduler class</source>
-        <translation></translation>
+        <location filename="../src/conf-window.cpp" line="487"/>
+        <source>EEVDF</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="536"/>
+        <location filename="../src/conf-window.cpp" line="488"/>
+        <source>BMQ (BitMap Queue)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="563"/>
         <source>Select one or more patch files</source>
         <translation>Выберите один или несколько файлов патчей</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="538"/>
+        <location filename="../src/conf-window.cpp" line="565"/>
         <source>Patch file (*.patch)</source>
         <translation>Файл патча (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="558"/>
+        <location filename="../src/conf-window.cpp" line="585"/>
         <source>Enter URL patch</source>
         <translation>Введите URL патча</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="559"/>
+        <location filename="../src/conf-window.cpp" line="586"/>
         <source>Patch URL:</source>
         <translation>URL патча:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="682"/>
+        <location filename="../src/conf-window.cpp" line="709"/>
         <source>Save file as</source>
         <translation>Сохранить файл как</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="684"/>
-        <location filename="../src/conf-window.cpp" line="701"/>
+        <location filename="../src/conf-window.cpp" line="711"/>
+        <location filename="../src/conf-window.cpp" line="728"/>
         <source>Config file (*.toml)</source>
         <translation>Конфиг файл (*.toml)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="691"/>
+        <location filename="../src/conf-window.cpp" line="718"/>
         <source>Failed to save config options to file: %1</source>
         <translation>Не удалось сохранить параметры конфигурации в файл: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="699"/>
+        <location filename="../src/conf-window.cpp" line="726"/>
         <source>Load from</source>
         <translation>Загрузить из</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="709"/>
+        <location filename="../src/conf-window.cpp" line="736"/>
         <source>Failed to load config options from file: %1</source>
         <translation>Не удалось загрузить параметры конфигурации из файла: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="745"/>
+        <location filename="../src/conf-window.cpp" line="772"/>
         <source>Config file(%1) is outdated</source>
         <translation>Конфигурационный файл(%1) устарел</translation>
     </message>

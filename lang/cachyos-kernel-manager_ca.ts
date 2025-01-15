@@ -11,22 +11,22 @@
     <message>
         <location filename="../src/conf-options-page.ui" line="95"/>
         <source>Tweak kernel options prior to a build via nconfig</source>
-        <translation>Ajusteu les opcions del nucli abans d'una compilació mitjançant nconfig</translation>
+        <translation>Ajusteu les opcions del nucli abans d&apos;una compilació mitjançant nconfig</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="124"/>
         <source>Tweak kernel options prior to a build via menuconfig</source>
-        <translation>Ajusteu les opcions del nucli abans d'una compilació mitjançant menuconfig</translation>
+        <translation>Ajusteu les opcions del nucli abans d&apos;una compilació mitjançant menuconfig</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="153"/>
         <source>Tweak kernel options prior to a build via xconfig</source>
-        <translation>Ajusteu les opcions del nucli abans d'una compilació mitjançant xconfig</translation>
+        <translation>Ajusteu les opcions del nucli abans d&apos;una compilació mitjançant xconfig</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="182"/>
         <source>Tweak kernel options prior to a build via gconfig</source>
-        <translation>Ajusteu les opcions del nucli abans d'una compilació mitjançant gconfig</translation>
+        <translation>Ajusteu les opcions del nucli abans d&apos;una compilació mitjançant gconfig</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="211"/>
@@ -56,7 +56,7 @@
     <message>
         <location filename="../src/conf-options-page.ui" line="356"/>
         <source>Running tick rate</source>
-        <translation>Taxa d'execució</translation>
+        <translation>Taxa d&apos;execució</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="385"/>
@@ -71,7 +71,7 @@
     <message>
         <location filename="../src/conf-options-page.ui" line="646"/>
         <source>Build the open NVIDIA module</source>
-        <translation>Construeix el mòdul obert d'NVIDIA</translation>
+        <translation>Construeix el mòdul obert d&apos;NVIDIA</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="721"/>
@@ -109,7 +109,7 @@
     <message>
         <location filename="../src/conf-options-page.ui" line="530"/>
         <source>Apply automatic CPU Optimization</source>
-        <translation>Aplica l'optimització automàtica de la CPU</translation>
+        <translation>Aplica l&apos;optimització automàtica de la CPU</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="559"/>
@@ -153,7 +153,7 @@
     <message>
         <location filename="../src/conf-options-page.ui" line="617"/>
         <source>Build the NVIDIA module</source>
-        <translation>Construeix el mòdul d'NVIDIA</translation>
+        <translation>Construeix el mòdul d&apos;NVIDIA</translation>
     </message>
 </context>
 <context>
@@ -187,90 +187,107 @@
         <translation>Pedaços</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="457"/>
         <source>Bore - Burst-Oriented Response Enhancer</source>
-        <translation>Bore - Potenciador de resposta orientat a ràfegues</translation>
+        <translation type="vanished">Bore - Potenciador de resposta orientat a ràfegues</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="458"/>
+        <location filename="../src/conf-window.cpp" line="484"/>
         <source>RC - Release Candidate</source>
         <translation>RC - Candidat de publicació</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="536"/>
+        <location filename="../src/conf-window.cpp" line="487"/>
+        <source>EEVDF</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="488"/>
+        <source>BMQ (BitMap Queue)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="563"/>
         <source>Select one or more patch files</source>
         <translation>Seleccioneu un o més fitxers de pedaç</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="538"/>
+        <location filename="../src/conf-window.cpp" line="565"/>
         <source>Patch file (*.patch)</source>
-        <translationFitxer de pedaç (*.patch)</translation>
+        <translation>Fitxer de pedaç (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="558"/>
+        <location filename="../src/conf-window.cpp" line="585"/>
         <source>Enter URL patch</source>
-        <translation>Introduïu l'URL del pedaç</translation>
+        <translation>Introduïu l&apos;URL del pedaç</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="559"/>
+        <location filename="../src/conf-window.cpp" line="586"/>
         <source>Patch URL:</source>
         <translation>URL del pedaç:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="682"/>
+        <location filename="../src/conf-window.cpp" line="709"/>
         <source>Save file as</source>
         <translation>Desa el fitxer com a</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="684"/>
-        <location filename="../src/conf-window.cpp" line="701"/>
+        <location filename="../src/conf-window.cpp" line="711"/>
+        <location filename="../src/conf-window.cpp" line="728"/>
         <source>Config file (*.toml)</source>
         <translation>Fitxer de config. (*.toml)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="691"/>
+        <location filename="../src/conf-window.cpp" line="718"/>
         <source>Failed to save config options to file: %1</source>
         <translation>Ha fallat desar les opcions de configuració al fitxer %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="699"/>
+        <location filename="../src/conf-window.cpp" line="726"/>
         <source>Load from</source>
         <translation>Carrega des de</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="709"/>
+        <location filename="../src/conf-window.cpp" line="736"/>
         <source>Failed to load config options from file: %1</source>
         <translation>Ha fallat carregar les opcions de configuració des del fitxer %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="745"/>
+        <location filename="../src/conf-window.cpp" line="772"/>
         <source>Config file(%1) is outdated</source>
         <translation>El fitxer de configuració (%1) està obsolet.</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="459"/>
+        <location filename="../src/conf-window.cpp" line="485"/>
         <source>RT - Realtime kernel</source>
         <translation>RT - Nucli en temps real</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="344"/>
+        <location filename="../src/conf-window.cpp" line="370"/>
         <source>Do you want to install build packages?</source>
         <translation>Voleu instal·lar els paquets de compilació?</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="460"/>
+        <location filename="../src/conf-window.cpp" line="482"/>
+        <source>CachyOS default scheduler (BORE+Cachy Sauce)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="483"/>
+        <source>BORE - Burst-Oriented Response Enhancer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="486"/>
         <source>RT-Bore</source>
         <translation>RT-Bore</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="461"/>
         <source>Sched-Ext - BPF extensible scheduler class</source>
-        <translation>Sched-Ext - Classe de planificador extensible BPF</translation>
+        <translation type="vanished">Sched-Ext - Classe de planificador extensible BPF</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="456"/>
         <source>CachyOS - BORE + SCHED-EXT</source>
-        <translation>CachyOS - BORE + SCHED-EXT</translation>
+        <translation type="vanished">CachyOS - BORE + SCHED-EXT</translation>
     </message>
 </context>
 <context>
@@ -291,8 +308,8 @@
         <translation type="vanished">&lt;html&gt;
 &lt;body&gt;
 &lt;p&gt;Aquí veureu informació sobre els nuclis de Linux instal·lats i disponibles actualment.&lt;/p&gt;
-&lt;p&gt;Podeu instal·lar o desinstal·lar paquets de nucli usant les caselles de selecció de la columna de l'esquerra.&lt;/p&gt;
-&lt;p&gt;Aquesta aplicació no funcionarà si ja s'executa una instància de pacman.&lt;/p&gt;
+&lt;p&gt;Podeu instal·lar o desinstal·lar paquets de nucli usant les caselles de selecció de la columna de l&apos;esquerra.&lt;/p&gt;
+&lt;p&gt;Aquesta aplicació no funcionarà si ja s&apos;executa una instància de pacman.&lt;/p&gt;
 &lt;/body&gt;
 &lt;/html&gt;</translation>
     </message>
@@ -341,9 +358,9 @@
         <source>No kernels found!
 Please run `pacman -Sy` to update DB!
 This is needed for the app to work properly</source>
-        <translation>No s'ha trobat cap nucli!
-Si us plau, executeu 'pacman -Sy' per actualitzar la base de dades!
-Això és necessari perquè l'aplicació funcioni correctament.</translation>
+        <translation>No s&apos;ha trobat cap nucli!
+Si us plau, executeu &apos;pacman -Sy&apos; per actualitzar la base de dades!
+Això és necessari perquè l&apos;aplicació funcioni correctament.</translation>
     </message>
     <message>
         <location filename="../src/km-window.cpp" line="201"/>
@@ -365,19 +382,19 @@ Clonació de PKGBUILDs..</translation>
     <message>
         <location filename="../src/km-window.cpp" line="143"/>
         <source>Failed to initialize alpm handle (%1)</source>
-        <translation>Ha fallat iniciar l'identificador d'alpm (%1)</translation>
+        <translation>Ha fallat iniciar l&apos;identificador d&apos;alpm (%1)</translation>
     </message>
     <message>
         <location filename="../src/km-window.cpp" line="156"/>
         <source>Failed to release alpm handle (%1)</source>
-        <translation>Ha fallat alliberar l'identificador d'alpm (%1)</translation>
+        <translation>Ha fallat alliberar l&apos;identificador d&apos;alpm (%1)</translation>
     </message>
     <message>
         <location filename="../src/km-window.cpp" line="361"/>
         <source>Please wait...
 Initializing kernels..</source>
         <translation>Espereu, si us plau...
-S'inicien els nuclis...</translation>
+S&apos;inicien els nuclis...</translation>
     </message>
     <message>
         <location filename="../src/km-window.ui" line="28"/>
@@ -391,8 +408,8 @@ S'inicien els nuclis...</translation>
         <translation>&lt;html&gt;
 &lt;body&gt;
 &lt;p&gt;Aquí veureu informació sobre els nuclis de Linux instal·lats i disponibles actualment.&lt;/p&gt;
-&lt;p&gt;Podeu instal·lar o desinstal·lar paquets de nucli usant les caselles de selecció de la columna de l'esquerra.&lt;/p&gt;
-&lt;p&gt;Aquesta aplicació no funcionarà si ja s'executa una instància de pacman.&lt;/p&gt;
+&lt;p&gt;Podeu instal·lar o desinstal·lar paquets de nucli usant les caselles de selecció de la columna de l&apos;esquerra.&lt;/p&gt;
+&lt;p&gt;Aquesta aplicació no funcionarà si ja s&apos;executa una instància de pacman.&lt;/p&gt;
 &lt;/body&gt;
 &lt;/html&gt;</translation>
     </message>
