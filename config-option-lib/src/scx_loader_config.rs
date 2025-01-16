@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 //
-// Copyright (c) 2024 Vladislav Nepogodin <vnepogodin@cachyos.org>
+// Copyright (c) 2024-2025 Vladislav Nepogodin <vnepogodin@cachyos.org>
 
 // This software may be used and distributed according to the terms of the
 // GNU General Public License version 2.
