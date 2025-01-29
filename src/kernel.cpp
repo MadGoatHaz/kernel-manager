@@ -117,10 +117,10 @@ bool Kernel::install() const noexcept {
     bool should_install_nvidia      = (is_nvidia_card_prebuild_module && m_nvidia_module != nullptr);
     bool should_install_nvidia_open = (is_nvidia_card_prebuild_open_module && m_nvidia_open_module != nullptr);
 
-    if (is_nvidia_open_modules_installed) {
+    if (is_nvidia_open_modules_installed && m_nvidia_open_module != nullptr) {
         should_install_nvidia_open = true;
         should_install_nvidia      = false;
-    } else if (is_nvidia_modules_installed) {
+    } else if (is_nvidia_modules_installed && m_nvidia_module != nullptr) {
         should_install_nvidia_open = false;
         should_install_nvidia      = true;
     }
