@@ -232,6 +232,15 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
 
                 const auto& nvidia_open_pkgname = fmt::format(FMT_COMPILE("{}-nvidia-open"), pkg_name);
                 kernel_obj.m_nvidia_open_module = alpm_db_get_pkg(db, nvidia_open_pkgname.c_str());
+            } else if (pkg_name == "linux" || pkg_name == "linux-lts") {
+                auto kernel_module = pkg_name;
+                utils::remove_all(kernel_module, "linux");
+
+                const auto& nvidia_pkgname = fmt::format(FMT_COMPILE("nvidia{}"), kernel_module);
+                kernel_obj.m_nvidia_module = alpm_db_get_pkg(db, nvidia_pkgname.c_str());
+
+                const auto& nvidia_open_pkgname = fmt::format(FMT_COMPILE("nvidia-open{}"), kernel_module);
+                kernel_obj.m_nvidia_open_module = alpm_db_get_pkg(db, nvidia_open_pkgname.c_str());
             }
 
             kernels.emplace_back(std::move(kernel_obj));
