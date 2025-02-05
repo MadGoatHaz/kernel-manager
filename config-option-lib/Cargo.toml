@@ -14,7 +14,7 @@ serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 zbus = { version = "5", features = ["tokio"], default-features = false }
 tokio = { version = "1.39", features = ["macros", "sync", "rt-multi-thread"] }
-scx_loader = "1.0.8"
+scx_loader = "1.0.9"
 
 [build-dependencies]
 cxx-build = "1"
