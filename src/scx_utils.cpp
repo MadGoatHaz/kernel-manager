@@ -65,6 +65,25 @@ auto convert_std_vec_into_stringlist(std::vector<std::string>&& std_vec) -> QStr
     return flags;
 }
 
+auto get_scx_mode_from_raw(std::uint8_t raw_mode) noexcept -> scx::SchedMode {
+    switch (raw_mode) {
+    case 0:
+        return scx::SchedMode::Auto;
+    case 1:
+        return scx::SchedMode::Gaming;
+    case 2:
+        return scx::SchedMode::PowerSave;
+    case 3:
+        return scx::SchedMode::LowLatency;
+    case 4:
+        return scx::SchedMode::Server;
+    default:
+        fmt::print(stderr, "SchedMode with such value doesn't exist: {}\n", raw_mode);
+        break;
+    }
+    return scx::SchedMode::Auto;
+}
+
 }  // namespace
 
 namespace scx::loader {
@@ -125,6 +144,26 @@ auto Config::disable_scheduler(std::string_view filepath) noexcept -> bool {
         fmt::print(stderr, "Failed to disable scx scheduler: {}\n", e.what());
     }
     return false;
+}
+
+auto Config::get_current_sched() noexcept -> std::optional<std::string> {
+    try {
+        auto current_sched = m_config->get_current_sched();
+        return std::string(current_sched);
+    } catch (const std::exception& e) {
+        fmt::print(stderr, "Failed to get currently running scx mode: {}\n", e.what());
+    }
+    return std::nullopt;
+}
+
+auto Config::get_current_mode() noexcept -> std::optional<SchedMode> {
+    try {
+        auto raw_mode = m_config->get_current_mode();
+        return get_scx_mode_from_raw(raw_mode);
+    } catch (const std::exception& e) {
+        fmt::print(stderr, "Failed to get currently running scx mode: {}\n", e.what());
+    }
+    return std::nullopt;
 }
 
 }  // namespace scx::loader

@@ -119,6 +119,12 @@ SchedExtWindow::SchedExtWindow(QWidget* parent)
         }
     }
 
+    // Timer updates information about currently running scheduler even without scx_loader,
+    // as it reads information reported by scx scheduler.
+    using namespace std::chrono_literals;  // NOLINT
+    connect(m_sched_timer, &QTimer::timeout, this, &SchedExtWindow::update_current_sched);
+    m_sched_timer->start(1s);
+
     // Selecting the scheduler
     auto supported_scheds = scx::loader::get_supported_scheds();
     if (supported_scheds.has_value()) {
@@ -135,14 +141,21 @@ SchedExtWindow::SchedExtWindow(QWidget* parent)
 
         m_ui->schedext_flags_edit->setHidden(true);
         m_ui->scheduler_set_flags_label->setHidden(true);
+        return;
+    }
+
+    // Set currently running scheduler
+    auto current_sched = m_scx_config->get_current_sched();
+    if (current_sched.has_value()) {
+        m_ui->schedext_combo_box->setCurrentText(QString::fromStdString(*current_sched));
     }
 
     // Selecting the performance profile
     QStringList sched_profiles;
     sched_profiles << "Auto"
                    << "Gaming"
-                   << "Lowlatency"
                    << "Powersave"
+                   << "Lowlatency"
                    << "Server";
     m_ui->schedext_profile_combo_box->addItems(sched_profiles);
     connect(m_ui->schedext_profile_combo_box,
@@ -150,13 +163,14 @@ SchedExtWindow::SchedExtWindow(QWidget* parent)
         this,
         &SchedExtWindow::on_sched_profile_changed);
 
+    // Set currently runing scheduler mode
+    auto current_mode = m_scx_config->get_current_mode();
+    if (current_mode.has_value()) {
+        // NOTE: the index of profiles and scxmode values MUST match
+        m_ui->schedext_profile_combo_box->setCurrentIndex(static_cast<std::uint8_t>(*current_mode));
+    }
+
     m_ui->current_sched_label->setText(QString::fromStdString(get_current_scheduler()));
-
-    // setup timer
-    using namespace std::chrono_literals;  // NOLINT
-
-    connect(m_sched_timer, &QTimer::timeout, this, &SchedExtWindow::update_current_sched);
-    m_sched_timer->start(1s);
 
     connect(m_ui->schedext_combo_box,
         QOverload<int>::of(&QComboBox::currentIndexChanged),

@@ -49,6 +49,12 @@ mod ffi {
 
         /// Returns a list of the schedulers currently supported by the Scheduler Loader.
         fn get_supported_scheds() -> Result<Vec<String>>;
+
+        /// Returns currently running scheduler.
+        fn get_current_sched(&self) -> Result<String>;
+
+        /// Returns currently running scheduler mode.
+        fn get_current_mode(&self) -> Result<u8>;
     }
 }
 
@@ -194,6 +200,32 @@ impl Config {
         spawn_child_process("/usr/bin/pkexec", &["/usr/bin/cp", tmp_config_path, config_path]);
 
         Ok(())
+    }
+
+    fn get_current_sched(&self) -> Result<String> {
+        let rt = Runtime::new().context("Failed to initialize tokio runtime")?;
+        let current_sched = rt.block_on(async move {
+            let connection = Connection::system().await?;
+            let loader_client = LoaderClientProxy::new(&connection).await?;
+            let current_sched = loader_client.current_scheduler().await?;
+
+            anyhow::Ok(current_sched)
+        })?;
+
+        Ok(current_sched)
+    }
+
+    fn get_current_mode(&self) -> Result<u8> {
+        let rt = Runtime::new().context("Failed to initialize tokio runtime")?;
+        let current_mode = rt.block_on(async move {
+            let connection = Connection::system().await?;
+            let loader_client = LoaderClientProxy::new(&connection).await?;
+            let current_mode = loader_client.scheduler_mode().await?;
+
+            anyhow::Ok(current_mode as u8)
+        })?;
+
+        Ok(current_mode)
     }
 }
 

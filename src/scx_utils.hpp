@@ -20,6 +20,7 @@
 #define SCX_UTILS_HPP
 
 #include <optional>
+#include <string>
 #include <string_view>
 
 #if defined(__clang__)
@@ -93,6 +94,12 @@ class Config {
 
     /// @brief Disables auto start of scheduler, and stops current scheduler.
     auto disable_scheduler(std::string_view filepath) noexcept -> bool;
+
+    /// @brief Returns currently running scheduler.
+    auto get_current_sched() noexcept -> std::optional<std::string>;
+
+    /// @brief Returns currently running scheduler mode.
+    auto get_current_mode() noexcept -> std::optional<SchedMode>;
 
     // explicitly deleted
     Config() = delete;
