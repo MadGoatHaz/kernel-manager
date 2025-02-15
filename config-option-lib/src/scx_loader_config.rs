@@ -129,14 +129,31 @@ impl Config {
 
     fn switch_scheduler_with_args(
         &self,
-        scx_name: &SupportedSched,
+        scx_sched: SupportedSched,
         scx_args: &[String],
     ) -> Result<()> {
         let rt = Runtime::new().context("Failed to initialize tokio runtime")?;
         rt.block_on(async move {
             let connection = Connection::system().await?;
             let loader_client = LoaderClientProxy::new(&connection).await?;
-            loader_client.switch_scheduler_with_args(scx_name.clone(), scx_args).await?;
+            loader_client.switch_scheduler_with_args(scx_sched, scx_args).await?;
+
+            anyhow::Ok(())
+        })?;
+
+        Ok(())
+    }
+
+    fn switch_scheduler_with_mode(
+        &self,
+        scx_sched: SupportedSched,
+        scx_mode: SchedMode,
+    ) -> Result<()> {
+        let rt = Runtime::new().context("Failed to initialize tokio runtime")?;
+        rt.block_on(async move {
+            let connection = Connection::system().await?;
+            let loader_client = LoaderClientProxy::new(&connection).await?;
+            loader_client.switch_scheduler(scx_sched, scx_mode).await?;
 
             anyhow::Ok(())
         })?;
@@ -155,6 +172,7 @@ impl Config {
         // overwise it will conflict
         disable_scx_service();
 
+        let default_args = self.get_scx_flags_for_mode(&scx_name, scx_mode)?;
         let scx_sched = get_scx_from_str(scx_name)?;
         let scx_mode = convert_from_raw_mode(scx_mode)?;
 
@@ -165,9 +183,18 @@ impl Config {
             sched_args.append(&mut extra_args);
         }
 
-        println!("Applying scx '{scx_name}' with args: {}", sched_args.join(" ").to_owned());
-        if let Err(scx_err) = self.switch_scheduler_with_args(&scx_sched, &sched_args) {
-            println!("Failed to switch '{scx_name}' with args: {sched_args:?}: {scx_err}");
+        if sched_args == default_args {
+            println!("Applying scx '{scx_name}' with mode {scx_mode:?}");
+            if let Err(scx_err) =
+                self.switch_scheduler_with_mode(scx_sched.clone(), scx_mode.clone())
+            {
+                println!("Failed to switch '{scx_name}' with mode {scx_mode:?}: {scx_err}");
+            }
+        } else {
+            println!("Applying scx '{scx_name}' with args: {}", sched_args.join(" ").to_owned());
+            if let Err(scx_err) = self.switch_scheduler_with_args(scx_sched.clone(), &sched_args) {
+                println!("Failed to switch '{scx_name}' with args: {sched_args:?}: {scx_err}");
+            }
         }
 
         // enable scx_loader service if not enabled yet, it fully replaces scx.service
