@@ -37,47 +37,40 @@
 #pragma GCC diagnostic ignored "-Wsuggest-attribute=pure"
 #endif
 
-#include <ui_schedext-window.h>
-
-#include "scx_utils.hpp"
-
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <QMainWindow>
-#include <QTimer>
+#include <QtCore/QtGlobal>
 
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #elif defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
+#if defined(SCHEDEXT_LIB)
+#define SCHEDEXT_EXPORT Q_DECL_EXPORT
+#else
+#define SCHEDEXT_EXPORT Q_DECL_IMPORT
+#endif
 
-class SchedExtWindow final : public QMainWindow {
-    Q_OBJECT
-    Q_DISABLE_COPY_MOVE(SchedExtWindow)
+class QWidget;
+
+namespace impl {
+class SchedExtWindow;
+}  // namespace impl
+
+class SCHEDEXT_EXPORT SchedExtWindow final {
  public:
     explicit SchedExtWindow(QWidget* parent = nullptr);
-    ~SchedExtWindow() = default;
+    ~SchedExtWindow();
 
- protected:
-    void closeEvent(QCloseEvent* event) override;
+    // very minimal and basic exposed func
+    void show() noexcept;
+    void hide() noexcept;
+    bool isVisible() const noexcept;
+    void setParent(QWidget* parent) noexcept;
 
  private:
-    void on_apply() noexcept;
-    void on_disable() noexcept;
-    void on_sched_changed() noexcept;
-    void on_sched_profile_changed() noexcept;
-
-    const std::string_view m_config_path{"/etc/scx_loader.toml"};
-    scx::loader::ConfigPtr m_scx_config;
-    std::vector<std::string> m_previously_set_options{};
-    std::unique_ptr<Ui::SchedExtWindow> m_ui = std::make_unique<Ui::SchedExtWindow>();
-    QTimer* m_sched_timer                    = nullptr;
-
-    void update_current_sched() noexcept;
+    impl::SchedExtWindow* m_impl = nullptr;
 };
+
+SCHEDEXT_EXPORT auto create_schedext_window(QWidget* parent = nullptr) noexcept -> SchedExtWindow;
 
 #endif  // SCHEDEXT_WINDOW_HPP_

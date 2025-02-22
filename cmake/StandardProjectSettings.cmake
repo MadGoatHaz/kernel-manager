@@ -24,6 +24,9 @@ add_definitions(-DQT_DISABLE_DEPRECATED_BEFORE=0x050F00)
 # Generate compile_commands.json to make it easier to work with clang based tools
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Build with PIC
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
   #add_compile_options(-nostdlib++ -stdlib=libc++ -nodefaultlibs -fexperimental-library)
   #add_link_options(-stdlib=libc++)
@@ -72,3 +75,14 @@ option(ENABLE_AUR_KERNELS "Enable AUR kernels support" OFF)
 if(ENABLE_AUR_KERNELS)
   add_definitions(-DENABLE_AUR_KERNELS)
 endif()
+
+set(SCXCTLUI_TARGET_NAME                scxctl-ui)
+set(SCXCTLUI_CONFIG_INSTALL_DIR         "${CMAKE_INSTALL_LIBDIR}/cmake/${SCXCTLUI_TARGET_NAME}" CACHE INTERNAL "")
+set(SCXCTLUI_INCLUDE_BUILD_DIR          "${PROJECT_SOURCE_DIR}/include")
+set(SCXCTLUI_INCLUDE_INSTALL_DIR        "${CMAKE_INSTALL_INCLUDEDIR}")
+set(SCXCTLUI_TARGETS_EXPORT_NAME        "${SCXCTLUI_TARGET_NAME}-targets")
+set(SCXCTLUI_CMAKE_CONFIG_TEMPLATE      "${PROJECT_SOURCE_DIR}/cmake/scxctl-ui-config.cmake.in")
+set(SCXCTLUI_CMAKE_CONFIG_DIR           "${CMAKE_CURRENT_BINARY_DIR}")
+set(SCXCTLUI_CMAKE_VERSION_CONFIG_FILE  "${SCXCTLUI_CMAKE_CONFIG_DIR}/${SCXCTLUI_TARGET_NAME}-config-version.cmake")
+set(SCXCTLUI_CMAKE_PROJECT_CONFIG_FILE  "${SCXCTLUI_CMAKE_CONFIG_DIR}/${SCXCTLUI_TARGET_NAME}-config.cmake")
+set(SCXCTLUI_CMAKE_PROJECT_TARGETS_FILE "${SCXCTLUI_CMAKE_CONFIG_DIR}/${SCXCTLUI_TARGET_NAME}-targets.cmake")

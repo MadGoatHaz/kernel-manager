@@ -35,7 +35,7 @@
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 #endif
 
-#include "config-option-lib-cxxbridge/scx_loader_config.h"
+#include "scx-lib-cxxbridge/scx_loader_config.h"
 
 #if defined(__clang__)
 #pragma clang diagnostic pop
