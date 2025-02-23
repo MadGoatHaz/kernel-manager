@@ -80,22 +80,22 @@ target_link_libraries(scxctl-ui PRIVATE project_warnings project_options Qt6::Wi
 # use a custom package version config file instead of
 # write_basic_package_version_file to ensure that it's architecture-independent
 # https://github.com/nlohmann/json/issues/1697
-#configure_file(
-#    "cmake/scxctl-ui-config.cmake.in"
-#    ${SCXCTLUI_CMAKE_VERSION_CONFIG_FILE}
-#    @ONLY
-#)
-#configure_file(
-#    ${SCXCTLUI_CMAKE_CONFIG_TEMPLATE}
-#    ${SCXCTLUI_CMAKE_PROJECT_CONFIG_FILE}
-#    @ONLY
-#)
-
-write_basic_package_version_file(
-    ${SCXCTLUI_CMAKE_PROJECT_CONFIG_FILE}
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion
+configure_file(
+    "cmake/scxctl-ui-config.cmake.in"
+    ${SCXCTLUI_CMAKE_VERSION_CONFIG_FILE}
+    @ONLY
 )
+configure_file(
+    ${SCXCTLUI_CMAKE_CONFIG_TEMPLATE}
+    ${SCXCTLUI_CMAKE_PROJECT_CONFIG_FILE}
+    @ONLY
+)
+
+#write_basic_package_version_file(
+#    ${SCXCTLUI_CMAKE_PROJECT_CONFIG_FILE}
+#    VERSION ${PROJECT_VERSION}
+#    COMPATIBILITY SameMajorVersion
+#)
 
 install(
     DIRECTORY ${SCXCTLUI_INCLUDE_BUILD_DIR}
@@ -106,18 +106,18 @@ install(
     DESTINATION ${SCXCTLUI_CONFIG_INSTALL_DIR}
 )
 
-#export(
-#    TARGETS ${SCXCTLUI_TARGET_NAME}
-#    NAMESPACE scxctl::
-#    FILE ${SCXCTLUI_CMAKE_PROJECT_TARGETS_FILE}
-#)
-#install(
-#    TARGETS ${SCXCTLUI_TARGET_NAME}
-#    EXPORT ${SCXCTLUI_TARGETS_EXPORT_NAME}
-#    INCLUDES DESTINATION ${SCXCTLUI_INCLUDE_INSTALL_DIR}
-#)
-#install(
-#    EXPORT ${SCXCTLUI_TARGETS_EXPORT_NAME}
-#    NAMESPACE scxctl::
-#    DESTINATION "${SCXCTLUI_CONFIG_INSTALL_DIR}"
-#)
+export(
+    TARGETS ${SCXCTLUI_TARGET_NAME}
+    NAMESPACE scxctl::
+    FILE ${SCXCTLUI_CMAKE_PROJECT_TARGETS_FILE}
+)
+install(
+    TARGETS ${SCXCTLUI_TARGET_NAME}
+    EXPORT ${SCXCTLUI_TARGETS_EXPORT_NAME}
+    INCLUDES DESTINATION ${SCXCTLUI_INCLUDE_INSTALL_DIR}
+)
+install(
+    EXPORT ${SCXCTLUI_TARGETS_EXPORT_NAME}
+    NAMESPACE scxctl::
+    DESTINATION "${SCXCTLUI_CONFIG_INSTALL_DIR}"
+)
