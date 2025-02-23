@@ -15,7 +15,7 @@ Any compiler which support C++23 standard should work.
 This is tested on Arch Linux, but *any* recent Arch Linux based system with latest C++20 compiler should do:
 
 ```sh
-sudo pacman -Sy \
+sudo pacman -S \
     base-devel cmake pkg-config make qt6-base qt6-tools polkit-qt6 python
 ```
 
