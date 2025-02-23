@@ -81,7 +81,7 @@ target_link_libraries(scxctl-ui PRIVATE project_warnings project_options Qt6::Wi
 # write_basic_package_version_file to ensure that it's architecture-independent
 # https://github.com/nlohmann/json/issues/1697
 configure_file(
-    "cmake/scxctl-ui-config.cmake.in"
+    "${CMAKE_SOURCE_DIR}/cmake/scxctl-ui-config-version.cmake.in"
     ${SCXCTLUI_CMAKE_VERSION_CONFIG_FILE}
     @ONLY
 )
