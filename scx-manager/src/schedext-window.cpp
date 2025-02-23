@@ -21,6 +21,8 @@
 #include "schedext-window.hpp"
 #include "schedext-window-internal.hpp"
 
+namespace scxctl {
+
 SchedExtWindow::SchedExtWindow(QWidget* parent)
   : m_impl(new impl::SchedExtWindow(parent)) {
 }
@@ -49,5 +51,7 @@ void SchedExtWindow::setParent(QWidget* parent) noexcept {
 auto create_schedext_window(QWidget* parent) noexcept -> SchedExtWindow {
     return SchedExtWindow(parent);
 }
+
+}  // namespace scxctl
 
 // NOLINTEND(bugprone-unhandled-exception-at-new)

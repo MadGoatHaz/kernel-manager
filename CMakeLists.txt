@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -125,15 +125,6 @@ qt_add_executable(${PROJECT_NAME}
     src/main.cpp "${CMAKE_BINARY_DIR}/cachyoskm_locale.qrc"
     )
 
-add_library(scxctl-ui SHARED
-    src/scx_utils.hpp src/scx_utils.cpp
-    src/schedext-window-internal.hpp src/schedext-window-internal.cpp
-    src/schedext-window.hpp src/schedext-window.cpp
-    src/schedext-window.ui
-)
-add_library(scxctl::scxctl-ui ALIAS scxctl-ui)
-target_compile_definitions(scxctl-ui PRIVATE SCHEDEXT_LIB)
-
 # Link this 'library' to use the warnings specified in CompilerWarnings.cmake
 add_library(project_warnings INTERFACE)
 set_project_warnings(project_warnings)
@@ -147,11 +138,12 @@ enable_sanitizers(project_options)
 include_directories(${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR})
 
 corrosion_import_crate(MANIFEST_PATH "config-option-lib/Cargo.toml" FLAGS "${CARGO_FLAGS}")
-corrosion_add_cxxbridge(config-option-lib-cxxbridge CRATE config_option_lib MANIFEST_PATH "config-option-lib/Cargo.toml" FILES lib.rs)
-corrosion_add_cxxbridge(scx-lib-cxxbridge CRATE config_option_lib MANIFEST_PATH "config-option-lib/Cargo.toml" FILES scx_loader_config.rs)
+corrosion_add_cxxbridge(config-option-lib-cxxbridge CRATE config_option_lib FILES lib.rs)
+
+# scxctl-ui dep
+add_subdirectory(scx-manager)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE project_warnings project_options scxctl::scxctl-ui Qt6::Widgets Qt6::Concurrent Threads::Threads fmt::fmt frozen::frozen config-option-lib-cxxbridge PkgConfig::LIBALPM PkgConfig::LIBGLIB)
-target_link_libraries(scxctl-ui PRIVATE project_warnings project_options Qt6::Widgets Qt6::Concurrent Threads::Threads fmt::fmt scx-lib-cxxbridge PkgConfig::LIBALPM PkgConfig::LIBGLIB)
 
 option(ENABLE_UNITY "Enable Unity builds of projects" OFF)
 if(ENABLE_UNITY)

@@ -57,7 +57,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-namespace impl {
+namespace scxctl::impl {
 
 class SchedExtWindow final : public QMainWindow {
     Q_OBJECT
@@ -84,6 +84,6 @@ class SchedExtWindow final : public QMainWindow {
     void update_current_sched() noexcept;
 };
 
-}  // namespace impl
+}  // namespace scxctl::impl
 
 #endif  // SCHEDEXT_WINDOW_INTERNAL_HPP_

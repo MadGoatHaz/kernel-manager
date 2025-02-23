@@ -52,8 +52,10 @@
 
 class QWidget;
 
+namespace scxctl {
+
 namespace impl {
-class SchedExtWindow;
+    class SchedExtWindow;
 }  // namespace impl
 
 class SCHEDEXT_EXPORT SchedExtWindow final {
@@ -72,5 +74,7 @@ class SCHEDEXT_EXPORT SchedExtWindow final {
 };
 
 SCHEDEXT_EXPORT auto create_schedext_window(QWidget* parent = nullptr) noexcept -> SchedExtWindow;
+
+}  // namespace scxctl
 
 #endif  // SCHEDEXT_WINDOW_HPP_

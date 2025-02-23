@@ -103,7 +103,7 @@ constexpr auto get_scx_mode_from_str(std::string_view scx_mode) noexcept -> scx:
 
 }  // namespace
 
-namespace impl {
+namespace scxctl::impl {
 
 SchedExtWindow::SchedExtWindow(QWidget* parent)
   : QMainWindow(parent), m_sched_timer(new QTimer(this)) {
@@ -259,6 +259,6 @@ void SchedExtWindow::on_apply() noexcept {
     m_ui->apply_button->setEnabled(true);
 }
 
-}  // namespace impl
+}  // namespace scxctl::impl
 
 // NOLINTEND(bugprone-unhandled-exception-at-new)
