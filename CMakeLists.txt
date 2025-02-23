@@ -59,6 +59,7 @@ CPMAddPackage(
 )
 
 find_package(PolkitQt6-1 REQUIRED)
+find_package(scxctl-ui 1 REQUIRED)
 
 ##
 ## CONFIGURATION
@@ -139,9 +140,6 @@ include_directories(${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR})
 
 corrosion_import_crate(MANIFEST_PATH "config-option-lib/Cargo.toml" FLAGS "${CARGO_FLAGS}")
 corrosion_add_cxxbridge(config-option-lib-cxxbridge CRATE config_option_lib FILES lib.rs)
-
-# scxctl-ui dep
-add_subdirectory(scx-manager)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE project_warnings project_options scxctl::scxctl-ui Qt6::Widgets Qt6::Concurrent Threads::Threads fmt::fmt frozen::frozen config-option-lib-cxxbridge PkgConfig::LIBALPM PkgConfig::LIBGLIB)
 

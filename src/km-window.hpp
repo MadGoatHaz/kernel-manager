@@ -42,8 +42,9 @@
 
 #include "conf-window.hpp"
 #include "kernel.hpp"
-#include "schedext-window.hpp"
 #include "utils.hpp"
+
+#include <scx-manager/schedext-window.hpp>
 
 #include <array>
 #include <condition_variable>
