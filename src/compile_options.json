@@ -4,6 +4,7 @@
         "nconfig": "_makenconfig",
         "xconfig": "_makexconfig",
         "localmodcfg": "_localmodcfg",
+        "use_current": "_use_current",
         "hardly": "_cc_harder",
         "per_gov": "_per_gov",
         "tcp_bbr3": "_tcp_bbr3",

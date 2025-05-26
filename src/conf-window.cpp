@@ -414,6 +414,7 @@ std::string ConfWindow::get_all_set_values() const noexcept {
     result += convert_to_var_assign_empty_wrapped("nconfig", checkstate_checked(options_page_ui_obj->nconfig_check));
     result += convert_to_var_assign_empty_wrapped("xconfig", checkstate_checked(options_page_ui_obj->xconfig_check));
     result += convert_to_var_assign_empty_wrapped("localmodcfg", checkstate_checked(options_page_ui_obj->localmodcfg_check));
+    result += convert_to_var_assign_empty_wrapped("use_current", checkstate_checked(options_page_ui_obj->use_current_check));
     result += convert_to_var_assign_empty_wrapped("builtin_zfs", checkstate_checked(options_page_ui_obj->builtin_zfs_check));
     result += convert_to_var_assign_empty_wrapped("builtin_nvidia", checkstate_checked(options_page_ui_obj->builtin_nvidia_check));
     result += convert_to_var_assign_empty_wrapped("builtin_nvidia_open", checkstate_checked(options_page_ui_obj->builtin_nvidia_open_check));
@@ -676,6 +677,7 @@ void ConfWindow::on_save() noexcept {
     config_options.nconfig_check             = checkstate_checked(options_page_ui_obj->nconfig_check);
     config_options.xconfig_check             = checkstate_checked(options_page_ui_obj->xconfig_check);
     config_options.localmodcfg_check         = checkstate_checked(options_page_ui_obj->localmodcfg_check);
+    config_options.use_current_check               = checkstate_checked(options_page_ui_obj->use_current_check);
     config_options.builtin_zfs_check         = checkstate_checked(options_page_ui_obj->builtin_zfs_check);
     config_options.builtin_nvidia_check      = checkstate_checked(options_page_ui_obj->builtin_nvidia_check);
     config_options.builtin_nvidia_open_check = checkstate_checked(options_page_ui_obj->builtin_nvidia_open_check);
@@ -735,6 +737,7 @@ void ConfWindow::on_load() noexcept {
     set_checkstate(options_page_ui_obj->nconfig_check, config_options->nconfig_check);
     set_checkstate(options_page_ui_obj->xconfig_check, config_options->xconfig_check);
     set_checkstate(options_page_ui_obj->localmodcfg_check, config_options->localmodcfg_check);
+    set_checkstate(options_page_ui_obj->use_current_check, config_options->use_current_check);
     set_checkstate(options_page_ui_obj->builtin_zfs_check, config_options->builtin_zfs_check);
     set_checkstate(options_page_ui_obj->builtin_nvidia_check, config_options->builtin_nvidia_check);
     set_checkstate(options_page_ui_obj->builtin_nvidia_open_check, config_options->builtin_nvidia_open_check);
