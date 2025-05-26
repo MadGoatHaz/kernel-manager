@@ -99,7 +99,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-GENERATE_CONST_LOOKUP_OPTION_VALUES(kernel_name, "cachyos", "bore", "rc", "rt", "rt-bore", "eevdf", "bmq")
+GENERATE_CONST_LOOKUP_OPTION_VALUES(kernel_name, "cachyos", "bore", "rc", "rt", "eevdf", "bmq")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(hz_tick, "1000", "750", "600", "500", "300", "250", "100")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(tickless_mode, "full", "idle", "perodic")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(preempt_mode, "full", "lazy", "voluntary", "none")
@@ -113,9 +113,8 @@ static_assert(lookup_kernel_name("cachyos") == 0, "Invalid position");
 static_assert(lookup_kernel_name("bore") == 1, "Invalid position");
 static_assert(lookup_kernel_name("rc") == 2, "Invalid position");
 static_assert(lookup_kernel_name("rt") == 3, "Invalid position");
-static_assert(lookup_kernel_name("rt-bore") == 4, "Invalid position");
-static_assert(lookup_kernel_name("eevdf") == 5, "Invalid position");
-static_assert(lookup_kernel_name("bmq") == 6, "Invalid position");
+static_assert(lookup_kernel_name("eevdf") == 4, "Invalid position");
+static_assert(lookup_kernel_name("bmq") == 5, "Invalid position");
 
 constexpr auto get_kernel_name_path(std::string_view kernel_name) noexcept {
     using namespace std::string_view_literals;
@@ -125,22 +124,14 @@ constexpr auto get_kernel_name_path(std::string_view kernel_name) noexcept {
         return "linux-cachyos-bmq"sv;
     } else if (kernel_name == "bore"sv) {
         return "linux-cachyos-bore"sv;
-    } else if (kernel_name == "cfs"sv) {
-        return "linux-cachyos-cfs"sv;
     } else if (kernel_name == "hardened"sv) {
         return "linux-cachyos-hardened"sv;
-    } else if (kernel_name == "pds"sv) {
-        return "linux-cachyos-pds"sv;
+    } else if (kernel_name == "lts"sv) {
+        return "linux-cachyos-lts"sv;
     } else if (kernel_name == "rc"sv) {
         return "linux-cachyos-rc"sv;
     } else if (kernel_name == "rt"sv) {
-        return "linux-cachyos-rt"sv;
-    } else if (kernel_name == "tt"sv) {
-        return "linux-cachyos-tt"sv;
-    } else if (kernel_name == "rt-bore"sv) {
         return "linux-cachyos-rt-bore"sv;
-    } else if (kernel_name == "sched-ext"sv) {
-        return "linux-cachyos-sched-ext"sv;
     } else if (kernel_name == "eevdf"sv) {
         return "linux-cachyos-eevdf"sv;
     }
@@ -479,7 +470,6 @@ ConfWindow::ConfWindow(QWidget* parent)
                  << tr("BORE - Burst-Oriented Response Enhancer")
                  << tr("RC - Release Candidate")
                  << tr("RT - Realtime kernel")
-                 << tr("RT-Bore")
                  << tr("EEVDF")
                  << tr("BMQ (BitMap Queue)");
     options_page_ui_obj->main_combo_box->addItems(kernel_names);
@@ -487,7 +477,6 @@ ConfWindow::ConfWindow(QWidget* parent)
     // Setting default options
     options_page_ui_obj->cachyconfig_check->setCheckState(Qt::Checked);
     options_page_ui_obj->hardly_check->setCheckState(Qt::Checked);
-    options_page_ui_obj->tcpbbr_check->setCheckState(Qt::Checked);
 
     QStringList hz_ticks;
     hz_ticks << "1000HZ"
@@ -527,10 +516,12 @@ ConfWindow::ConfWindow(QWidget* parent)
               << "Full"
               << "Thin";
     options_page_ui_obj->lto_combo_box->addItems(lto_modes);
+    // ThinLTO is enabled by default for defaultkernel,rckernel in the PKGBUILD
+    options_page_ui_obj->lto_combo_box->setCurrentIndex(2);
 
     QStringList hugepage_modes;
     hugepage_modes << "Always"
-                   << "Madivse";
+                   << "Madvise";
     options_page_ui_obj->hugepage_combo_box->addItems(hugepage_modes);
 
     // Connect buttons signal
@@ -538,7 +529,19 @@ ConfWindow::ConfWindow(QWidget* parent)
     connect(options_page_ui_obj->ok_button, &QPushButton::clicked, this, &ConfWindow::on_execute);
     connect(options_page_ui_obj->save_button, &QPushButton::clicked, this, &ConfWindow::on_save);
     connect(options_page_ui_obj->load_button, &QPushButton::clicked, this, &ConfWindow::on_load);
-    connect(options_page_ui_obj->main_combo_box, &QComboBox::currentIndexChanged, this, [this](std::int32_t) {
+    connect(options_page_ui_obj->main_combo_box, &QComboBox::currentIndexChanged, this, [this, options_page_ui_obj](std::int32_t main_combo_index) {
+        using namespace std::string_view_literals;
+        // ThinLTO is enabled by default for defaultkernel,rckernel in the PKGBUILD
+        const std::string_view kernel_name = get_kernel_name(static_cast<size_t>(main_combo_index));
+        if (kernel_name == "cachyos"sv || kernel_name == "rc"sv) {
+            options_page_ui_obj->lto_combo_box->setCurrentIndex(2);
+        } else {
+            options_page_ui_obj->lto_combo_box->setCurrentIndex(0);
+        }
+
+        reset_patches_data_tab();
+    });
+    connect(options_page_ui_obj->lto_combo_box, &QComboBox::currentIndexChanged, this, [this](std::int32_t) {
         reset_patches_data_tab();
     });
 
@@ -669,15 +672,15 @@ void ConfWindow::on_save() noexcept {
     ConfigOptions config_options{};
 
     // checkboxes values (booleans)
-    config_options.hardly_check     = checkstate_checked(options_page_ui_obj->hardly_check);
-    config_options.per_gov_check    = checkstate_checked(options_page_ui_obj->perfgovern_check);
-    config_options.tcp_bbr3_check   = checkstate_checked(options_page_ui_obj->tcpbbr_check);
+    config_options.hardly_check   = checkstate_checked(options_page_ui_obj->hardly_check);
+    config_options.per_gov_check  = checkstate_checked(options_page_ui_obj->perfgovern_check);
+    config_options.tcp_bbr3_check = checkstate_checked(options_page_ui_obj->tcpbbr_check);
 
     config_options.cachy_config_check        = checkstate_checked(options_page_ui_obj->cachyconfig_check);
     config_options.nconfig_check             = checkstate_checked(options_page_ui_obj->nconfig_check);
     config_options.xconfig_check             = checkstate_checked(options_page_ui_obj->xconfig_check);
     config_options.localmodcfg_check         = checkstate_checked(options_page_ui_obj->localmodcfg_check);
-    config_options.use_current_check               = checkstate_checked(options_page_ui_obj->use_current_check);
+    config_options.use_current_check         = checkstate_checked(options_page_ui_obj->use_current_check);
     config_options.builtin_zfs_check         = checkstate_checked(options_page_ui_obj->builtin_zfs_check);
     config_options.builtin_nvidia_check      = checkstate_checked(options_page_ui_obj->builtin_nvidia_check);
     config_options.builtin_nvidia_open_check = checkstate_checked(options_page_ui_obj->builtin_nvidia_open_check);
