@@ -42,13 +42,13 @@ pkg_check_modules(
 CPMAddPackage(
   NAME fmt
   GITHUB_REPOSITORY fmtlib/fmt
-  GIT_TAG 11.1.3
+  GIT_TAG 11.2.0
   EXCLUDE_FROM_ALL YES
 )
 CPMAddPackage(
   NAME frozen
   GITHUB_REPOSITORY serge-sans-paille/frozen
-  GIT_TAG 83a5604b86f114daf2eaf26567b8e04b6c67ddad
+  GIT_TAG 45ddf6534848ec00668e1408333f8515f6dccf8c
   EXCLUDE_FROM_ALL YES
 )
 CPMAddPackage(
