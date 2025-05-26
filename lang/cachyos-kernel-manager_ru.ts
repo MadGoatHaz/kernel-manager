@@ -24,19 +24,9 @@
         <translation>Выполнить настройку параметров ядра с помощью nconfig</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="124"/>
-        <source>Tweak kernel options prior to a build via menuconfig</source>
-        <translation>Выполнить настройку параметров ядра с помощью menuconfig</translation>
-    </message>
-    <message>
         <location filename="../src/conf-options-page.ui" line="153"/>
         <source>Tweak kernel options prior to a build via xconfig</source>
         <translation>Выполнить настройку параметров ядра с помощью xconfig</translation>
-    </message>
-    <message>
-        <location filename="../src/conf-options-page.ui" line="182"/>
-        <source>Tweak kernel options prior to a build via gconfig</source>
-        <translation>Выполнить настройку параметров ядра с помощью gconfig</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="211"/>

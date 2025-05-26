@@ -14,19 +14,9 @@
         <translation>Upravit možnosti jádra před sestavením přes nconfig</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="124"/>
-        <source>Tweak kernel options prior to a build via menuconfig</source>
-        <translation>Upravit možnosti jádra před sestavením přes menuconfig</translation>
-    </message>
-    <message>
         <location filename="../src/conf-options-page.ui" line="153"/>
         <source>Tweak kernel options prior to a build via xconfig</source>
         <translation>Upravit možnosti jádra před sestavením přes xconfig</translation>
-    </message>
-    <message>
-        <location filename="../src/conf-options-page.ui" line="182"/>
-        <source>Tweak kernel options prior to a build via gconfig</source>
-        <translation>Upravit možnosti jádra před sestavením přes gconfig</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="211"/>

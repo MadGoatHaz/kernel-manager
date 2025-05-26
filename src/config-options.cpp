@@ -58,11 +58,8 @@ auto ConfigOptions::parse_from_file(std::string_view filepath) noexcept -> std::
 
         .cachy_config_check        = rust_config_options.cachy_config_check,
         .nconfig_check             = rust_config_options.nconfig_check,
-        .menuconfig_check          = rust_config_options.menuconfig_check,
         .xconfig_check             = rust_config_options.xconfig_check,
-        .gconfig_check             = rust_config_options.gconfig_check,
         .localmodcfg_check         = rust_config_options.localmodcfg_check,
-        .numa_check                = rust_config_options.numa_check,
         .damon_check               = rust_config_options.damon_check,
         .builtin_zfs_check         = rust_config_options.builtin_zfs_check,
         .builtin_nvidia_check      = rust_config_options.builtin_nvidia_check,
@@ -90,11 +87,8 @@ auto ConfigOptions::write_config_file(const ConfigOptions& config_options, std::
 
         .cachy_config_check        = config_options.cachy_config_check,
         .nconfig_check             = config_options.nconfig_check,
-        .menuconfig_check          = config_options.menuconfig_check,
         .xconfig_check             = config_options.xconfig_check,
-        .gconfig_check             = config_options.gconfig_check,
         .localmodcfg_check         = config_options.localmodcfg_check,
-        .numa_check                = config_options.numa_check,
         .damon_check               = config_options.damon_check,
         .builtin_zfs_check         = config_options.builtin_zfs_check,
         .builtin_nvidia_check      = config_options.builtin_nvidia_check,

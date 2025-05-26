@@ -14,24 +14,9 @@
         <translation>Kernel-Optionen vor einem Build über nconfig anpassen</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="124"/>
-        <source>Tweak kernel options prior to a build via menuconfig</source>
-        <translation>Kernel-Optionen vor einem Build über menuconfig anpassen</translation>
-    </message>
-    <message>
         <location filename="../src/conf-options-page.ui" line="153"/>
         <source>Tweak kernel options prior to a build via xconfig</source>
         <translation>Kernel-Optionen vor einem Build über xconfig anpassen</translation>
-    </message>
-    <message>
-        <location filename="../src/conf-options-page.ui" line="182"/>
-        <source>Tweak kernel options prior to a build via gconfig</source>
-        <translation>Kernel-Optionen vor einem Build über gconfig anpassen</translation>
-    </message>
-    <message>
-        <location filename="../src/conf-options-page.ui" line="211"/>
-        <source>Disable NUMA</source>
-        <translation>NUMA deaktivieren</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="240"/>

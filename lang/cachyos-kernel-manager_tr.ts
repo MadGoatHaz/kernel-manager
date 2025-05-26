@@ -14,19 +14,9 @@
         <translation>nconfig ile yapılandırmadan önce çekirdek ayarlarına ince ayar yap</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="124"/>
-        <source>Tweak kernel options prior to a build via menuconfig</source>
-        <translation>menuconfig ile yapılandırmadan önce çekirdek ayarlarına ince ayar yap</translation>
-    </message>
-    <message>
         <location filename="../src/conf-options-page.ui" line="153"/>
         <source>Tweak kernel options prior to a build via xconfig</source>
         <translation>xconfig ile yapılandırmadan önce çekirdek ayarlarına ince ayar yap</translation>
-    </message>
-    <message>
-        <location filename="../src/conf-options-page.ui" line="182"/>
-        <source>Tweak kernel options prior to a build via gconfig</source>
-        <translation>gconfig ile yapılandırmadan önce çekirdek ayarlarına ince ayar yap</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="211"/>

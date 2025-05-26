@@ -32,11 +32,8 @@ mod ffi {
 
         pub cachy_config_check: bool,
         pub nconfig_check: bool,
-        pub menuconfig_check: bool,
         pub xconfig_check: bool,
-        pub gconfig_check: bool,
         pub localmodcfg_check: bool,
-        pub numa_check: bool,
         pub damon_check: bool,
         pub builtin_zfs_check: bool,
         pub builtin_nvidia_check: bool,

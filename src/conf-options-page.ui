@@ -116,35 +116,6 @@
          </widget>
         </item>
         <item>
-         <widget class="QWidget" name="menuconfig_widget" native="true">
-          <layout class="QHBoxLayout" name="menuconfig_horizontal_layout">
-           <item>
-            <widget class="QLabel" name="menuconfig_label">
-             <property name="text">
-              <string>Tweak kernel options prior to a build via menuconfig</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <spacer name="menuconfig_horizontal_spacer">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item>
-            <widget class="QCheckBox" name="menuconfig_check"/>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
          <widget class="QWidget" name="xconfig_widget" native="true">
           <layout class="QHBoxLayout" name="xconfig_horizontal_layout">
            <item>
@@ -169,64 +140,6 @@
            </item>
            <item>
             <widget class="QCheckBox" name="xconfig_check"/>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QWidget" name="gconfig_widget" native="true">
-          <layout class="QHBoxLayout" name="gconfig_horizontal_layout">
-           <item>
-            <widget class="QLabel" name="gconfig_label">
-             <property name="text">
-              <string>Tweak kernel options prior to a build via gconfig</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <spacer name="gconfig_horizontal_spacer">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item>
-            <widget class="QCheckBox" name="gconfig_check"/>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QWidget" name="numa_widget" native="true">
-          <layout class="QHBoxLayout" name="numa_horizontal_layout">
-           <item>
-            <widget class="QLabel" name="numa_label">
-             <property name="text">
-              <string>Disable NUMA</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <spacer name="numa_horizontal_spacer">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item>
-            <widget class="QCheckBox" name="numa_check"/>
            </item>
           </layout>
          </widget>

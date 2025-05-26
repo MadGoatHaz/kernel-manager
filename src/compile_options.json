@@ -2,10 +2,7 @@
     "option_map": {
         "cachy_config": "_cachy_config",
         "nconfig": "_makenconfig",
-        "menuconfig": "_makemenuconfig",
         "xconfig": "_makexconfig",
-        "gconfig": "_makegconfig",
-        "numa": "_NUMAdisable",
         "localmodcfg": "_localmodcfg",
         "hardly": "_cc_harder",
         "per_gov": "_per_gov",

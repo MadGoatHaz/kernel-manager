@@ -31,11 +31,8 @@ struct ConfigOptions {
 
     bool cachy_config_check{};
     bool nconfig_check{};
-    bool menuconfig_check{};
     bool xconfig_check{};
-    bool gconfig_check{};
     bool localmodcfg_check{};
-    bool numa_check{};
     bool damon_check{};
     bool builtin_zfs_check{};
     bool builtin_nvidia_check{};
