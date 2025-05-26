@@ -32,7 +32,6 @@ struct ConfigOptions {
     bool nconfig_check{};
     bool xconfig_check{};
     bool localmodcfg_check{};
-    bool damon_check{};
     bool builtin_zfs_check{};
     bool builtin_nvidia_check{};
     bool builtin_nvidia_open_check{};

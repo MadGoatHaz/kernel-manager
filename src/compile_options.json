@@ -11,7 +11,6 @@
         "tickrate": "_tickrate",
         "preempt": "_preempt",
         "hugepage": "_hugepage",
-        "damon": "_damon",
         "cpu_opt": "_processor_opt",
         "lto": "_use_llvm_lto",
         "builtin_zfs": "_build_zfs",

@@ -377,35 +377,6 @@
          </widget>
         </item>
         <item>
-         <widget class="QWidget" name="damon_widget" native="true">
-          <layout class="QHBoxLayout" name="damon_horizontal_layout">
-           <item>
-            <widget class="QLabel" name="damon_label">
-             <property name="text">
-              <string>Enable DAMON</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <spacer name="damon_horizontal_spacer">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item>
-            <widget class="QCheckBox" name="damon_check"/>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
          <widget class="QWidget" name="processor_opt_widget" native="true">
           <layout class="QHBoxLayout" name="processor_opt_horizontal_layout">
            <item>

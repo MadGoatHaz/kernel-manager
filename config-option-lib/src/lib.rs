@@ -33,7 +33,6 @@ mod ffi {
         pub nconfig_check: bool,
         pub xconfig_check: bool,
         pub localmodcfg_check: bool,
-        pub damon_check: bool,
         pub builtin_zfs_check: bool,
         pub builtin_nvidia_check: bool,
         pub builtin_nvidia_open_check: bool,

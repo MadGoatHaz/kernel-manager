@@ -51,15 +51,14 @@ auto ConfigOptions::parse_from_file(std::string_view filepath) noexcept -> std::
     }
 
     ConfigOptions config_options{
-        .hardly_check     = rust_config_options.hardly_check,
-        .per_gov_check    = rust_config_options.per_gov_check,
-        .tcp_bbr3_check   = rust_config_options.tcp_bbr3_check,
+        .hardly_check   = rust_config_options.hardly_check,
+        .per_gov_check  = rust_config_options.per_gov_check,
+        .tcp_bbr3_check = rust_config_options.tcp_bbr3_check,
 
         .cachy_config_check        = rust_config_options.cachy_config_check,
         .nconfig_check             = rust_config_options.nconfig_check,
         .xconfig_check             = rust_config_options.xconfig_check,
         .localmodcfg_check         = rust_config_options.localmodcfg_check,
-        .damon_check               = rust_config_options.damon_check,
         .builtin_zfs_check         = rust_config_options.builtin_zfs_check,
         .builtin_nvidia_check      = rust_config_options.builtin_nvidia_check,
         .builtin_nvidia_open_check = rust_config_options.builtin_nvidia_open_check,
@@ -79,15 +78,14 @@ auto ConfigOptions::parse_from_file(std::string_view filepath) noexcept -> std::
 
 auto ConfigOptions::write_config_file(const ConfigOptions& config_options, std::string_view filepath) noexcept -> bool {
     const ::cachyos_km::Config rust_config_options{
-        .hardly_check     = config_options.hardly_check,
-        .per_gov_check    = config_options.per_gov_check,
-        .tcp_bbr3_check   = config_options.tcp_bbr3_check,
+        .hardly_check   = config_options.hardly_check,
+        .per_gov_check  = config_options.per_gov_check,
+        .tcp_bbr3_check = config_options.tcp_bbr3_check,
 
         .cachy_config_check        = config_options.cachy_config_check,
         .nconfig_check             = config_options.nconfig_check,
         .xconfig_check             = config_options.xconfig_check,
         .localmodcfg_check         = config_options.localmodcfg_check,
-        .damon_check               = config_options.damon_check,
         .builtin_zfs_check         = config_options.builtin_zfs_check,
         .builtin_nvidia_check      = config_options.builtin_nvidia_check,
         .builtin_nvidia_open_check = config_options.builtin_nvidia_open_check,
