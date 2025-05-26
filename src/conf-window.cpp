@@ -99,7 +99,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-GENERATE_CONST_LOOKUP_OPTION_VALUES(kernel_name, "cachyos", "bore", "rc", "rt", "eevdf", "bmq")
+GENERATE_CONST_LOOKUP_OPTION_VALUES(kernel_name, "cachyos", "bore", "rc", "rt", "lts", "eevdf", "bmq")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(hz_tick, "1000", "750", "600", "500", "300", "250", "100")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(tickless_mode, "full", "idle", "perodic")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(preempt_mode, "full", "lazy", "voluntary", "none")
@@ -113,8 +113,9 @@ static_assert(lookup_kernel_name("cachyos") == 0, "Invalid position");
 static_assert(lookup_kernel_name("bore") == 1, "Invalid position");
 static_assert(lookup_kernel_name("rc") == 2, "Invalid position");
 static_assert(lookup_kernel_name("rt") == 3, "Invalid position");
-static_assert(lookup_kernel_name("eevdf") == 4, "Invalid position");
-static_assert(lookup_kernel_name("bmq") == 5, "Invalid position");
+static_assert(lookup_kernel_name("lts") == 4, "Invalid position");
+static_assert(lookup_kernel_name("eevdf") == 5, "Invalid position");
+static_assert(lookup_kernel_name("bmq") == 6, "Invalid position");
 
 constexpr auto get_kernel_name_path(std::string_view kernel_name) noexcept {
     using namespace std::string_view_literals;
@@ -470,6 +471,7 @@ ConfWindow::ConfWindow(QWidget* parent)
                  << tr("BORE - Burst-Oriented Response Enhancer")
                  << tr("RC - Release Candidate")
                  << tr("RT - Realtime kernel")
+                 << tr("LTS - Long-term support kernel")
                  << tr("EEVDF")
                  << tr("BMQ (BitMap Queue)");
     options_page_ui_obj->main_combo_box->addItems(kernel_names);
