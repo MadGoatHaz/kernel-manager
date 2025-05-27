@@ -542,6 +542,13 @@ ConfWindow::ConfWindow(QWidget* parent)
             options_page_ui_obj->lto_combo_box->setCurrentIndex(0);
         }
 
+        // thin-dist isn't available for all kernels
+        if (kernel_name == "cachyos"sv || kernel_name == "bore"sv || kernel_name == "rc"sv || kernel_name == "rt"sv || kernel_name == "eevdf"sv || kernel_name == "bmq"sv) {
+            options_page_ui_obj->lto_combo_box->addItem(QStringLiteral("Thin-dist"));
+        } else {
+            options_page_ui_obj->lto_combo_box->removeItem(3);
+        }
+
         reset_patches_data_tab();
     });
     connect(options_page_ui_obj->lto_combo_box, &QComboBox::currentIndexChanged, this, [this](std::int32_t) {
