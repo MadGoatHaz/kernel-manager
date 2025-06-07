@@ -534,19 +534,18 @@ ConfWindow::ConfWindow(QWidget* parent)
     connect(options_page_ui_obj->load_button, &QPushButton::clicked, this, &ConfWindow::on_load);
     connect(options_page_ui_obj->main_combo_box, &QComboBox::currentIndexChanged, this, [this, options_page_ui_obj](std::int32_t main_combo_index) {
         using namespace std::string_view_literals;
-        // ThinLTO is enabled by default for defaultkernel,rckernel in the PKGBUILD
-        const std::string_view kernel_name = get_kernel_name(static_cast<size_t>(main_combo_index));
-        if (kernel_name == "cachyos"sv || kernel_name == "rc"sv) {
-            options_page_ui_obj->lto_combo_box->setCurrentIndex(2);
-        } else {
-            options_page_ui_obj->lto_combo_box->setCurrentIndex(0);
-        }
-
         // thin-dist isn't available for all kernels
+        const std::string_view kernel_name = get_kernel_name(static_cast<size_t>(main_combo_index));
         if (kernel_name == "cachyos"sv || kernel_name == "bore"sv || kernel_name == "rc"sv || kernel_name == "rt"sv || kernel_name == "eevdf"sv || kernel_name == "bmq"sv) {
             options_page_ui_obj->lto_combo_box->addItem(QStringLiteral("Thin-dist"));
         } else {
+            options_page_ui_obj->lto_combo_box->setCurrentIndex(0);
             options_page_ui_obj->lto_combo_box->removeItem(3);
+        }
+
+        // ThinLTO is enabled by default for defaultkernel,rckernel in the PKGBUILD
+        if (kernel_name == "rc"sv) {
+            options_page_ui_obj->lto_combo_box->setCurrentIndex(3);
         }
 
         reset_patches_data_tab();
