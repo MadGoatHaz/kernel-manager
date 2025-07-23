@@ -18,13 +18,14 @@ concurrency:
 jobs:
   cpp-linter:
     runs-on: ubuntu-latest
-    container: archlinux:base-devel
+    container: cachyos/cachyos:latest
     steps:
       - uses: actions/checkout@v4
 
       - name: install deps
         run: |
-          pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git
+          pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
+          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git scx-manager
         shell: bash
 
       - name: Configure CMake
