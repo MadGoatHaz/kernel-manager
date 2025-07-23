@@ -93,6 +93,13 @@ enum { Check,
     Immutable };
 }
 
+class KernelTreeWidgetItem : public QTreeWidgetItem {
+ public:
+    using QTreeWidgetItem::QTreeWidgetItem;
+
+    bool operator<(const QTreeWidgetItem& other) const override;
+};
+
 class MainWindow final : public QMainWindow {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(MainWindow)
@@ -130,10 +137,10 @@ class MainWindow final : public QMainWindow {
     Work* m_worker{nullptr};
 
     alpm_errno_t m_err{};
-    alpm_handle_t* m_handle                        = utils::parse_alpm("/", "/var/lib/pacman/", &m_err);
-    std::vector<Kernel> m_kernels                  = Kernel::get_kernels(m_handle);
-    std::unique_ptr<Ui::MainWindow> m_ui           = std::make_unique<Ui::MainWindow>();
-    std::unique_ptr<ConfWindow> m_conf_window      = std::make_unique<ConfWindow>();
+    alpm_handle_t* m_handle                                = utils::parse_alpm("/", "/var/lib/pacman/", &m_err);
+    std::vector<Kernel> m_kernels                          = Kernel::get_kernels(m_handle);
+    std::unique_ptr<Ui::MainWindow> m_ui                   = std::make_unique<Ui::MainWindow>();
+    std::unique_ptr<ConfWindow> m_conf_window              = std::make_unique<ConfWindow>();
     std::unique_ptr<scxctl::SchedExtWindow> m_sched_window = std::make_unique<scxctl::SchedExtWindow>();
 
     void build_change_list(QTreeWidgetItem* item) noexcept;

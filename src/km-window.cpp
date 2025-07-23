@@ -26,9 +26,10 @@
 #include <algorithm>   // for any_of, find_if
 #include <filesystem>  // for exists
 #include <future>
-#include <ranges>  // for ranges::*
-#include <span>    // for span
-#include <thread>  // for this_thread
+#include <ranges>       // for ranges::*
+#include <span>         // for span
+#include <string_view>  // for string_view
+#include <thread>       // for this_thread
 
 #include <fmt/core.h>
 
@@ -87,7 +88,7 @@ bool is_kernels_change_state(alpm_handle_t* handle, std::span<std::string_view> 
 
 void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kernels) noexcept {
     for (auto& kernel : kernels) {
-        auto* widget_item = new QTreeWidgetItem(tree_kernels);
+        auto* widget_item = new KernelTreeWidgetItem(tree_kernels);
         widget_item->setCheckState(TreeCol::Check, Qt::Unchecked);
         widget_item->setText(TreeCol::PkgName, kernel.get_raw());
         widget_item->setText(TreeCol::Version, QString::fromStdString(kernel.version()));
@@ -384,6 +385,29 @@ void MainWindow::on_execute() noexcept {
 
 void MainWindow::on_schedext_config() noexcept {
     m_sched_window->show();
+}
+
+bool KernelTreeWidgetItem::operator<(const QTreeWidgetItem& other) const {
+    const auto sort_col = treeWidget()->sortColumn();
+    if (sort_col != TreeCol::Version) {
+        return QTreeWidgetItem::operator<(other);
+    }
+
+    auto get_comparable_version = [](QString&& version_string) {
+        using namespace std::string_view_literals;
+        auto std_str = std::move(version_string).toStdString();
+        for (auto&& prefix : {"∨"sv, "∧"sv}) {
+            if (std_str.starts_with(prefix)) {
+                return std_str.substr(prefix.size());
+            }
+        }
+        return std_str;
+    };
+
+    const auto& version_a = get_comparable_version(text(sort_col));
+    const auto& version_b = get_comparable_version(other.text(sort_col));
+
+    return alpm_pkg_vercmp(version_a.c_str(), version_b.c_str()) < 0;
 }
 
 // NOLINTEND(bugprone-unhandled-exception-at-new)
