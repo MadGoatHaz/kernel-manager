@@ -3,7 +3,7 @@ name = "config-option-lib"
 version = "0.1.0"
 build = "build.rs"
 authors = ["Vladislav Nepogodin <nepogodin.vlad@gmail.com>"]
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,7 +11,7 @@ edition = "2021"
 anyhow = { version = "1", default-features = false, features = ["std"] }
 cxx = { version = "1", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"] }
-toml = "0.8"
+toml = "0.9"
 
 [build-dependencies]
 cxx-build = "1"
