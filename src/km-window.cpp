@@ -168,6 +168,7 @@ MainWindow::MainWindow(QWidget* parent)
                 // clear install and removal lists
                 kernel_install_list.clear();
                 kernel_removal_list.clear();
+                m_change_list.clear();
 
                 m_running.store(false, std::memory_order_relaxed);
                 m_ui->ok->setEnabled(!is_kernel_status_changed);
