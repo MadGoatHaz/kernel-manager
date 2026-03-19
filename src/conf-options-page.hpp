@@ -54,7 +54,18 @@ class ConfOptionsPage final : public QWidget {
     Q_DISABLE_COPY_MOVE(ConfOptionsPage)
  public:
     explicit ConfOptionsPage(QWidget* parent = nullptr)
-      : QWidget(parent) { m_ui->setupUi(this); }
+      : QWidget(parent) {
+        m_ui->setupUi(this);
+
+        // Enable row hover highlighting for easier navigation
+        // NOTE: https://github.com/CachyOS/kernel-manager/issues/69
+        const auto children = m_ui->scroll_area_widgets->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly);
+        for (auto* child : children) {
+            child->setAttribute(Qt::WA_StyledBackground, true);
+        }
+        m_ui->scroll_area_widgets->setStyleSheet(
+            QStringLiteral("#scroll_area_widgets > QWidget:hover { background-color: palette(midlight); border-radius: 4px; }"));
+    }
     ~ConfOptionsPage() = default;
 
     Ui::ConfOptionsPage* get_ui_obj() noexcept { return m_ui.get(); }
