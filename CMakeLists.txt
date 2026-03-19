@@ -42,19 +42,19 @@ pkg_check_modules(
 CPMAddPackage(
   NAME fmt
   GITHUB_REPOSITORY fmtlib/fmt
-  GIT_TAG 12.0.0
+  GIT_TAG 12.1.0
   EXCLUDE_FROM_ALL YES
 )
 CPMAddPackage(
   NAME frozen
   GITHUB_REPOSITORY serge-sans-paille/frozen
-  GIT_TAG 45ddf6534848ec00668e1408333f8515f6dccf8c
+  GIT_TAG 61dce5ae18ca59931e27675c468e64118aba8744
   EXCLUDE_FROM_ALL YES
 )
 CPMAddPackage(
   NAME Corrosion
   GITHUB_REPOSITORY corrosion-rs/corrosion
-  GIT_TAG f783ee84b4d6c0ea2bc2d77125c39e9e24546a7d
+  GIT_TAG v0.6.1
   EXCLUDE_FROM_ALL YES
 )
 
