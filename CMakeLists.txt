@@ -48,7 +48,7 @@ CPMAddPackage(
 CPMAddPackage(
   NAME frozen
   GITHUB_REPOSITORY serge-sans-paille/frozen
-  GIT_TAG 61dce5ae18ca59931e27675c468e64118aba8744
+  GIT_TAG b07a5c8187bc3e6f1461efab89fe07f467e300db
   EXCLUDE_FROM_ALL YES
 )
 CPMAddPackage(
