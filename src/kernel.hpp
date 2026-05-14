@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2025 Vladislav Nepogodin
+// Copyright (C) 2022-2026 Vladislav Nepogodin
 //
 // This file is part of CachyOS kernel manager.
 //
@@ -40,6 +40,8 @@ class Kernel {
         constexpr std::string_view lts{"lts"};
         constexpr std::string_view zen{"zen"};
         constexpr std::string_view hardened{"hardened"};
+        constexpr std::string_view deckify{"deckify"};
+        constexpr std::string_view server{"server"};
         constexpr std::string_view next{"next"};
         constexpr std::string_view mainline{"mainline"};
         constexpr std::string_view git{"git"};
@@ -59,7 +61,15 @@ class Kernel {
         }
         found = std::ranges::search(m_name, hardened);
         if (!found.empty()) {
-            return "hardened-kernel"sv;
+            return "hardened kernel"sv;
+        }
+        found = std::ranges::search(m_name, deckify);
+        if (!found.empty()) {
+            return "handheld kernel"sv;
+        }
+        found = std::ranges::search(m_name, server);
+        if (!found.empty()) {
+            return "server kernel"sv;
         }
         found = std::ranges::search(m_name, next);
         if (!found.empty()) {

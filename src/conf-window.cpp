@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2025 Vladislav Nepogodin
+// Copyright (C) 2022-2026 Vladislav Nepogodin
 //
 // This file is part of CachyOS kernel manager.
 //
@@ -46,6 +46,7 @@
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QSignalBlocker>
 #include <QStringList>
 
 #if defined(__clang__)
@@ -99,13 +100,13 @@ namespace fs = std::filesystem;
 
 namespace {
 
-GENERATE_CONST_LOOKUP_OPTION_VALUES(kernel_name, "cachyos", "bore", "rc", "rt", "lts", "eevdf", "bmq")
+GENERATE_CONST_LOOKUP_OPTION_VALUES(kernel_name, "cachyos", "bore", "rc", "rt", "lts", "eevdf", "bmq", "hardened", "deckify", "server")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(hz_tick, "1000", "750", "600", "500", "300", "250", "100")
-GENERATE_CONST_LOOKUP_OPTION_VALUES(tickless_mode, "full", "idle", "perodic")
+GENERATE_CONST_LOOKUP_OPTION_VALUES(tickless_mode, "full", "idle", "periodic")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(preempt_mode, "full", "lazy", "voluntary", "none")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(lto_mode, "none", "full", "thin", "thin-dist")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(hugepage_mode, "always", "madvise")
-GENERATE_CONST_LOOKUP_OPTION_VALUES(cpu_opt_mode, "manual", "native", "generic", "generic_v2", "generic_v3", "generic_v4", "zen4")
+GENERATE_CONST_LOOKUP_OPTION_VALUES(cpu_opt_mode, "manual", "native", "generic_v1", "generic_v2", "generic_v3", "generic_v4", "zen4")
 
 // NOLINTEND(cppcoreguidelines-macro-usage)
 
@@ -116,6 +117,9 @@ static_assert(lookup_kernel_name("rt") == 3, "Invalid position");
 static_assert(lookup_kernel_name("lts") == 4, "Invalid position");
 static_assert(lookup_kernel_name("eevdf") == 5, "Invalid position");
 static_assert(lookup_kernel_name("bmq") == 6, "Invalid position");
+static_assert(lookup_kernel_name("hardened") == 7, "Invalid position");
+static_assert(lookup_kernel_name("deckify") == 8, "Invalid position");
+static_assert(lookup_kernel_name("server") == 9, "Invalid position");
 
 constexpr auto get_kernel_name_path(std::string_view kernel_name) noexcept {
     using namespace std::string_view_literals;
@@ -135,6 +139,10 @@ constexpr auto get_kernel_name_path(std::string_view kernel_name) noexcept {
         return "linux-cachyos-rt-bore"sv;
     } else if (kernel_name == "eevdf"sv) {
         return "linux-cachyos-eevdf"sv;
+    } else if (kernel_name == "deckify"sv) {
+        return "linux-cachyos-deckify"sv;
+    } else if (kernel_name == "server"sv) {
+        return "linux-cachyos-server"sv;
     }
     return "linux-cachyos"sv;
 }
@@ -471,7 +479,10 @@ ConfWindow::ConfWindow(QWidget* parent)
                  << tr("RT - Realtime kernel")
                  << tr("LTS - Long-term support kernel")
                  << tr("EEVDF")
-                 << tr("BMQ (BitMap Queue)");
+                 << tr("BMQ (BitMap Queue)")
+                 << tr("Hardened - Hardened Linux kernel")
+                 << tr("Deckify - Handheld optimized kernel")
+                 << tr("Server - Server optimized kernel");
     options_page_ui_obj->main_combo_box->addItems(kernel_names);
 
     // Setting default options
@@ -496,9 +507,7 @@ ConfWindow::ConfWindow(QWidget* parent)
 
     QStringList preempt_modes;
     preempt_modes << "Full"
-                  << "Lazy"
-                  << "Voluntary"
-                  << "None";
+                  << "Lazy";
     options_page_ui_obj->preempt_combo_box->addItems(preempt_modes);
 
     /* clang-format off */
@@ -517,8 +526,8 @@ ConfWindow::ConfWindow(QWidget* parent)
               << "Thin"
               << "Thin-dist";
     options_page_ui_obj->lto_combo_box->addItems(lto_modes);
-    // ThinLTO is enabled by default for defaultkernel,rckernel in the PKGBUILD
-    options_page_ui_obj->lto_combo_box->setCurrentIndex(2);
+    // Default for cachyos (initial selection) is Thin
+    options_page_ui_obj->lto_combo_box->setCurrentIndex(static_cast<int>(lookup_lto_mode("thin")));
 
     QStringList hugepage_modes;
     hugepage_modes << "Always"
@@ -532,18 +541,50 @@ ConfWindow::ConfWindow(QWidget* parent)
     connect(options_page_ui_obj->load_button, &QPushButton::clicked, this, &ConfWindow::on_load);
     connect(options_page_ui_obj->main_combo_box, &QComboBox::currentIndexChanged, this, [this, options_page_ui_obj](std::int32_t main_combo_index) {
         using namespace std::string_view_literals;
-        // thin-dist isn't available for all kernels
         const std::string_view kernel_name = get_kernel_name(static_cast<size_t>(main_combo_index));
-        if (kernel_name == "cachyos"sv || kernel_name == "bore"sv || kernel_name == "rc"sv || kernel_name == "rt"sv || kernel_name == "eevdf"sv || kernel_name == "bmq"sv) {
+
+        // Block signals to prevent cascading combo box updates
+        const QSignalBlocker preempt_blocker(options_page_ui_obj->preempt_combo_box);
+        const QSignalBlocker lto_blocker(options_page_ui_obj->lto_combo_box);
+        const QSignalBlocker hz_blocker(options_page_ui_obj->hzticks_combo_box);
+        const QSignalBlocker cachyconfig_blocker(options_page_ui_obj->cachyconfig_check);
+        const QSignalBlocker zfs_blocker(options_page_ui_obj->builtin_zfs_check);
+
+        // thin-dist is not available for lts and hardened
+        const bool has_thin_dist = (kernel_name != "lts"sv && kernel_name != "hardened"sv);
+        if (has_thin_dist && options_page_ui_obj->lto_combo_box->count() == 3) {
             options_page_ui_obj->lto_combo_box->addItem(QStringLiteral("Thin-dist"));
-        } else {
-            options_page_ui_obj->lto_combo_box->setCurrentIndex(0);
-            options_page_ui_obj->lto_combo_box->removeItem(3);
+        } else if (!has_thin_dist && options_page_ui_obj->lto_combo_box->count() == 4) {
+            options_page_ui_obj->lto_combo_box->removeItem(options_page_ui_obj->lto_combo_box->count() - 1);
         }
 
-        // ThinLTO is enabled by default for defaultkernel,rckernel in the PKGBUILD
-        if (kernel_name == "rc"sv) {
-            options_page_ui_obj->lto_combo_box->setCurrentIndex(3);
+        // thin for cachyos/rc, none for others
+        const bool lto_thin_default = (kernel_name == "cachyos"sv || kernel_name == "rc"sv);
+        options_page_ui_obj->lto_combo_box->setCurrentIndex(static_cast<int>(lto_thin_default ? lookup_lto_mode("thin") : lookup_lto_mode("none")));
+
+        // voluntary/none only available for hardened and lts
+        const bool has_extended_preempt = (kernel_name == "hardened"sv || kernel_name == "lts"sv);
+        if (has_extended_preempt && options_page_ui_obj->preempt_combo_box->count() == 2) {
+            options_page_ui_obj->preempt_combo_box->addItem(QStringLiteral("Voluntary"));
+            options_page_ui_obj->preempt_combo_box->addItem(QStringLiteral("None"));
+        } else if (!has_extended_preempt && options_page_ui_obj->preempt_combo_box->count() == 4) {
+            options_page_ui_obj->preempt_combo_box->removeItem(options_page_ui_obj->preempt_combo_box->count() - 1);
+            options_page_ui_obj->preempt_combo_box->removeItem(options_page_ui_obj->preempt_combo_box->count() - 1);
+        }
+
+        // lazy for server, full for others
+        options_page_ui_obj->preempt_combo_box->setCurrentIndex(static_cast<int>((kernel_name == "server"sv) ? lookup_preempt_mode("lazy") : lookup_preempt_mode("full")));
+
+        // 300 for server, 1000 for others
+        options_page_ui_obj->hzticks_combo_box->setCurrentIndex(static_cast<int>((kernel_name == "server"sv) ? lookup_hz_tick("300") : lookup_hz_tick("1000")));
+
+        // unchecked for server, checked for others
+        set_checkstate(options_page_ui_obj->cachyconfig_check, kernel_name != "server"sv);
+
+        // incompatible with realtime kernels
+        options_page_ui_obj->builtin_zfs_check->setEnabled(kernel_name != "rt"sv);
+        if (kernel_name == "rt"sv) {
+            set_checkstate(options_page_ui_obj->builtin_zfs_check, false);
         }
 
         reset_patches_data_tab();
