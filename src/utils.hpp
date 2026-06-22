@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2025 Vladislav Nepogodin
+// Copyright (C) 2022-2026 Vladislav Nepogodin
 //
 // This file is part of CachyOS kernel manager.
 //
@@ -22,6 +22,7 @@
 #include "alpm_utils.hpp"
 #include "string_utils.hpp"
 
+#include <filesystem>   // for path
 #include <string>       // for string
 #include <string_view>  // for string_view
 #include <vector>       // for vector
@@ -56,6 +57,9 @@ std::string exec(std::string_view command) noexcept;
 
 // Runs a command in a terminal, escalates using pkexec if escalate is true
 int runCmdTerminal(QString cmd, bool escalate) noexcept;
+
+int run_process(std::string_view program, const std::vector<std::string>& args) noexcept;
+void prepare_git_repo(const std::filesystem::path& parent_dir, const std::filesystem::path& repo_path, std::string_view clone_url) noexcept;
 
 void prepare_build_environment() noexcept;
 void restore_clean_environment(std::vector<std::string>& previously_set_options, std::string_view all_set_values) noexcept;

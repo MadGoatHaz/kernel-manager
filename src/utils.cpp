@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2025 Vladislav Nepogodin
+// Copyright (C) 2022-2026 Vladislav Nepogodin
 //
 // This file is part of CachyOS kernel manager.
 //
@@ -134,6 +134,22 @@ int runCmdTerminal(QString cmd, bool escalate) noexcept {
     return proc.exitCode();
 }
 
+int run_process(std::string_view program, const std::vector<std::string>& args) noexcept {
+    QProcess proc;
+    QStringList qargs{};
+    for (const auto& arg : args) {
+        qargs << QString::fromStdString(arg);
+    }
+
+    proc.setProcessChannelMode(QProcess::ForwardedChannels);
+    proc.start(QString::fromStdString(std::string{program}), qargs);
+    proc.waitForFinished(-1);
+    if (proc.error() == QProcess::FailedToStart) {
+        return -1;
+    }
+    return proc.exitCode();
+}
+
 std::string fix_path(std::string&& path) noexcept {
     /* clang-format off */
     if (path[0] != '~') { return std::move(path); }
@@ -142,32 +158,47 @@ std::string fix_path(std::string&& path) noexcept {
     return std::move(path);
 }
 
+void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std::string_view clone_url) noexcept {
+    std::error_code ec{};
+
+    const auto enter = [&ec](const fs::path& dir) {
+        fs::current_path(dir, ec);
+        if (ec) {
+            fmt::print(stderr, "prepare_git_repo: cannot enter '{}': {}\n", dir.string(), ec.message());
+        }
+        return !ec;
+    };
+
+    fs::create_directories(parent_dir, ec);
+    if (!enter(parent_dir)) {
+        return;
+    }
+
+    if (fs::exists(repo_path, ec) && !fs::exists(repo_path / ".git", ec)) {
+        fs::remove_all(repo_path, ec);
+    }
+
+    if (!fs::exists(repo_path, ec)
+        && run_process("git", {"clone", std::string{clone_url}, repo_path.filename().string()}) != 0) {
+        fmt::print(stderr, "prepare_git_repo: 'git clone {}' failed\n", clone_url);
+        return;
+    }
+
+    if (!enter(repo_path)) {
+        return;
+    }
+
+    if (run_process("git", {"checkout", "--force", "master"}) != 0
+        || run_process("git", {"clean", "-fd"}) != 0
+        || run_process("git", {"pull"}) != 0) {
+        fmt::print(stderr, "prepare_git_repo: failed to refresh checkout at '{}'\n", repo_path.string());
+    }
+}
+
 void prepare_build_environment() noexcept {
     static const fs::path app_path       = utils::fix_path("~/.cache/cachyos-km");
     static const fs::path pkgbuilds_path = utils::fix_path("~/.cache/cachyos-km/pkgbuilds");
-    if (!fs::exists(app_path)) {
-        fs::create_directories(app_path);
-    }
-
-    fs::current_path(app_path);
-
-    // Check if folder exits, but .git doesn't.
-    if (fs::exists(pkgbuilds_path) && !fs::exists(pkgbuilds_path / ".git")) {
-        fs::remove_all(pkgbuilds_path);
-    }
-
-    std::int32_t cmd_status{};
-    if (!fs::exists(pkgbuilds_path)) {
-        cmd_status = std::system("git clone https://github.com/cachyos/linux-cachyos.git pkgbuilds");
-    }
-
-    fs::current_path(pkgbuilds_path);
-    cmd_status += std::system("git checkout --force master");
-    cmd_status += std::system("git clean -fd");
-    cmd_status += std::system("git pull");
-    if (cmd_status != 0) {
-        std::perror("prepare_build_environment");
-    }
+    utils::prepare_git_repo(app_path, pkgbuilds_path, "https://github.com/cachyos/linux-cachyos.git");
 }
 
 void restore_clean_environment(std::vector<std::string>& previously_set_options, std::string_view all_set_values) noexcept {

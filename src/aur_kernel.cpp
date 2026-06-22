@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2025 Vladislav Nepogodin
+// Copyright (C) 2022-2026 Vladislav Nepogodin
 //
 // This file is part of CachyOS kernel manager.
 //
@@ -19,11 +19,8 @@
 #include "aur_kernel.hpp"
 #include "utils.hpp"
 
-#include <cstdio>   // for perror
-#include <cstdlib>  // for system
-
 #include <algorithm>   // for search
-#include <filesystem>  // for path, exists
+#include <filesystem>  // for path
 #include <ranges>      // for ranges::*
 
 #include <fmt/format.h>
@@ -33,37 +30,9 @@ namespace fs = std::filesystem;
 namespace {
 
 void prepare_build_environment(const std::string_view& package_name) noexcept {
-    static const fs::path app_path       = utils::fix_path("~/.cache/cachyos-km");
     static const fs::path pkgbuilds_path = utils::fix_path("~/.cache/cachyos-km/aur_pkgbuilds");
-    static const fs::path package_path   = utils::fix_path(fmt::format("~/.cache/cachyos-km/aur_pkgbuilds/{}", package_name));
-    if (!fs::exists(app_path)) {
-        fs::create_directories(app_path);
-    }
-    fs::current_path(app_path);
-
-    if (!fs::exists(pkgbuilds_path)) {
-        fs::create_directories(pkgbuilds_path);
-    }
-    fs::current_path(pkgbuilds_path);
-
-    // Check if folder exits, but .git doesn't.
-    if (fs::exists(package_path) && !fs::exists(package_path / ".git")) {
-        fs::remove_all(package_path);
-    }
-
-    std::int32_t cmd_status{};
-    if (!fs::exists(package_path)) {
-        const auto& clone_cmd = fmt::format("git clone https://aur.archlinux.org/{}.git", package_name);
-        cmd_status            = std::system(clone_cmd.c_str());
-    }
-
-    fs::current_path(package_path);
-    cmd_status += std::system("git checkout --force master");
-    cmd_status += std::system("git clean -fd");
-    cmd_status += std::system("git pull");
-    if (cmd_status != 0) {
-        std::perror("prepare_build_environment");
-    }
+    const fs::path package_path          = utils::fix_path(fmt::format("~/.cache/cachyos-km/aur_pkgbuilds/{}", package_name));
+    utils::prepare_git_repo(pkgbuilds_path, package_path, fmt::format("https://aur.archlinux.org/{}.git", package_name));
 }
 
 }  // namespace
