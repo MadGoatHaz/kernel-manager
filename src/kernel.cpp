@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2025 Vladislav Nepogodin
+// Copyright (C) 2022-2026 Vladislav Nepogodin
 //
 // This file is part of CachyOS kernel manager.
 //
@@ -111,8 +111,8 @@ bool Kernel::install() const noexcept {
 
     // if we have any of the modules already installed,
     // then just use whatever is installed. skipping chwd detection
-    const bool is_nvidia_modules_installed      = utils::exec("pacman -Qqs '^linux-cachyos' 2>/dev/null | grep -q '\\-nvidia$'; echo $?") == "0";
-    const bool is_nvidia_open_modules_installed = utils::exec("pacman -Qqs '^linux-cachyos' 2>/dev/null | grep -q '\\-nvidia-open$'; echo $?") == "0";
+    const bool is_nvidia_modules_installed      = !utils::exec("pacman -Qqs '^linux-cachyos.*-nvidia$' 2>/dev/null").empty();
+    const bool is_nvidia_open_modules_installed = !utils::exec("pacman -Qqs '^linux-cachyos.*-nvidia-open$' 2>/dev/null").empty();
 
     bool should_install_nvidia      = (is_nvidia_card_prebuild_module && m_nvidia_module != nullptr);
     bool should_install_nvidia_open = (is_nvidia_card_prebuild_open_module && m_nvidia_open_module != nullptr);
