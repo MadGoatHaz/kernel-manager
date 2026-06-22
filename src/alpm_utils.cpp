@@ -24,6 +24,9 @@ namespace utils {
 alpm_handle_t* parse_alpm(std::string_view root, std::string_view dbpath, alpm_errno_t* err) noexcept {
     // Initialize alpm.
     alpm_handle_t* alpm_handle = alpm_initialize(root.data(), dbpath.data(), err);
+    if (alpm_handle == nullptr) {
+        return nullptr;
+    }
 
     // Parse pacman config.
     static constexpr auto pacman_conf_path = "/etc/pacman.conf";
@@ -47,12 +50,12 @@ alpm_handle_t* parse_alpm(std::string_view root, std::string_view dbpath, alpm_e
 }
 
 std::int32_t release_alpm(alpm_handle_t* handle, alpm_errno_t* err) noexcept {
+    // read errno before
+    if (err != nullptr) {
+        *err = alpm_errno(handle);
+    }
     // Release libalpm handle
-    const std::int32_t ret = alpm_release(handle);
-
-    *err = alpm_errno(handle);
-
-    return ret;
+    return alpm_release(handle);
 }
 
 }  // namespace utils
