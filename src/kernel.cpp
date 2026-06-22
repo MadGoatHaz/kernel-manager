@@ -254,8 +254,8 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
     namespace fs = std::filesystem;
 
     bool is_paru_installed{true};
-    if (!fs::exists("/sbin/paru") && !fs::exists("/sbin/awk")) {
-        fmt::print(stderr, "Paru & AWK are not installed! Disabling AUR kernels support\n");
+    if (!fs::exists("/sbin/paru") || !fs::exists("/sbin/awk")) {
+        fmt::print(stderr, "Paru and/or AWK are not installed! Disabling AUR kernels support\n");
         is_paru_installed = false;
     }
 
