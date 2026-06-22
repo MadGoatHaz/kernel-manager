@@ -113,8 +113,8 @@ class Kernel {
 
     static std::vector<Kernel> get_kernels(alpm_handle_t* handle) noexcept;
 
-    static std::vector<std::string_view>& get_install_list() noexcept;
-    static std::vector<std::string_view>& get_removal_list() noexcept;
+    static std::vector<std::string>& get_install_list() noexcept;
+    static std::vector<std::string>& get_removal_list() noexcept;
 
  private:
     bool m_update{};

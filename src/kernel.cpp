@@ -33,11 +33,11 @@
 namespace {
 
 #ifdef ENABLE_AUR_KERNELS
-static std::vector<std::string_view> g_aur_kernel_install_list{};  // NOLINT
+static std::vector<std::string> g_aur_kernel_install_list{};  // NOLINT
 #endif
 
-static std::vector<std::string_view> g_kernel_install_list{};                        // NOLINT
-static std::vector<std::string_view> g_kernel_removal_list{};                        // NOLINT
+static std::vector<std::string> g_kernel_install_list{};                             // NOLINT
+static std::vector<std::string> g_kernel_removal_list{};                             // NOLINT
 static const bool is_root_on_zfs = utils::exec("findmnt -ln -o FSTYPE /") == "zfs";  // NOLINT
 
 // NOLINTNEXTLINE
@@ -89,7 +89,7 @@ bool Kernel::is_installed() const noexcept {
 bool Kernel::install() const noexcept {
 #ifdef ENABLE_AUR_KERNELS
     if (m_repo == "aur") {
-        g_aur_kernel_install_list.insert(g_aur_kernel_install_list.end(), {m_name.c_str()});
+        g_aur_kernel_install_list.push_back(m_name);
         return true;
     }
 #endif
@@ -306,13 +306,13 @@ void Kernel::commit_transaction() noexcept {
 /** @brief Get global kernel install list
  *  @return Global kernel install list
  */
-std::vector<std::string_view>& Kernel::get_install_list() noexcept {
+std::vector<std::string>& Kernel::get_install_list() noexcept {
     return g_kernel_install_list;
 }
 
 /** @brief Get global kernel removal list
  *  @return Global kernel removal list
  */
-std::vector<std::string_view>& Kernel::get_removal_list() noexcept {
+std::vector<std::string>& Kernel::get_removal_list() noexcept {
     return g_kernel_removal_list;
 }

@@ -70,7 +70,7 @@ bool remove_packages(alpm_handle_t* handle, const std::span<Kernel>& kernels, co
     return true;
 }
 
-bool is_kernels_change_state(alpm_handle_t* handle, std::span<std::string_view> kernel_install_list, std::span<std::string_view> kernel_removal_list) {
+bool is_kernels_change_state(alpm_handle_t* handle, std::span<std::string> kernel_install_list, std::span<std::string> kernel_removal_list) {
     if (handle == nullptr) {
         return false;
     }

@@ -39,7 +39,7 @@ void prepare_build_environment(const std::string_view& package_name) noexcept {
 
 namespace detail {
 
-void install_aur_kernels(std::span<std::string_view> kernel_list) noexcept {
+void install_aur_kernels(std::span<std::string> kernel_list) noexcept {
     using namespace std::literals;
 
     for (auto&& kernel_name : kernel_list) {

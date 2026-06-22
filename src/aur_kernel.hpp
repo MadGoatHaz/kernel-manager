@@ -20,10 +20,10 @@
 #define AUR_KERNEL_HPP
 
 #include <span>
-#include <string_view>
+#include <string>
 
 namespace detail {
-void install_aur_kernels(std::span<std::string_view> kernel_list) noexcept;
+void install_aur_kernels(std::span<std::string> kernel_list) noexcept;
 }  // namespace detail
 
 #endif  // AUR_KERNEL_HPP
