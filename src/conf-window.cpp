@@ -155,6 +155,26 @@ inline void set_checkstate(QCheckBox* checkbox, bool is_checked) noexcept {
     checkbox->setCheckState(is_checked ? Qt::Checked : Qt::Unchecked);
 }
 
+struct CheckboxBinding {
+    QCheckBox* Ui::ConfOptionsPage::* widget;
+    bool ConfigOptions::* config_field;
+    std::string_view build_var;
+};
+
+inline constexpr std::array<CheckboxBinding, 11> checkbox_bindings{{
+    {&Ui::ConfOptionsPage::hardly_check, &ConfigOptions::hardly_check, "hardly"},
+    {&Ui::ConfOptionsPage::perfgovern_check, &ConfigOptions::per_gov_check, "per_gov"},
+    {&Ui::ConfOptionsPage::tcpbbr_check, &ConfigOptions::tcp_bbr3_check, "tcp_bbr3"},
+    {&Ui::ConfOptionsPage::cachyconfig_check, &ConfigOptions::cachy_config_check, "cachy_config"},
+    {&Ui::ConfOptionsPage::nconfig_check, &ConfigOptions::nconfig_check, "nconfig"},
+    {&Ui::ConfOptionsPage::xconfig_check, &ConfigOptions::xconfig_check, "xconfig"},
+    {&Ui::ConfOptionsPage::localmodcfg_check, &ConfigOptions::localmodcfg_check, "localmodcfg"},
+    {&Ui::ConfOptionsPage::use_current_check, &ConfigOptions::use_current_check, "use_current"},
+    {&Ui::ConfOptionsPage::builtin_zfs_check, &ConfigOptions::builtin_zfs_check, "builtin_zfs"},
+    {&Ui::ConfOptionsPage::builtin_nvidia_open_check, &ConfigOptions::builtin_nvidia_open_check, "builtin_nvidia_open"},
+    {&Ui::ConfOptionsPage::build_debug_check, &ConfigOptions::build_debug_check, "build_debug"},
+}};
+
 inline auto set_combobox_val(QComboBox* combobox, ssize_t index) noexcept {
     if (index < 0) {
         return 1;
@@ -405,18 +425,9 @@ std::string ConfWindow::get_all_set_values() const noexcept {
     // checkboxes values,
     // which becomes enabled with any value passed,
     // and if nothing passed means it's disabled.
-    result += convert_to_var_assign_empty_wrapped("hardly", checkstate_checked(options_page_ui_obj->hardly_check));
-    result += convert_to_var_assign_empty_wrapped("per_gov", checkstate_checked(options_page_ui_obj->perfgovern_check));
-    result += convert_to_var_assign_empty_wrapped("tcp_bbr3", checkstate_checked(options_page_ui_obj->tcpbbr_check));
-
-    result += convert_to_var_assign_empty_wrapped("cachy_config", checkstate_checked(options_page_ui_obj->cachyconfig_check));
-    result += convert_to_var_assign_empty_wrapped("nconfig", checkstate_checked(options_page_ui_obj->nconfig_check));
-    result += convert_to_var_assign_empty_wrapped("xconfig", checkstate_checked(options_page_ui_obj->xconfig_check));
-    result += convert_to_var_assign_empty_wrapped("localmodcfg", checkstate_checked(options_page_ui_obj->localmodcfg_check));
-    result += convert_to_var_assign_empty_wrapped("use_current", checkstate_checked(options_page_ui_obj->use_current_check));
-    result += convert_to_var_assign_empty_wrapped("builtin_zfs", checkstate_checked(options_page_ui_obj->builtin_zfs_check));
-    result += convert_to_var_assign_empty_wrapped("builtin_nvidia_open", checkstate_checked(options_page_ui_obj->builtin_nvidia_open_check));
-    result += convert_to_var_assign_empty_wrapped("build_debug", checkstate_checked(options_page_ui_obj->build_debug_check));
+    for (const auto& binding : checkbox_bindings) {
+        result += convert_to_var_assign_empty_wrapped(binding.build_var, checkstate_checked(options_page_ui_obj->*binding.widget));
+    }
 
     // combobox values
     result += convert_to_var_assign("HZ_ticks", get_hz_tick(static_cast<size_t>(options_page_ui_obj->hzticks_combo_box->currentIndex())));
@@ -645,21 +656,30 @@ ConfWindow::ConfWindow(QWidget* parent)
 
     // remove entry
     connect(patches_page_ui_obj->remove_entry_button, &QPushButton::clicked, this, [patches_page_ui_obj]() {
-        const auto& current_index = patches_page_ui_obj->list_widget->currentRow();
+        const auto current_index = patches_page_ui_obj->list_widget->currentRow();
+        if (current_index < 0) {
+            return;
+        }
         delete patches_page_ui_obj->list_widget->takeItem(current_index);
     });
 
     // move up
     connect(patches_page_ui_obj->move_up_button, &QPushButton::clicked, this, [patches_page_ui_obj]() {
-        const auto& current_index = patches_page_ui_obj->list_widget->currentRow();
-        auto* current_item        = patches_page_ui_obj->list_widget->takeItem(current_index);
+        const auto current_index = patches_page_ui_obj->list_widget->currentRow();
+        if (current_index <= 0) {
+            return;
+        }
+        auto* current_item = patches_page_ui_obj->list_widget->takeItem(current_index);
         patches_page_ui_obj->list_widget->insertItem(current_index - 1, current_item);
         patches_page_ui_obj->list_widget->setCurrentRow(current_index - 1);
     });
     // move down
     connect(patches_page_ui_obj->move_down_button, &QPushButton::clicked, this, [patches_page_ui_obj]() {
-        const auto& current_index = patches_page_ui_obj->list_widget->currentRow();
-        auto* current_item        = patches_page_ui_obj->list_widget->takeItem(current_index);
+        const auto current_index = patches_page_ui_obj->list_widget->currentRow();
+        if (current_index < 0 || current_index >= patches_page_ui_obj->list_widget->count() - 1) {
+            return;
+        }
+        auto* current_item = patches_page_ui_obj->list_widget->takeItem(current_index);
         patches_page_ui_obj->list_widget->insertItem(current_index + 1, current_item);
         patches_page_ui_obj->list_widget->setCurrentRow(current_index + 1);
     });
@@ -720,18 +740,9 @@ void ConfWindow::on_save() noexcept {
     ConfigOptions config_options{};
 
     // checkboxes values (booleans)
-    config_options.hardly_check   = checkstate_checked(options_page_ui_obj->hardly_check);
-    config_options.per_gov_check  = checkstate_checked(options_page_ui_obj->perfgovern_check);
-    config_options.tcp_bbr3_check = checkstate_checked(options_page_ui_obj->tcpbbr_check);
-
-    config_options.cachy_config_check        = checkstate_checked(options_page_ui_obj->cachyconfig_check);
-    config_options.nconfig_check             = checkstate_checked(options_page_ui_obj->nconfig_check);
-    config_options.xconfig_check             = checkstate_checked(options_page_ui_obj->xconfig_check);
-    config_options.localmodcfg_check         = checkstate_checked(options_page_ui_obj->localmodcfg_check);
-    config_options.use_current_check         = checkstate_checked(options_page_ui_obj->use_current_check);
-    config_options.builtin_zfs_check         = checkstate_checked(options_page_ui_obj->builtin_zfs_check);
-    config_options.builtin_nvidia_open_check = checkstate_checked(options_page_ui_obj->builtin_nvidia_open_check);
-    config_options.build_debug_check         = checkstate_checked(options_page_ui_obj->build_debug_check);
+    for (const auto& binding : checkbox_bindings) {
+        config_options.*binding.config_field = checkstate_checked(options_page_ui_obj->*binding.widget);
+    }
 
     // combobox values (strings that we try to find on load)
     config_options.hz_ticks_combo = get_hz_tick(static_cast<size_t>(options_page_ui_obj->hzticks_combo_box->currentIndex()));
@@ -779,18 +790,9 @@ void ConfWindow::on_load() noexcept {
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
 
     // checkboxes values (booleans)
-    set_checkstate(options_page_ui_obj->hardly_check, config_options->hardly_check);
-    set_checkstate(options_page_ui_obj->perfgovern_check, config_options->per_gov_check);
-    set_checkstate(options_page_ui_obj->tcpbbr_check, config_options->tcp_bbr3_check);
-
-    set_checkstate(options_page_ui_obj->cachyconfig_check, config_options->cachy_config_check);
-    set_checkstate(options_page_ui_obj->nconfig_check, config_options->nconfig_check);
-    set_checkstate(options_page_ui_obj->xconfig_check, config_options->xconfig_check);
-    set_checkstate(options_page_ui_obj->localmodcfg_check, config_options->localmodcfg_check);
-    set_checkstate(options_page_ui_obj->use_current_check, config_options->use_current_check);
-    set_checkstate(options_page_ui_obj->builtin_zfs_check, config_options->builtin_zfs_check);
-    set_checkstate(options_page_ui_obj->builtin_nvidia_open_check, config_options->builtin_nvidia_open_check);
-    set_checkstate(options_page_ui_obj->build_debug_check, config_options->build_debug_check);
+    for (const auto& binding : checkbox_bindings) {
+        set_checkstate(options_page_ui_obj->*binding.widget, (*config_options).*binding.config_field);
+    }
 
     // combobox values (strings that we try to find on load)
     auto combobox_stat = set_combobox_val(options_page_ui_obj->hzticks_combo_box, lookup_hz_tick(config_options->hz_ticks_combo));
