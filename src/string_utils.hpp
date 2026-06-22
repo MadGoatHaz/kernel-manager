@@ -24,6 +24,7 @@
 #include <span>         // for span
 #include <string>       // for string
 #include <string_view>  // for string_view
+#include <utility>      // for forward
 #include <vector>       // for vector
 
 namespace utils {
@@ -86,8 +87,9 @@ constexpr auto make_multiline_view(std::string_view str, char delim = '\n') noex
 /// @param lines The lines to join.
 /// @param delim The delimiter to join the lines.
 /// @return The joined lines as a single string.
-constexpr auto join_vec(std::span<std::string_view> lines, std::string_view delim) noexcept -> std::string {
-    return [&] { return lines | std::ranges::views::join_with(delim) | std::ranges::to<std::string>(); }();
+template <std::ranges::range Range>
+constexpr auto join_vec(Range&& lines, std::string_view delim) noexcept -> std::string {
+    return std::forward<Range>(lines) | std::ranges::views::join_with(delim) | std::ranges::to<std::string>();
 }
 
 }  // namespace utils
