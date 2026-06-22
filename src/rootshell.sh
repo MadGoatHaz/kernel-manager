@@ -1,3 +1,3 @@
 #!/bin/bash
 
-exec bash $@
+exec /bin/bash "$@"
