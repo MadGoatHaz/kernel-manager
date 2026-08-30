@@ -28,7 +28,7 @@ struct ConfigOptions {
     bool per_gov_check{};
     bool tcp_bbr3_check{};
 
-    bool cachy_config_check{};
+    bool custom_config_check{};
     bool nconfig_check{};
     bool xconfig_check{};
     bool localmodcfg_check{};

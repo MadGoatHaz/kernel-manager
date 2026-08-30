@@ -23,9 +23,38 @@
          <height>912</height>
         </rect>
        </property>
-       <layout class="QVBoxLayout" name="verticalLayout_2">
-        <item>
-         <widget class="QWidget" name="custom_name_widget" native="true">
+        <layout class="QVBoxLayout" name="verticalLayout_2">
+         <item>
+          <widget class="QWidget" name="build_source_widget" native="true">
+           <layout class="QHBoxLayout" name="build_source_horizontal_layout">
+            <item>
+             <widget class="QLabel" name="build_source_label">
+              <property name="text">
+               <string>Kernel source (AUR package name or git URL)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="build_source_horizontal_spacer">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="build_source_edit"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QWidget" name="custom_name_widget" native="true">
           <layout class="QHBoxLayout" name="custom_name_horizontal_layout">
            <item>
             <widget class="QLabel" name="custom_name_label">
@@ -58,33 +87,33 @@
          </widget>
         </item>
         <item>
-         <widget class="QWidget" name="cachyconfig_widget" native="true">
-          <layout class="QHBoxLayout" name="cachyconfig_horizontal_layout">
-           <item>
-            <widget class="QLabel" name="cachyconfig_label">
-             <property name="text">
-              <string>Enable CachyOS config</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <spacer name="cachyconfig_horizontal_spacer">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item>
-            <widget class="QCheckBox" name="cachyconfig_check"/>
-           </item>
-          </layout>
-         </widget>
+          <widget class="QWidget" name="customconfig_widget" native="true">
+           <layout class="QHBoxLayout" name="customconfig_horizontal_layout">
+            <item>
+             <widget class="QLabel" name="customconfig_label">
+              <property name="text">
+               <string>Enable custom config</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="customconfig_horizontal_spacer">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="customconfig_check"/>
+            </item>
+           </layout>
+          </widget>
         </item>
         <item>
          <widget class="QWidget" name="nconfig_widget" native="true">

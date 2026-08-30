@@ -71,6 +71,10 @@ class ConfWindow final : public QMainWindow {
     void reset_patches_data_tab() noexcept;
     void refresh_flavors() noexcept;
 
+    // Apply the build source selected in the UI (AUR package name or git
+    // URL) to the single utils accessor used by prepare_build_environment().
+    void sync_build_source() noexcept;
+
     protected:
     void closeEvent(QCloseEvent* event) override;
 
@@ -82,6 +86,7 @@ class ConfWindow final : public QMainWindow {
     void finished_proc(int exit_code, QProcess::ExitStatus exit_status) noexcept;
 
     auto kernel_path_for_index(std::int32_t index) const noexcept -> std::string;
+    void update_option_set() noexcept;
 
     bool m_running{};
     QProcess m_cmd{};

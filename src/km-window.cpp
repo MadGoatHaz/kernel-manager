@@ -342,6 +342,9 @@ void MainWindow::on_configure() noexcept {
     m_conf_progress_dialog->setLabelText(tr("Please wait...\nWe are preparing configuration window for you\ncloning PKGBUILDs.."));
     m_conf_progress_dialog->show();
 
+    // Apply the user-selected build source before the background prepare.
+    m_conf_window->sync_build_source();
+
     // NOTE: the future created by QtConcurrent::run is not cancelable.
     // prepare in the background, without blocking the UI
     m_future_watcher.setFuture(QtConcurrent::run([this] {

@@ -38,6 +38,15 @@ def needs_run():
                 return True
     except FileNotFoundError:
         return True
+    # The per-repo option maps live in compile_options.json: a JSON newer
+    # than the generated header means the header is stale, so regenerate.
+    try:
+        json_mtime = os.stat(SOURCE_ROOT + '/src/compile_options.json').st_mtime
+        header_mtime = os.stat(HEADER_ROOT + '/compile_options.hpp').st_mtime
+        if header_mtime < json_mtime:
+            return True
+    except FileNotFoundError:
+        return True
     return False
 
 def main():
