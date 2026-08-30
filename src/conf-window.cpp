@@ -134,9 +134,12 @@ auto flavor_display_name(const std::string& key, const std::string& base_key) no
 // containing a PKGBUILD is one flavor. Keys are derived from the directory
 // names relative to their common family prefix, so no flavor names are
 // hard-coded here. A single-package layout (a PKGBUILD at the repo root,
-// e.g. an AUR repo) yields the repo itself as its sole flavor.
+// e.g. an AUR repo) yields the repo itself as its sole flavor. Paths are
+// always absolute (resolved against repo_root) so downstream consumers can
+// rely on them regardless of the process CWD.
 auto discover_repo_flavors(const fs::path& repo_root, std::string_view fallback_repo_name) noexcept -> std::vector<KernelFlavor> {
     std::vector<std::string> dirs{};
+    std::string single_package_dir{};  // set only for the single-package fallback below
     std::error_code ec{};
     if (fs::is_directory(repo_root, ec)) {
         for (const auto& entry : fs::directory_iterator(repo_root, ec)) {
@@ -146,7 +149,8 @@ auto discover_repo_flavors(const fs::path& repo_root, std::string_view fallback_
         }
     }
     if (dirs.empty() && !fallback_repo_name.empty() && fs::is_regular_file(repo_root / "PKGBUILD", ec)) {
-        dirs.push_back(std::string{fallback_repo_name});
+        single_package_dir = std::string{fallback_repo_name};
+        dirs.push_back(single_package_dir);
     }
     std::sort(dirs.begin(), dirs.end());
     if (dirs.empty()) {
@@ -182,7 +186,10 @@ auto discover_repo_flavors(const fs::path& repo_root, std::string_view fallback_
     flavors.reserve(dirs.size());
     for (const auto& dir : dirs) {
         KernelFlavor flavor{};
-        flavor.path = dir;
+        // Absolute path: a subdirectory flavor lives under the repo root,
+        // while the single-package layout (fallback repo basename) IS the
+        // repo root itself.
+        flavor.path = (dir == single_package_dir) ? repo_root.string() : (repo_root / dir).string();
         flavor.key  = (dir == family) ? base_key : dir.substr(family.size() + 1);
         flavors.emplace_back(std::move(flavor));
     }
@@ -316,11 +323,15 @@ inline auto convert_to_var_assign_empty_wrapped(option_map_ref map, std::string_
 // the script only sources the PKGBUILD / makepkg.conf so it can be parsed,
 // and must never linger in the source tree or the user's working directory.
 auto run_and_remove_testscript(std::string_view script_path, std::string_view script_src, std::string_view args = {}) noexcept -> std::string {
-    if (utils::write_to_file(script_path, script_src)) {
-        fs::permissions(script_path,
-            fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
-            fs::perm_options::add);
+    if (!utils::write_to_file(script_path, script_src)) {
+        // Never exec a script that could not be written: popen would just
+        // fail and pollute the result with "-1" noise.
+        fmt::print(stderr, "run_and_remove_testscript: failed to write '{}'; not executing\n", std::string{script_path});
+        return {};
     }
+    fs::permissions(script_path,
+        fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
+        fs::perm_options::add);
 
     const std::string command = args.empty() ? std::string{script_path} : fmt::format(FMT_COMPILE("{} {}"), std::string{script_path}, std::string{args});
     const std::string result  = utils::exec(command);
@@ -346,7 +357,9 @@ auto get_pkgext_value_from_makepkgconf() noexcept -> std::string {
     using namespace std::string_literals;
     static constexpr auto testscript_src = "#!/usr/bin/bash\nsource \"/etc/makepkg.conf\"\necho \"${PKGEXT}\""sv;
 
-    const auto& testscript_path = fmt::format(FMT_COMPILE("{}/.testscriptpkgext"), fs::current_path().string());
+    // Pinned to the absolute build repo root (not the process CWD): the
+    // transient testscript must land in a known, existing directory.
+    const auto& testscript_path = fmt::format(FMT_COMPILE("{}/.testscriptpkgext"), utils::build_repo_path().string());
 
     auto pkgext_val = run_and_remove_testscript(testscript_path, testscript_src);
     if (pkgext_val.empty()) {
@@ -431,6 +444,12 @@ bool insert_new_source_array_into_pkgbuild(std::string_view kernel_name_path, QL
     }
     const auto& pkgbuild_path = fmt::format(FMT_COMPILE("{}/PKGBUILD"), kernel_name_path);
     auto pkgbuildsrc          = utils::read_whole_file(pkgbuild_path);
+    if (pkgbuildsrc.empty()) {
+        // Never rewrite on empty content: the PKGBUILD is missing or
+        // unreadable, so the source array cannot be (re)placed safely.
+        fmt::print(stderr, "insert_new_source_array: PKGBUILD at '{}' is missing or unreadable; file left untouched\n", pkgbuild_path);
+        return false;
+    }
 
     const auto& new_source_array = fmt::format(FMT_COMPILE("source=(\n{})\n"), array_entries | std::ranges::views::join_with('\n') | std::ranges::to<std::string>());
     if (auto foundpos = pkgbuildsrc.find("prepare()"); foundpos != std::string::npos) {
@@ -940,8 +959,9 @@ void ConfWindow::on_execute() noexcept {
         fmt::print(stderr, "Failed to set custom name in pkgbuild\n");
         return;
     }
-    const auto& saved_working_path = fs::current_path().string();
-    const auto& build_working_path = fmt::format(FMT_COMPILE("{}/{}"), saved_working_path, cpusched_path);
+    // The flavor path is absolute (resolved against the build repo root by
+    // discover_repo_flavors) and doubles as the makepkg working directory.
+    const auto& build_working_path = cpusched_path;
 
     // Run our build command!
     //
