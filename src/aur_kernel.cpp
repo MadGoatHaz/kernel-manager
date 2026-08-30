@@ -1,6 +1,6 @@
 // Copyright (C) 2022-2026 Vladislav Nepogodin
 //
-// This file is part of CachyOS kernel manager.
+// This file is part of kernel-manager.
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -30,8 +30,8 @@ namespace fs = std::filesystem;
 namespace {
 
 void prepare_build_environment(const std::string_view& package_name) noexcept {
-    static const fs::path pkgbuilds_path = utils::fix_path("~/.cache/cachyos-km/aur_pkgbuilds");
-    const fs::path package_path          = utils::fix_path(fmt::format("~/.cache/cachyos-km/aur_pkgbuilds/{}", package_name));
+    static const fs::path pkgbuilds_path = utils::fix_path("~/.cache/kernel-manager/aur_pkgbuilds");
+    const fs::path package_path          = utils::fix_path(fmt::format("~/.cache/kernel-manager/aur_pkgbuilds/{}", package_name));
     utils::prepare_git_repo(pkgbuilds_path, package_path, fmt::format("https://aur.archlinux.org/{}.git", package_name));
 }
 

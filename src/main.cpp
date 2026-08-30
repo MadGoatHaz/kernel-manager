@@ -1,6 +1,6 @@
 // Copyright (C) 2022-2025 Vladislav Nepogodin
 //
-// This file is part of CachyOS kernel manager.
+// This file is part of kernel-manager.
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -94,12 +94,12 @@ void initTranslations(QTranslator& qtTranslatorBase, QTranslator& qtTranslator, 
         QApplication::installTranslator(&qtTranslator);
     }
 
-    // Load e.g. cachyos-kernel-manager_de.qm (shortcut "de" needs to be defined in bitcoin.qrc)
+    // Load e.g. kernel-manager_de.qm (shortcut "de" needs to be defined in km_locale.qrc)
     if (translatorBase.load(lang, ":/translations/")) {
         QApplication::installTranslator(&translatorBase);
     }
 
-    // Load e.g. cachyos-kernel-manager_de_DE.qm (shortcut "de_DE" needs to be defined in bitcoin.qrc)
+    // Load e.g. kernel-manager_de_DE.qm (shortcut "de_DE" needs to be defined in km_locale.qrc)
     if (translator.load(lang_territory, ":/translations/")) {
         QApplication::installTranslator(&translator);
     }
@@ -108,7 +108,7 @@ void initTranslations(QTranslator& qtTranslatorBase, QTranslator& qtTranslator, 
 }  // namespace
 
 auto main(int argc, char** argv) -> std::int32_t {
-    QSharedMemory sharedMemoryLock("CachyOS-KM-lock");
+    QSharedMemory sharedMemoryLock("KernelManager-lock");
     if (IsInstanceAlreadyRunning(sharedMemoryLock)) {
         return -1;
     }
@@ -121,10 +121,10 @@ auto main(int argc, char** argv) -> std::int32_t {
 #endif
 
     /// 2. Application identification
-    QApplication::setOrganizationName("CachyOS");
-    QApplication::setOrganizationDomain("cachyos.org");
-    QApplication::setApplicationName("CachyOS-KM");
-    QApplication::setDesktopFileName("org.cachyos.KernelManager");
+    QApplication::setOrganizationName("ArchLinux");
+    QApplication::setOrganizationDomain("archlinux.org");
+    QApplication::setApplicationName("KernelManager");
+    QApplication::setDesktopFileName("org.archlinux.KernelManager");
 
     // Set application attributes
     const QApplication app(argc, argv);

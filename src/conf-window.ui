@@ -13,13 +13,13 @@
     <height>544</height>
    </rect>
   </property>
-  <property name="windowTitle">
-   <string>CachyOS Kernel Manager Configure</string>
-  </property>
-  <property name="windowIcon">
-   <iconset theme="cachyos-kernel-manager">
-    <normaloff>.</normaloff>.</iconset>
-  </property>
+   <property name="windowTitle">
+    <string>Kernel Manager Configure</string>
+   </property>
+   <property name="windowIcon">
+    <iconset theme="org.archlinux.KernelManager">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
   <widget class="QWidget" name="central_widget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>

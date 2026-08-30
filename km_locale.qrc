@@ -1,0 +1,20 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/translations">
+        <file alias="bg">lang/kernel-manager_bg.qm</file>
+        <file alias="ca">lang/kernel-manager_ca.qm</file>
+        <file alias="cs">lang/kernel-manager_cs.qm</file>
+        <file alias="de">lang/kernel-manager_de.qm</file>
+        <file alias="es">lang/kernel-manager_es.qm</file>
+        <file alias="it">lang/kernel-manager_it.qm</file>
+        <file alias="ja">lang/kernel-manager_ja.qm</file>
+        <file alias="ko">lang/kernel-manager_ko.qm</file>
+        <file alias="pl">lang/kernel-manager_pl.qm</file>
+        <file alias="ru">lang/kernel-manager_ru.qm</file>
+        <file alias="sk">lang/kernel-manager_sk.qm</file>
+        <file alias="sv">lang/kernel-manager_sv.qm</file>
+        <file alias="tr">lang/kernel-manager_tr.qm</file>
+        <file alias="nl">lang/kernel-manager_nl.qm</file>
+        <file alias="zh-CN">lang/kernel-manager_zh-CN.qm</file>
+    </qresource>
+</RCC>

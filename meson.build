@@ -1,4 +1,4 @@
-project('cachyos-kernel-manager', 'cpp',
+project('kernel-manager', 'cpp',
         version: '1.19.0',
         license: 'GPLv3',
         meson_version: '>=0.59.0',
@@ -134,7 +134,7 @@ prep = qt6.compile_moc(
 # XML files that need to be compiled with the uic tol.
 prep += qt6.compile_ui(sources : ['src/km-window.ui', 'src/conf-window.ui', 'src/conf-options-page.ui', 'src/conf-patches-page.ui'])
 
-prep += qt6.compile_translations(qresource: 'cachyoskm_locale.qrc')
+prep += qt6.compile_translations(qresource: 'km_locale.qrc')
 
 compile_options_hpp = custom_target(
     'compile_options.hpp',
@@ -149,7 +149,7 @@ deps += [compile_options_dep]
 
 src_files += [prep]
 executable(
-  'cachyos-kernel-manager',
+  'kernel-manager',
   src_files,
   dependencies: deps,
   include_directories: [include_directories('src')],
