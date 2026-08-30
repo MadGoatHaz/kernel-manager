@@ -21,6 +21,7 @@
 #include "km-window.hpp"
 #include "conf-window.hpp"
 #include "kernel.hpp"
+#include "known_kernels.hpp"
 #include "utils.hpp"
 
 #include <algorithm>   // for any_of, find_if
@@ -91,6 +92,11 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         auto* widget_item = new KernelTreeWidgetItem(tree_kernels);
         widget_item->setCheckState(TreeCol::Check, Qt::Unchecked);
         widget_item->setText(TreeCol::PkgName, kernel.get_raw());
+        // Hover tooltip on the PkgName: what this kernel is and who it's
+        // for. description_for() accepts the repo-prefixed raw name and
+        // always returns a non-empty string (curated entry or a synthesized
+        // fallback line), so every row gets a tooltip.
+        widget_item->setToolTip(TreeCol::PkgName, QString::fromStdString(km::description_for(kernel.get_raw(), kernel.category())));
         widget_item->setText(TreeCol::Version, QString::fromStdString(kernel.version()));
         widget_item->setText(TreeCol::Category, QString::fromStdString(std::string{kernel.category()}));
         widget_item->setText(TreeCol::Displayed, QStringLiteral("true"));
