@@ -26,7 +26,8 @@
 
 // The curated table of known kernel packages: the single source of truth for
 // the kernel -> build-source mapping (Configure-page source dropdown +
-// auto-populate) and for the per-kernel descriptions (kernel-tree tooltips).
+// auto-populate), the per-kernel descriptions (kernel-tree tooltips), and the
+// pre-compiled install data (install_package/install_repo + availability flags).
 //
 // Lookup key = the package name with the repo prefix stripped from the tree
 // PkgName ("core/linux" -> "linux", "aur/linux-zen" -> "linux-zen"); all
@@ -35,10 +36,14 @@
 // Adjusting the mapping (e.g. which source a kernel builds from) is a data
 // change — edit one table row in known_kernels.cpp, no control flow involved.
 struct KnownKernel {
-    std::string name;            // package name, repo prefix stripped, e.g. "linux"
-    std::string display_name;    // human label, e.g. "Linux (mainline)"
-    std::string description;     // 1-2 sentences: what it is, who it's for
-    std::string default_source;  // build-source identifier (AUR name or git URL)
+    std::string name;             // package name, repo prefix stripped, e.g. "linux"
+    std::string display_name;     // human label, e.g. "Linux (mainline)"
+    std::string description;      // 1-2 sentences: what it is, who it's for
+    std::string default_source;   // build-source identifier (AUR name or git URL); == name (identity)
+    std::string install_package;  // pre-compiled package name, "" if none
+    std::string install_repo;     // core|extra|cachyos|chaotic-aur|aur|liquorix
+    bool precompiled_available;   // true if install_package is non-empty
+    bool buildable;               // true if default_source is non-empty
 };
 
 namespace km {
@@ -63,6 +68,11 @@ std::string description_for(std::string_view name, std::string_view category = {
 // The known build sources for the source dropdown: the unique default_source
 // values of the curated table, sorted.
 std::vector<std::string> known_sources();
+
+// Whether a kernel has a documented pre-compiled install path: its curated
+// entry must be precompiled_available with a non-empty install_package
+// (false for unknown names).
+bool is_installable(std::string_view name);
 
 // The package name with a leading "repo/" prefix stripped
 // ("core/linux" -> "linux"; "linux" -> "linux").
