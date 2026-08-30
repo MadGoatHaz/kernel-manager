@@ -1,6 +1,6 @@
 // Copyright (C) 2022-2026 Vladislav Nepogodin
 //
-// This file is part of CachyOS kernel manager.
+// This file is part of kernel-manager.
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -196,8 +196,8 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
 }
 
 void prepare_build_environment() noexcept {
-    static const fs::path app_path       = utils::fix_path("~/.cache/cachyos-km");
-    static const fs::path pkgbuilds_path = utils::fix_path("~/.cache/cachyos-km/pkgbuilds");
+    static const fs::path app_path       = utils::fix_path("~/.cache/kernel-manager");
+    static const fs::path pkgbuilds_path = utils::fix_path("~/.cache/kernel-manager/pkgbuilds");
     utils::prepare_git_repo(app_path, pkgbuilds_path, "https://github.com/cachyos/linux-cachyos.git");
 }
 

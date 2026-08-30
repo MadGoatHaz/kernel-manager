@@ -45,6 +45,6 @@ pretty_format:
 NEXT_VERSION ?= "unreleased"
 
 Changelog.md:
-	github_changelog_generator -o Changelog.md --user cachyos --project kernel-manager --simple-list --release-url https://github.com/cachyos/kernel-manager/releases/tag/%s --future-release $(NEXT_VERSION)
-	$(SED) -i 's|https://github.com/cachyos/kernel-manager/releases/tag/HEAD|https://github.com/cachyos/kernel-manager/tree/HEAD|' Changelog.md
+	github_changelog_generator -o Changelog.md --user MadGoatHaz --project kernel-manager --simple-list --release-url https://github.com/MadGoatHaz/kernel-manager/releases/tag/%s --future-release $(NEXT_VERSION)
+	$(SED) -i 's|https://github.com/MadGoatHaz/kernel-manager/releases/tag/HEAD|https://github.com/MadGoatHaz/kernel-manager/tree/HEAD|' Changelog.md
 	$(SED) -i '2i All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org/).' Changelog.md

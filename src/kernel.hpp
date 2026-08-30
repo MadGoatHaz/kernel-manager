@@ -1,6 +1,6 @@
 // Copyright (C) 2022-2026 Vladislav Nepogodin
 //
-// This file is part of CachyOS kernel manager.
+// This file is part of kernel-manager.
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by

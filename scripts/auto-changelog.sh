@@ -4,7 +4,7 @@ set -e
 set -u
 set -o pipefail
 
-readonly URL='https://github.com/cachyos/kernel-manager'
+readonly URL='https://github.com/MadGoatHaz/kernel-manager'
 
 git fetch --tags
 

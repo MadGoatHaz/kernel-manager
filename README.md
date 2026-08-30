@@ -21,7 +21,7 @@ sudo pacman -S \
 
 ### Cloning the source code
 ```sh
-git clone https://github.com/cachyos/kernel-manager.git
+git clone https://github.com/MadGoatHaz/kernel-manager.git
 cd kernel-manager
 ```
 
