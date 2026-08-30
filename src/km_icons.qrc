@@ -1,0 +1,16 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/km-icons">
+        <!--
+            Bundled app icon (chunk 4): embedded hicolor PNGs so the window
+            icon works when running from the build directory, where the .ui
+            <iconset theme="org.archlinux.KernelManager"/> lookups cannot
+            resolve (the hicolor theme is not installed). Both sizes map to a
+            single canonical resource path; rcc resolves it to the 256x256
+            master, which Qt scales down for 48px taskbars and smaller.
+            Installed use keeps resolving the theme iconset as before.
+        -->
+        <file alias="org.archlinux.KernelManager.png">../icons/48x48/org.archlinux.KernelManager.png</file>
+        <file alias="org.archlinux.KernelManager.png">../icons/256x256/org.archlinux.KernelManager.png</file>
+    </qresource>
+</RCC>

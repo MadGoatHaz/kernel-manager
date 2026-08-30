@@ -139,7 +139,7 @@ qt_add_executable(${PROJECT_NAME}
     src/conf-patches-page.hpp src/conf-patches-page.ui
     src/conf-options-page.hpp src/conf-options-page.ui
     src/km-window.ui src/conf-window.ui
-    src/main.cpp "${CMAKE_BINARY_DIR}/km_locale.qrc"
+    src/main.cpp "${CMAKE_BINARY_DIR}/km_locale.qrc" src/km_icons.qrc
     )
 
 ##
