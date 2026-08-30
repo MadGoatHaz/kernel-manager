@@ -126,6 +126,15 @@ qt_add_executable(${PROJECT_NAME}
     src/main.cpp "${CMAKE_BINARY_DIR}/km_locale.qrc"
     )
 
+##
+## Polkit privilege layer (WU-2)
+##
+# Single install prefix for the pkexec helpers (terminal-helper, rootshell.sh).
+# Exposed to C++ as KM_HELPER_DIR so no hard-coded path literals remain in src/.
+# Keep in sync with the exec.path annotation in org.archlinux.kernel-manager.pkexec.policy.
+set(KM_HELPER_DIR "/usr/lib/kernel-manager")
+target_compile_definitions(${PROJECT_NAME} PRIVATE KM_HELPER_DIR="${KM_HELPER_DIR}")
+
 # Link this 'library' to use the warnings specified in CompilerWarnings.cmake
 add_library(project_warnings INTERFACE)
 set_project_warnings(project_warnings)
@@ -155,13 +164,13 @@ install(
 )
 
 install(
-   PROGRAMS ${CMAKE_SOURCE_DIR}/src/terminal-helper
-   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cachyos-kernel-manager
+    PROGRAMS ${CMAKE_SOURCE_DIR}/src/terminal-helper
+    DESTINATION ${KM_HELPER_DIR}
 )
 
 install(
-   PROGRAMS ${CMAKE_SOURCE_DIR}/src/rootshell.sh
-   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cachyos-kernel-manager
+    PROGRAMS ${CMAKE_SOURCE_DIR}/src/rootshell.sh
+    DESTINATION ${KM_HELPER_DIR}
 )
 
 install(

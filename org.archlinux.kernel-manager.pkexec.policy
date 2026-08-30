@@ -3,21 +3,21 @@
 "http://www.freedesktop.org/software/polkit/policyconfig-1.dtd">
 <policyconfig>
 
-  <vendor>cachyos-kernel-manager</vendor>
+  <vendor>kernel-manager</vendor>
   <vendor_url>https://github.com/CachyOS/kernel-manager</vendor_url>
 
-  <action id="org.cachyos.KernelManager.pkexec.policy.run-root-terminal">
+  <action id="org.archlinux.kernel-manager.pkexec.policy.run-root-terminal">
     <description>Run kernel installation/removal</description>
     <description xml:lang="ja">カーネルのインストール・削除を実行</description>
     <message>Authentication is required to run the installation/removal</message>
     <message xml:lang="ja">インストール・削除の実行には認証が必要です</message>
-    <icon_name>cachyos-kernel-manager</icon_name>
+    <icon_name>org.archlinux.KernelManager</icon_name>
     <defaults>
       <allow_any>no</allow_any>
       <allow_inactive>no</allow_inactive>
       <allow_active>auth_admin</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/cachyos-kernel-manager/rootshell.sh</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/kernel-manager/rootshell.sh</annotate>
   </action>
 
 </policyconfig>

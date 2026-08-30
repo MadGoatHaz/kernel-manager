@@ -125,11 +125,11 @@ int runCmdTerminal(QString cmd, bool escalate) noexcept {
     auto paramlist = QStringList();
     if (escalate) {
         paramlist << "-s"
-                  << "pkexec /usr/lib/cachyos-kernel-manager/rootshell.sh";
+                  << "pkexec " KM_HELPER_DIR "/rootshell.sh";
     }
     paramlist << cmd;
 
-    proc.start("/usr/lib/cachyos-kernel-manager/terminal-helper", paramlist);
+    proc.start(KM_HELPER_DIR "/terminal-helper", paramlist);
     proc.waitForFinished(-1);
     return proc.exitCode();
 }
