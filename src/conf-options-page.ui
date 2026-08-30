@@ -28,27 +28,43 @@
           <widget class="QWidget" name="build_source_widget" native="true">
            <layout class="QHBoxLayout" name="build_source_horizontal_layout">
             <item>
-             <widget class="QLabel" name="build_source_label">
-              <property name="text">
-               <string>Kernel source (AUR package name or git URL)</string>
-              </property>
-             </widget>
+              <widget class="QLabel" name="build_source_label">
+               <property name="text">
+                <string>Kernel source (known package or custom git URL)</string>
+               </property>
+              </widget>
             </item>
             <item>
-             <spacer name="build_source_horizontal_spacer">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>20</height>
-               </size>
-              </property>
-             </spacer>
+              <spacer name="build_source_horizontal_spacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
             </item>
             <item>
-             <widget class="QLineEdit" name="build_source_edit"/>
+              <widget class="QComboBox" name="build_source_combo"/>
+            </item>
+            <item>
+              <widget class="QLineEdit" name="build_source_custom_edit">
+               <property name="visible">
+                <bool>false</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>260</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="placeholderText">
+                <string>git URL or AUR package name</string>
+               </property>
+              </widget>
             </item>
            </layout>
           </widget>
