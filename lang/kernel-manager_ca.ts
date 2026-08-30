@@ -4,19 +4,17 @@
 <context>
     <name>ConfOptionsPage</name>
     <message>
-        <location filename="../src/conf-options-page.ui" line="66"/>
         <source>Enable CachyOS config</source>
-        <translation>Habilita les modificacions del CachyOS</translation>
+        <translation type="vanished">Habilita les modificacions del CachyOS</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="95"/>
+        <location filename="../src/conf-options-page.ui" line="124"/>
         <source>Tweak kernel options prior to a build via nconfig</source>
         <translation>Ajusteu les opcions del nucli abans d&apos;una compilació mitjançant nconfig</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="124"/>
         <source>Tweak kernel options prior to a build via menuconfig</source>
-        <translation>Ajusteu les opcions del nucli abans d&apos;una compilació mitjançant menuconfig</translation>
+        <translation type="vanished">Ajusteu les opcions del nucli abans d&apos;una compilació mitjançant menuconfig</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="153"/>
@@ -24,67 +22,70 @@
         <translation>Ajusteu les opcions del nucli abans d&apos;una compilació mitjançant xconfig</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="182"/>
         <source>Tweak kernel options prior to a build via gconfig</source>
-        <translation>Ajusteu les opcions del nucli abans d&apos;una compilació mitjançant gconfig</translation>
+        <translation type="vanished">Ajusteu les opcions del nucli abans d&apos;una compilació mitjançant gconfig</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="211"/>
         <source>Disable NUMA</source>
-        <translation>Inhabilita NUMA</translation>
+        <translation type="vanished">Inhabilita NUMA</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="240"/>
+        <location filename="../src/conf-options-page.ui" line="182"/>
         <source>Use Modprobed-db</source>
         <translation>Usa Modprobed-db</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="269"/>
+        <location filename="../src/conf-options-page.ui" line="211"/>
+        <source>Use the current kernel&apos;s config</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="240"/>
         <source>Enable KBUILD_CFLAGS -O3</source>
         <translation>Habilita KBUILD_CFLAGS -O3</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="298"/>
+        <location filename="../src/conf-options-page.ui" line="269"/>
         <source>Set performance governor as default</source>
         <translation>Estableix el governador de rendiment com a predeterminat</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="327"/>
+        <location filename="../src/conf-options-page.ui" line="298"/>
         <source>Enable TCP_CONG_BBR3</source>
         <translation>Habilita TCP_CONG_BBR3</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="356"/>
+        <location filename="../src/conf-options-page.ui" line="327"/>
         <source>Running tick rate</source>
         <translation>Taxa d&apos;execució</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="385"/>
+        <location filename="../src/conf-options-page.ui" line="356"/>
         <source>Select tickless</source>
         <translation>Selecciona tickless</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="414"/>
+        <location filename="../src/conf-options-page.ui" line="385"/>
         <source>Select preempt</source>
         <translation>Selecciona preempt</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="646"/>
+        <location filename="../src/conf-options-page.ui" line="530"/>
         <source>Build the open NVIDIA module</source>
         <translation>Construeix el mòdul obert d&apos;NVIDIA</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="721"/>
+        <location filename="../src/conf-options-page.ui" line="605"/>
         <source>Load</source>
         <translation>Carrega</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="728"/>
+        <location filename="../src/conf-options-page.ui" line="612"/>
         <source>Save</source>
         <translation>Desa</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="755"/>
+        <location filename="../src/conf-options-page.ui" line="639"/>
         <source>Build kernel</source>
         <translation>Construeix el nucli</translation>
     </message>
@@ -97,42 +98,50 @@
         <translation type="vanished">Habilita el blocatge per VMA</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="472"/>
         <source>Enable DAMON</source>
-        <translation>Habilita DAMON</translation>
+        <translation type="vanished">Habilita DAMON</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="501"/>
+        <location filename="../src/conf-options-page.ui" line="443"/>
         <source>CPU compiler optimizations</source>
         <translation>Optimitzacions del compilador de la CPU</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="530"/>
         <source>Apply automatic CPU Optimization</source>
-        <translation>Aplica l&apos;optimització automàtica de la CPU</translation>
+        <translation type="vanished">Aplica l&apos;optimització automàtica de la CPU</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="559"/>
+        <location filename="../src/conf-options-page.ui" line="472"/>
         <source>Enable LTO</source>
         <translation>Habilita LTO</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="588"/>
+        <location filename="../src/conf-options-page.ui" line="501"/>
         <source>Build the ZFS module</source>
         <translation>Construeix el mòdul ZFS</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="675"/>
+        <location filename="../src/conf-options-page.ui" line="559"/>
         <source>Include vmlinux with debug informations/symbols</source>
         <translation>Inclou vmlinux amb informació/símbols de depuració</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="443"/>
+        <location filename="../src/conf-options-page.ui" line="414"/>
         <source>Transparent Hugepages</source>
         <translation>Pàgines enormes transparents</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="748"/>
+        <location filename="../src/conf-options-page.ui" line="33"/>
+        <source>Kernel source (AUR package name or git URL)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="95"/>
+        <source>Enable custom config</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="632"/>
         <source>Cancel</source>
         <translation>Cancel·la</translation>
     </message>
@@ -141,12 +150,12 @@
         <translation type="vanished">Executa</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="33"/>
+        <location filename="../src/conf-options-page.ui" line="62"/>
         <source>Custom package name</source>
         <translation>Nom del paquet personalitzat</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="53"/>
+        <location filename="../src/conf-options-page.ui" line="82"/>
         <source>$pkgbase-custom</source>
         <translation>$pkgbase-custom</translation>
     </message>
@@ -167,9 +176,13 @@
 <context>
     <name>ConfWindow</name>
     <message>
-        <location filename="../src/conf-window.ui" line="17"/>
         <source>CachyOS Kernel Manager Configure</source>
-        <translation>Gestor de nuclis del CachyOS</translation>
+        <translation type="vanished">Gestor de nuclis del CachyOS</translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.ui" line="17"/>
+        <source>Kernel Manager Configure</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/conf-window.ui" line="40"/>
@@ -186,95 +199,80 @@
         <translation type="vanished">Bore - Potenciador de resposta orientat a ràfegues</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="484"/>
         <source>RC - Release Candidate</source>
-        <translation>RC - Candidat de publicació</translation>
+        <translation type="vanished">RC - Candidat de publicació</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="487"/>
-        <source>EEVDF</source>
+        <location filename="../src/conf-window.cpp" line="517"/>
+        <location filename="../src/conf-window.cpp" line="985"/>
+        <location filename="../src/conf-window.cpp" line="1003"/>
+        <location filename="../src/conf-window.cpp" line="1025"/>
+        <source>Kernel Manager</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="488"/>
-        <source>BMQ (BitMap Queue)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/conf-window.cpp" line="563"/>
+        <location filename="../src/conf-window.cpp" line="823"/>
         <source>Select one or more patch files</source>
         <translation>Seleccioneu un o més fitxers de pedaç</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="565"/>
+        <location filename="../src/conf-window.cpp" line="825"/>
         <source>Patch file (*.patch)</source>
         <translation>Fitxer de pedaç (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="585"/>
+        <location filename="../src/conf-window.cpp" line="845"/>
         <source>Enter URL patch</source>
         <translation>Introduïu l&apos;URL del pedaç</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="586"/>
+        <location filename="../src/conf-window.cpp" line="846"/>
         <source>Patch URL:</source>
         <translation>URL del pedaç:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="709"/>
+        <location filename="../src/conf-window.cpp" line="976"/>
         <source>Save file as</source>
         <translation>Desa el fitxer com a</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="711"/>
-        <location filename="../src/conf-window.cpp" line="728"/>
+        <location filename="../src/conf-window.cpp" line="978"/>
+        <location filename="../src/conf-window.cpp" line="995"/>
         <source>Config file (*.toml)</source>
         <translation>Fitxer de config. (*.toml)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="718"/>
+        <location filename="../src/conf-window.cpp" line="985"/>
         <source>Failed to save config options to file: %1</source>
         <translation>Ha fallat desar les opcions de configuració al fitxer %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="726"/>
+        <location filename="../src/conf-window.cpp" line="993"/>
         <source>Load from</source>
         <translation>Carrega des de</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="736"/>
+        <location filename="../src/conf-window.cpp" line="1003"/>
         <source>Failed to load config options from file: %1</source>
         <translation>Ha fallat carregar les opcions de configuració des del fitxer %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="772"/>
+        <location filename="../src/conf-window.cpp" line="1025"/>
         <source>Config file(%1) is outdated</source>
         <translation>El fitxer de configuració (%1) està obsolet.</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="485"/>
         <source>RT - Realtime kernel</source>
-        <translation>RT - Nucli en temps real</translation>
+        <translation type="vanished">RT - Nucli en temps real</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="370"/>
+        <location filename="../src/conf-window.cpp" line="517"/>
         <source>Do you want to install build packages?</source>
         <translation>Voleu instal·lar els paquets de compilació?</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="482"/>
-        <source>CachyOS default Scheduler (tuned EEVDF)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/conf-window.cpp" line="483"/>
-        <source>BORE - Burst-Oriented Response Enhancer</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/conf-window.cpp" line="486"/>
         <source>RT-Bore</source>
-        <translation>RT-Bore</translation>
+        <translation type="vanished">RT-Bore</translation>
     </message>
     <message>
         <source>Sched-Ext - BPF extensible scheduler class</source>
@@ -288,9 +286,8 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/km-window.ui" line="17"/>
         <source>CachyOS Kernel Manager</source>
-        <translation>Gestor de nuclis del CachyOS</translation>
+        <translation type="vanished">Gestor de nuclis del CachyOS</translation>
     </message>
     <message>
         <source>&lt;html&gt;
@@ -309,47 +306,58 @@
 &lt;/html&gt;</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="64"/>
+        <location filename="../src/km-window.ui" line="17"/>
+        <location filename="../src/km-window.cpp" line="144"/>
+        <location filename="../src/km-window.cpp" line="157"/>
+        <location filename="../src/km-window.cpp" line="214"/>
+        <location filename="../src/km-window.cpp" line="240"/>
+        <location filename="../src/km-window.cpp" line="409"/>
+        <location filename="../src/km-window.cpp" line="416"/>
+        <source>Kernel Manager</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="66"/>
         <source>Choose</source>
         <translation>Trieu</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="69"/>
+        <location filename="../src/km-window.ui" line="71"/>
         <source>PkgName</source>
         <translation>Nom del paquet</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="74"/>
+        <location filename="../src/km-window.ui" line="76"/>
         <source>Version</source>
         <translation>Versió</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="79"/>
+        <location filename="../src/km-window.ui" line="81"/>
         <source>Category</source>
         <translation>Categoria</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="116"/>
+        <location filename="../src/km-window.ui" line="118"/>
         <source>sched-ext scheduler config</source>
         <translation>Configuració del planificador sched-ext</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="123"/>
+        <location filename="../src/km-window.ui" line="125"/>
         <source>Configure</source>
         <translation>Configura</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="130"/>
+        <location filename="../src/km-window.ui" line="132"/>
         <source>Cancel</source>
         <translation>Cancel·la</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="137"/>
+        <location filename="../src/km-window.ui" line="139"/>
         <source>Execute</source>
         <translation>Executa</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="227"/>
+        <location filename="../src/km-window.cpp" line="240"/>
         <source>No kernels found!
 Please run `pacman -Sy` to update DB!
 This is needed for the app to work properly</source>
@@ -358,15 +366,15 @@ Si us plau, executeu &apos;pacman -Sy&apos; per actualitzar la base de dades!
 Això és necessari perquè l&apos;aplicació funcioni correctament.</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="201"/>
+        <location filename="../src/km-window.cpp" line="214"/>
         <source>Failed to clone repository!
 Please check your internet connection and try again</source>
         <translation>Ha fallat clonar el repositori!
 Si us plau, comproveu la connexió a Internet i torneu-ho a provar.</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="276"/>
-        <location filename="../src/km-window.cpp" line="340"/>
+        <location filename="../src/km-window.cpp" line="293"/>
+        <location filename="../src/km-window.cpp" line="357"/>
         <source>Please wait...
 We are preparing configuration window for you
 cloning PKGBUILDs..</source>
@@ -375,24 +383,30 @@ Es posa a punt la finestra de configuració.
 Clonació de PKGBUILDs..</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="143"/>
+        <location filename="../src/km-window.cpp" line="144"/>
         <source>Failed to initialize alpm handle (%1)</source>
         <translation>Ha fallat iniciar l&apos;identificador d&apos;alpm (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="156"/>
+        <location filename="../src/km-window.cpp" line="157"/>
         <source>Failed to release alpm handle (%1)</source>
         <translation>Ha fallat alliberar l&apos;identificador d&apos;alpm (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="361"/>
+        <location filename="../src/km-window.cpp" line="382"/>
         <source>Please wait...
 Initializing kernels..</source>
         <translation>Espereu, si us plau...
 S&apos;inicien els nuclis...</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="28"/>
+        <location filename="../src/km-window.cpp" line="409"/>
+        <location filename="../src/km-window.cpp" line="416"/>
+        <source>scx-manager is not installed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="27"/>
         <source>&lt;html&gt;
 &lt;body&gt;
 &lt;p&gt;Here you&apos;ll see information about currently installed and available Linux kernels.&lt;/p&gt;
@@ -412,49 +426,40 @@ S&apos;inicien els nuclis...</translation>
 <context>
     <name>SchedExtWindow</name>
     <message>
-        <location filename="../src/schedext-window.ui" line="17"/>
         <source>CachyOS Configure sched-ext</source>
-        <translation>Configuració de sched-ext del CachyOS</translation>
+        <translation type="vanished">Configuració de sched-ext del CachyOS</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="40"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;Configure sched-ext scheduler:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;Configura el planificador sched-ext:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation type="vanished">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;Configura el planificador sched-ext:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="82"/>
         <source>Select sched-ext scheduler:</source>
-        <translation>Seleccioneu el planificador sched-ext:</translation>
+        <translation type="vanished">Seleccioneu el planificador sched-ext:</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="92"/>
         <source>Select scheduler profile:</source>
-        <translation>Seleccioneu el perfil del planificador:</translation>
+        <translation type="vanished">Seleccioneu el perfil del planificador:</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="115"/>
         <source>unknown</source>
-        <translation>desconegut</translation>
+        <translation type="vanished">desconegut</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="75"/>
         <source>Running sched-ext scheduler:</source>
-        <translation>Execució del planificador sched-ext:</translation>
+        <translation type="vanished">Execució del planificador sched-ext:</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="122"/>
         <source>Set sched-ext extra scheduler flags:</source>
-        <translation>Estableix senyals de planificador addicionals de sched-ext:</translation>
+        <translation type="vanished">Estableix senyals de planificador addicionals de sched-ext:</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="176"/>
         <source>Disable</source>
-        <translation>Inhabilita</translation>
+        <translation type="vanished">Inhabilita</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="183"/>
         <source>Apply</source>
-        <translation>Aplica</translation>
+        <translation type="vanished">Aplica</translation>
     </message>
 </context>
 </TS>

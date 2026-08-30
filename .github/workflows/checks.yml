@@ -16,7 +16,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Base job: generic Arch (arch base, mirrors build.yml). scx-manager is NOT
+  # installed here, so this verifies the default WITH_SCX_MANAGER=OFF path
+  # (configure QUIET, no link, guarded sources).
   cpp-linter:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install deps
+        run: |
+          pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
+          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git
+        shell: bash
+
+      - name: Configure CMake
+        run: |
+          export AR=llvm-ar
+          export CC=clang
+          export CXX=clang++
+          export NM=llvm-nm
+          export RANLIB=llvm-ranlib
+
+          ./configure.sh -t=Debug -p=${{github.workspace}}/build --use_clang
+          ./build.sh
+        shell: bash
+
+      - name: Run clang-tidy
+        run: |
+          clang-tidy -p ${{github.workspace}}/build/Debug src/*.cpp
+        shell: bash
+
+  # Dedicated scx job: cachyOS container (its repo provides scx-manager, an
+  # AUR-only package on generic Arch). scxctl-ui is found, so
+  # WITH_SCX_MANAGER auto-enables; this covers the ON code path.
+  cpp-linter-scx:
     runs-on: ubuntu-latest
     container: cachyos/cachyos:latest
     steps:
@@ -28,7 +63,7 @@ jobs:
           mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git scx-manager
         shell: bash
 
-      - name: Configure CMake
+      - name: Configure CMake (WITH_SCX_MANAGER=ON)
         run: |
           export AR=llvm-ar
           export CC=clang

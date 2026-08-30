@@ -59,7 +59,23 @@ CPMAddPackage(
 )
 
 find_package(PolkitQt6-1 REQUIRED)
-find_package(scxctl-ui 1 REQUIRED)
+
+# sched-ext (scx-manager) support is OPTIONAL (WU-5): the default build for
+# generic Arch must configure/build/link without it.
+#
+#   default (no -D):           auto — scxctl-ui is probed silently;
+#                              present -> WITH_SCX_MANAGER=ON, absent -> OFF
+#   -DWITH_SCX_MANAGER=ON/OFF: explicit user choice always wins
+#                              (ON requires the scx-manager package to be
+#                              installed; a missing package is a hard error)
+find_package(scxctl-ui 1 QUIET)
+if(NOT DEFINED WITH_SCX_MANAGER)
+    set(WITH_SCX_MANAGER ${scxctl-ui_FOUND})
+else()
+    if(WITH_SCX_MANAGER AND NOT scxctl-ui_FOUND)
+        message(FATAL_ERROR "WITH_SCX_MANAGER=ON requires scx-manager (scxctl-ui) but it was not found; install scx-manager or set WITH_SCX_MANAGER=OFF")
+    endif()
+endif()
 
 ##
 ## CONFIGURATION
@@ -140,6 +156,12 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE KM_HELPER_DIR="${KM_HELPER_DI
 set(KM_IGNORE_REPO "" CACHE STRING "pacman.conf sync repo to ignore during kernel discovery")
 target_compile_definitions(${PROJECT_NAME} PRIVATE KM_IGNORE_REPO="${KM_IGNORE_REPO}")
 
+# sched-ext feature gate (WU-5): only defined when scx-manager is available,
+# so the scxctl::SchedExtWindow member + handlers compile out cleanly otherwise.
+if(WITH_SCX_MANAGER)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE WITH_SCX_MANAGER=1)
+endif()
+
 # Link this 'library' to use the warnings specified in CompilerWarnings.cmake
 add_library(project_warnings INTERFACE)
 set_project_warnings(project_warnings)
@@ -155,7 +177,13 @@ include_directories(${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR})
 corrosion_import_crate(MANIFEST_PATH "config-option-lib/Cargo.toml" FLAGS "${CARGO_FLAGS}")
 corrosion_add_cxxbridge(config-option-lib-cxxbridge CRATE config_option_lib FILES lib.rs)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE project_warnings project_options scxctl::scxctl-ui Qt6::Widgets Qt6::Concurrent Threads::Threads fmt::fmt frozen::frozen config-option-lib-cxxbridge PkgConfig::LIBALPM PkgConfig::LIBGLIB)
+target_link_libraries(${PROJECT_NAME} PRIVATE project_warnings project_options Qt6::Widgets Qt6::Concurrent Threads::Threads fmt::fmt frozen::frozen config-option-lib-cxxbridge PkgConfig::LIBALPM PkgConfig::LIBGLIB)
+
+# Link scx-manager's UI library only when the optional feature is enabled (WU-5);
+# a generic-Arch build (WITH_SCX_MANAGER=OFF) must link without it.
+if(WITH_SCX_MANAGER)
+    target_link_libraries(${PROJECT_NAME} PRIVATE scxctl::scxctl-ui)
+endif()
 
 option(ENABLE_UNITY "Enable Unity builds of projects" OFF)
 if(ENABLE_UNITY)

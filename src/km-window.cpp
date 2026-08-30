@@ -182,10 +182,21 @@ MainWindow::MainWindow(QWidget* parent)
 
     m_ui->ok->setEnabled(false);
 
-    // Hide sched-ext button in case we are not on kernel with sched-ext
+    // Instantiate the sched-ext config window only when scx-manager support is
+    // compiled in (WU-5); m_sched_window stays nullptr otherwise.
+#ifdef WITH_SCX_MANAGER
+    m_sched_window = std::make_unique<scxctl::SchedExtWindow>();
+#endif
+
+    // Hide sched-ext button in case we are not on kernel with sched-ext, or
+    // scx-manager support is not compiled in at all (WU-5).
+#ifdef WITH_SCX_MANAGER
     if (!fs::exists("/sys/kernel/sched_ext/state")) {
         m_ui->schedext->setHidden(true);
     }
+#else
+    m_ui->schedext->setHidden(true);
+#endif
 
     // Setup progress dialog
     set_progress_dialog();
@@ -233,7 +244,11 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_ui->cancel, &QPushButton::clicked, this, &MainWindow::on_cancel);
     connect(m_ui->ok, &QPushButton::clicked, this, &MainWindow::on_execute);
     connect(m_ui->configure, &QPushButton::clicked, this, &MainWindow::on_configure);
-    connect(m_ui->schedext, &QPushButton::clicked, this, &MainWindow::on_schedext_config);
+#ifdef WITH_SCX_MANAGER
+    if (m_sched_window != nullptr) {
+        connect(m_ui->schedext, &QPushButton::clicked, this, &MainWindow::on_schedext_config);
+    }
+#endif
 
     // Connect worker thread signals
     connect(m_worker_th, &QThread::finished, m_worker, &QObject::deleteLater);
@@ -389,7 +404,17 @@ void MainWindow::on_execute() noexcept {
 }
 
 void MainWindow::on_schedext_config() noexcept {
+#ifdef WITH_SCX_MANAGER
+    if (m_sched_window == nullptr) {
+        QMessageBox::warning(this, tr("Kernel Manager"), tr("scx-manager is not installed."));
+        return;
+    }
     m_sched_window->show();
+#else
+    // scx-manager support is not compiled in (WU-5): the button is hidden in
+    // the ctor, this path is defensive only.
+    QMessageBox::warning(this, tr("Kernel Manager"), tr("scx-manager is not installed."));
+#endif
 }
 
 bool KernelTreeWidgetItem::operator<(const QTreeWidgetItem& other) const {

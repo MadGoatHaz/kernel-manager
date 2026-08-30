@@ -4,12 +4,11 @@
 <context>
     <name>ConfOptionsPage</name>
     <message>
-        <location filename="../src/conf-options-page.ui" line="66"/>
         <source>Enable CachyOS config</source>
-        <translation>CachyOS ayarlamayı etkinleştir</translation>
+        <translation type="vanished">CachyOS ayarlamayı etkinleştir</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="95"/>
+        <location filename="../src/conf-options-page.ui" line="124"/>
         <source>Tweak kernel options prior to a build via nconfig</source>
         <translation>nconfig ile yapılandırmadan önce çekirdek ayarlarına ince ayar yap</translation>
     </message>
@@ -19,62 +18,66 @@
         <translation>xconfig ile yapılandırmadan önce çekirdek ayarlarına ince ayar yap</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="211"/>
         <source>Disable NUMA</source>
-        <translation>NUMA devre dışı bırakılsın</translation>
+        <translation type="vanished">NUMA devre dışı bırakılsın</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="240"/>
+        <location filename="../src/conf-options-page.ui" line="182"/>
         <source>Use Modprobed-db</source>
         <translation>Modprobed-db kullanılsın</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="269"/>
+        <location filename="../src/conf-options-page.ui" line="211"/>
+        <source>Use the current kernel&apos;s config</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="240"/>
         <source>Enable KBUILD_CFLAGS -O3</source>
         <translation>KBUILD_CFLAGS -O3 etkinleştirilsin</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="298"/>
+        <location filename="../src/conf-options-page.ui" line="269"/>
         <source>Set performance governor as default</source>
         <translation>Performans odaklı işlemci yöneticisini varsayılan yap</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="327"/>
+        <location filename="../src/conf-options-page.ui" line="298"/>
         <source>Enable TCP_CONG_BBR3</source>
         <translation>TCP_CONG_BBR3 etkinleştirilsin</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="356"/>
+        <location filename="../src/conf-options-page.ui" line="327"/>
         <source>Running tick rate</source>
         <translation>Çalışılan tik oranı</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="385"/>
+        <location filename="../src/conf-options-page.ui" line="356"/>
         <source>Select tickless</source>
         <translation>Tiksiz seçim yap</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="414"/>
+        <location filename="../src/conf-options-page.ui" line="385"/>
         <source>Select preempt</source>
         <translation>preempt belirle</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="646"/>
+        <location filename="../src/conf-options-page.ui" line="530"/>
         <source>Build the open NVIDIA module</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="721"/>
+        <location filename="../src/conf-options-page.ui" line="605"/>
         <source>Load</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="728"/>
+        <location filename="../src/conf-options-page.ui" line="612"/>
         <source>Save</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="755"/>
+        <location filename="../src/conf-options-page.ui" line="639"/>
         <source>Build kernel</source>
         <translation type="unfinished"></translation>
     </message>
@@ -87,42 +90,50 @@
         <translation type="vanished">per-VMA locking etkinleştirilsin</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="472"/>
         <source>Enable DAMON</source>
-        <translation>DAMON etkinleştirilsin</translation>
+        <translation type="vanished">DAMON etkinleştirilsin</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="501"/>
+        <location filename="../src/conf-options-page.ui" line="443"/>
         <source>CPU compiler optimizations</source>
         <translation>İşlemci derleme iyileştirmeleri</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="530"/>
         <source>Apply automatic CPU Optimization</source>
-        <translation>Otomatik işlemci iyileştirmeleri uygulansın</translation>
+        <translation type="vanished">Otomatik işlemci iyileştirmeleri uygulansın</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="559"/>
+        <location filename="../src/conf-options-page.ui" line="472"/>
         <source>Enable LTO</source>
         <translation>LTO etkinleştirilsin</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="588"/>
+        <location filename="../src/conf-options-page.ui" line="501"/>
         <source>Build the ZFS module</source>
         <translation>ZFS modülünü yapılandır</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="675"/>
+        <location filename="../src/conf-options-page.ui" line="559"/>
         <source>Include vmlinux with debug informations/symbols</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="443"/>
+        <location filename="../src/conf-options-page.ui" line="414"/>
         <source>Transparent Hugepages</source>
         <translation>Saydam HugePage&apos;ler</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="748"/>
+        <location filename="../src/conf-options-page.ui" line="33"/>
+        <source>Kernel source (AUR package name or git URL)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="95"/>
+        <source>Enable custom config</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="632"/>
         <source>Cancel</source>
         <translation>Vazgeç</translation>
     </message>
@@ -131,12 +142,12 @@
         <translation type="vanished">Gerçekleştir</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="33"/>
+        <location filename="../src/conf-options-page.ui" line="62"/>
         <source>Custom package name</source>
         <translation>Özel paket ismi</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="53"/>
+        <location filename="../src/conf-options-page.ui" line="82"/>
         <source>$pkgbase-custom</source>
         <translation type="unfinished"></translation>
     </message>
@@ -157,9 +168,13 @@
 <context>
     <name>ConfWindow</name>
     <message>
-        <location filename="../src/conf-window.ui" line="17"/>
         <source>CachyOS Kernel Manager Configure</source>
-        <translation>CachyOS Çekirdek Yöneticisi Yapılandırma</translation>
+        <translation type="vanished">CachyOS Çekirdek Yöneticisi Yapılandırma</translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.ui" line="17"/>
+        <source>Kernel Manager Configure</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/conf-window.ui" line="40"/>
@@ -176,94 +191,75 @@
         <translation type="vanished">BORE - Ani Yüke Odaklı Tepki Arttırıcı</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="484"/>
         <source>RC - Release Candidate</source>
-        <translation>RC - Çıkış sürümü adayı</translation>
+        <translation type="vanished">RC - Çıkış sürümü adayı</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="487"/>
-        <source>EEVDF</source>
+        <location filename="../src/conf-window.cpp" line="517"/>
+        <location filename="../src/conf-window.cpp" line="985"/>
+        <location filename="../src/conf-window.cpp" line="1003"/>
+        <location filename="../src/conf-window.cpp" line="1025"/>
+        <source>Kernel Manager</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="488"/>
-        <source>BMQ (BitMap Queue)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/conf-window.cpp" line="563"/>
+        <location filename="../src/conf-window.cpp" line="823"/>
         <source>Select one or more patch files</source>
         <translation>Bir veya daha fazla yama dosyası seç</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="565"/>
+        <location filename="../src/conf-window.cpp" line="825"/>
         <source>Patch file (*.patch)</source>
         <translation>Yama dosyası (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="585"/>
+        <location filename="../src/conf-window.cpp" line="845"/>
         <source>Enter URL patch</source>
         <translation>URL yaması gir</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="586"/>
+        <location filename="../src/conf-window.cpp" line="846"/>
         <source>Patch URL:</source>
         <translation>Yama için URL:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="709"/>
+        <location filename="../src/conf-window.cpp" line="976"/>
         <source>Save file as</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="711"/>
-        <location filename="../src/conf-window.cpp" line="728"/>
+        <location filename="../src/conf-window.cpp" line="978"/>
+        <location filename="../src/conf-window.cpp" line="995"/>
         <source>Config file (*.toml)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="718"/>
+        <location filename="../src/conf-window.cpp" line="985"/>
         <source>Failed to save config options to file: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="726"/>
+        <location filename="../src/conf-window.cpp" line="993"/>
         <source>Load from</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="736"/>
+        <location filename="../src/conf-window.cpp" line="1003"/>
         <source>Failed to load config options from file: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="772"/>
+        <location filename="../src/conf-window.cpp" line="1025"/>
         <source>Config file(%1) is outdated</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="485"/>
         <source>RT - Realtime kernel</source>
-        <translation>RT - Gerçek zamanlı çekirdek</translation>
+        <translation type="vanished">RT - Gerçek zamanlı çekirdek</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="370"/>
+        <location filename="../src/conf-window.cpp" line="517"/>
         <source>Do you want to install build packages?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/conf-window.cpp" line="482"/>
-        <source>CachyOS default Scheduler (tuned EEVDF)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/conf-window.cpp" line="483"/>
-        <source>BORE - Burst-Oriented Response Enhancer</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/conf-window.cpp" line="486"/>
-        <source>RT-Bore</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -274,9 +270,8 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/km-window.ui" line="17"/>
         <source>CachyOS Kernel Manager</source>
-        <translation>CachyOS Çekirdek Yöneticisi</translation>
+        <translation type="vanished">CachyOS Çekirdek Yöneticisi</translation>
     </message>
     <message>
         <source>&lt;html&gt;
@@ -295,47 +290,58 @@
 &lt;/html&gt;</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="64"/>
+        <location filename="../src/km-window.ui" line="17"/>
+        <location filename="../src/km-window.cpp" line="144"/>
+        <location filename="../src/km-window.cpp" line="157"/>
+        <location filename="../src/km-window.cpp" line="214"/>
+        <location filename="../src/km-window.cpp" line="240"/>
+        <location filename="../src/km-window.cpp" line="409"/>
+        <location filename="../src/km-window.cpp" line="416"/>
+        <source>Kernel Manager</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="66"/>
         <source>Choose</source>
         <translation>Seç</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="69"/>
+        <location filename="../src/km-window.ui" line="71"/>
         <source>PkgName</source>
         <translation>Paket ismi</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="74"/>
+        <location filename="../src/km-window.ui" line="76"/>
         <source>Version</source>
         <translation>Sürüm</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="79"/>
+        <location filename="../src/km-window.ui" line="81"/>
         <source>Category</source>
         <translation>Kategori</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="116"/>
+        <location filename="../src/km-window.ui" line="118"/>
         <source>sched-ext scheduler config</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="123"/>
+        <location filename="../src/km-window.ui" line="125"/>
         <source>Configure</source>
         <translation>Yapılandır</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="130"/>
+        <location filename="../src/km-window.ui" line="132"/>
         <source>Cancel</source>
         <translation>Vazgeç</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="137"/>
+        <location filename="../src/km-window.ui" line="139"/>
         <source>Execute</source>
         <translation>Gerçekleştir</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="227"/>
+        <location filename="../src/km-window.cpp" line="240"/>
         <source>No kernels found!
 Please run `pacman -Sy` to update DB!
 This is needed for the app to work properly</source>
@@ -344,15 +350,15 @@ Lütfen `pacman -Sy` komutuyla veri tabanını güncelleyin!
 Uygulamanın düzgün çalışabilmesi için bu gereklidir.</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="201"/>
+        <location filename="../src/km-window.cpp" line="214"/>
         <source>Failed to clone repository!
 Please check your internet connection and try again</source>
         <translation>Repoyu klonlama başarısız oldu!
 Lütfen internet bağlantınızı kontrol edip tekrar deneyin.</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="276"/>
-        <location filename="../src/km-window.cpp" line="340"/>
+        <location filename="../src/km-window.cpp" line="293"/>
+        <location filename="../src/km-window.cpp" line="357"/>
         <source>Please wait...
 We are preparing configuration window for you
 cloning PKGBUILDs..</source>
@@ -361,24 +367,30 @@ Biçimleme penceresini sizin için hazırlıyoruz
 PKGBUILD&apos;ler klonlanıyor…</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="143"/>
+        <location filename="../src/km-window.cpp" line="144"/>
         <source>Failed to initialize alpm handle (%1)</source>
         <translation>ALPM işleyicisini başlatım başarısız oldu (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="156"/>
+        <location filename="../src/km-window.cpp" line="157"/>
         <source>Failed to release alpm handle (%1)</source>
         <translation>ALPM işleyicisini salım başarısız oldu (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="361"/>
+        <location filename="../src/km-window.cpp" line="382"/>
         <source>Please wait...
 Initializing kernels..</source>
         <translation>Lütfen bekleyin…
 Çekirdekler ilk kullanıma hazırlandırılıyor…</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="28"/>
+        <location filename="../src/km-window.cpp" line="409"/>
+        <location filename="../src/km-window.cpp" line="416"/>
+        <source>scx-manager is not installed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="27"/>
         <source>&lt;html&gt;
 &lt;body&gt;
 &lt;p&gt;Here you&apos;ll see information about currently installed and available Linux kernels.&lt;/p&gt;
@@ -386,54 +398,6 @@ Initializing kernels..</source>
 &lt;p&gt;This app won&apos;t work if you are already running a pacman instance.&lt;/p&gt;
 &lt;/body&gt;
 &lt;/html&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>SchedExtWindow</name>
-    <message>
-        <location filename="../src/schedext-window.ui" line="17"/>
-        <source>CachyOS Configure sched-ext</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/schedext-window.ui" line="40"/>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;Configure sched-ext scheduler:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/schedext-window.ui" line="82"/>
-        <source>Select sched-ext scheduler:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/schedext-window.ui" line="92"/>
-        <source>Select scheduler profile:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/schedext-window.ui" line="115"/>
-        <source>unknown</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/schedext-window.ui" line="75"/>
-        <source>Running sched-ext scheduler:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/schedext-window.ui" line="122"/>
-        <source>Set sched-ext extra scheduler flags:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/schedext-window.ui" line="176"/>
-        <source>Disable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/schedext-window.ui" line="183"/>
-        <source>Apply</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

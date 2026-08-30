@@ -27,8 +27,9 @@ license=(GPL-3.0-or-later)
 conflicts=(cachyos-kernel-manager kernel-manager)
 provides=(cachyos-kernel-manager kernel-manager)
 
-depends=(qt6-base pacman glib2 scx-manager polkit)
-makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 scx-manager polkit-qt6)
+depends=(qt6-base pacman glib2 polkit)
+optdepends=("scx-manager: sched-ext (BPF) scheduler management")
+makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polkit-qt6)
 
 install=kernel-manager.install
 

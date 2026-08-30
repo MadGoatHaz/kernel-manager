@@ -4,12 +4,11 @@
 <context>
     <name>ConfOptionsPage</name>
     <message>
-        <location filename="../src/conf-options-page.ui" line="66"/>
         <source>Enable CachyOS config</source>
-        <translation>Увімкнути конфігурацію CachyOS</translation>
+        <translation type="vanished">Увімкнути конфігурацію CachyOS</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="95"/>
+        <location filename="../src/conf-options-page.ui" line="124"/>
         <source>Tweak kernel options prior to a build via nconfig</source>
         <translation>Налаштувати параметри ядра перед збиранням через nconfig</translation>
     </message>
@@ -19,131 +18,146 @@
         <translation>Налаштувати параметри ядра перед збиранням через xconfig</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="211"/>
         <source>Disable NUMA</source>
-        <translation>Вимкнути NUMA</translation>
+        <translation type="vanished">Вимкнути NUMA</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="240"/>
+        <location filename="../src/conf-options-page.ui" line="182"/>
         <source>Use Modprobed-db</source>
         <translation>Використовувати Modprobed-db</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="269"/>
+        <location filename="../src/conf-options-page.ui" line="211"/>
+        <source>Use the current kernel&apos;s config</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="240"/>
         <source>Enable KBUILD_CFLAGS -O3</source>
         <translation>Увімкнути KBUILD_CFLAGS -O3</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="298"/>
+        <location filename="../src/conf-options-page.ui" line="269"/>
         <source>Set performance governor as default</source>
         <translation>Встановити регулятор продуктивності типовим</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="327"/>
+        <location filename="../src/conf-options-page.ui" line="298"/>
         <source>Enable TCP_CONG_BBR3</source>
         <translation>Увімкнути TCP_CONG_BBR3</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="356"/>
+        <location filename="../src/conf-options-page.ui" line="327"/>
         <source>Running tick rate</source>
         <translation>Частота системного таймера</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="385"/>
+        <location filename="../src/conf-options-page.ui" line="356"/>
         <source>Select tickless</source>
         <translation>Вибрати режим tickless</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="414"/>
+        <location filename="../src/conf-options-page.ui" line="385"/>
         <source>Select preempt</source>
         <translation>Вибрати режим preempt</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="646"/>
+        <location filename="../src/conf-options-page.ui" line="530"/>
         <source>Build the open NVIDIA module</source>
         <translation>Зібрати відкритий модуль NVIDIA</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="721"/>
+        <location filename="../src/conf-options-page.ui" line="605"/>
         <source>Load</source>
         <translation>Завантажити</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="728"/>
+        <location filename="../src/conf-options-page.ui" line="612"/>
         <source>Save</source>
         <translation>Зберегти</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="755"/>
+        <location filename="../src/conf-options-page.ui" line="639"/>
         <source>Build kernel</source>
         <translation>Зібрати ядро</translation>
     </message>
-    <message type="vanished">
+    <message>
         <source>Enable multigenerational LRU</source>
-        <translation>Увімкнути багатопоколінний LRU</translation>
+        <translation type="vanished">Увімкнути багатопоколінний LRU</translation>
     </message>
-    <message type="vanished">
+    <message>
         <source>Enable per-VMA locking</source>
-        <translation>Увімкнути блокування для кожного VMA</translation>
+        <translation type="vanished">Увімкнути блокування для кожного VMA</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="472"/>
         <source>Enable DAMON</source>
-        <translation>Увімкнути DAMON</translation>
+        <translation type="vanished">Увімкнути DAMON</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="501"/>
+        <location filename="../src/conf-options-page.ui" line="443"/>
         <source>CPU compiler optimizations</source>
         <translation>Оптимізації компіляції для CPU</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="530"/>
         <source>Apply automatic CPU Optimization</source>
-        <translation>Застосувати автоматичну оптимізацію CPU</translation>
+        <translation type="vanished">Застосувати автоматичну оптимізацію CPU</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="559"/>
+        <location filename="../src/conf-options-page.ui" line="472"/>
         <source>Enable LTO</source>
         <translation>Увімкнути LTO</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="588"/>
+        <location filename="../src/conf-options-page.ui" line="501"/>
         <source>Build the ZFS module</source>
         <translation>Зібрати модуль ZFS</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="675"/>
+        <location filename="../src/conf-options-page.ui" line="559"/>
         <source>Include vmlinux with debug informations/symbols</source>
         <translation>Додати vmlinux із символами налагодження</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="443"/>
+        <location filename="../src/conf-options-page.ui" line="414"/>
         <source>Transparent Hugepages</source>
         <translation>Прозорі великі сторінки</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="748"/>
+        <location filename="../src/conf-options-page.ui" line="33"/>
+        <source>Kernel source (AUR package name or git URL)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="82"/>
+        <source>$pkgbase-custom</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="95"/>
+        <source>Enable custom config</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="632"/>
         <source>Cancel</source>
         <translation>Скасувати</translation>
     </message>
-    <message type="vanished">
+    <message>
         <source>Execute</source>
-        <translation>Виконати</translation>
+        <translation type="vanished">Виконати</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="33"/>
+        <location filename="../src/conf-options-page.ui" line="62"/>
         <source>Custom package name</source>
         <translation>Власна назва пакета</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="53"/>
         <source>$pkgbase</source>
-        <translation>$pkgbase</translation>
+        <translation type="vanished">$pkgbase</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="617"/>
         <source>Build the NVIDIA module</source>
-        <translation>Зібрати модуль NVIDIA</translation>
+        <translation type="vanished">Зібрати модуль NVIDIA</translation>
     </message>
 </context>
 <context>
@@ -162,9 +176,13 @@
 <context>
     <name>ConfWindow</name>
     <message>
-        <location filename="../src/conf-window.ui" line="17"/>
         <source>CachyOS Kernel Manager Configure</source>
-        <translation>Конфігуратор ядер CachyOS</translation>
+        <translation type="vanished">Конфігуратор ядер CachyOS</translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.ui" line="17"/>
+        <source>Kernel Manager Configure</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/conf-window.ui" line="40"/>
@@ -181,111 +199,111 @@
         <translation type="vanished">BORE - планувальник імпульсної відповіді</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="484"/>
         <source>RC - Release Candidate</source>
-        <translation>RC - попередній випуск</translation>
+        <translation type="vanished">RC - попередній випуск</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="487"/>
         <source>EEVDF</source>
-        <translation>EEVDF</translation>
+        <translation type="vanished">EEVDF</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="488"/>
         <source>BMQ (BitMap Queue)</source>
-        <translation>BMQ (бітова черга)</translation>
+        <translation type="vanished">BMQ (бітова черга)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="563"/>
+        <location filename="../src/conf-window.cpp" line="517"/>
+        <location filename="../src/conf-window.cpp" line="985"/>
+        <location filename="../src/conf-window.cpp" line="1003"/>
+        <location filename="../src/conf-window.cpp" line="1025"/>
+        <source>Kernel Manager</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="823"/>
         <source>Select one or more patch files</source>
         <translation>Виберіть один або кілька файлів латок</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="565"/>
+        <location filename="../src/conf-window.cpp" line="825"/>
         <source>Patch file (*.patch)</source>
         <translation>Файл латки (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="585"/>
+        <location filename="../src/conf-window.cpp" line="845"/>
         <source>Enter URL patch</source>
         <translation>Введіть URL латки</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="586"/>
+        <location filename="../src/conf-window.cpp" line="846"/>
         <source>Patch URL:</source>
         <translation>URL латки:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="709"/>
+        <location filename="../src/conf-window.cpp" line="976"/>
         <source>Save file as</source>
         <translation>Зберегти як</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="711"/>
-        <location filename="../src/conf-window.cpp" line="728"/>
+        <location filename="../src/conf-window.cpp" line="978"/>
+        <location filename="../src/conf-window.cpp" line="995"/>
         <source>Config file (*.toml)</source>
         <translation>Файл конфігурації (*.toml)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="718"/>
+        <location filename="../src/conf-window.cpp" line="985"/>
         <source>Failed to save config options to file: %1</source>
         <translation>Не вдалося зберегти конфігурацію у файл: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="726"/>
+        <location filename="../src/conf-window.cpp" line="993"/>
         <source>Load from</source>
         <translation>Завантажити з</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="736"/>
+        <location filename="../src/conf-window.cpp" line="1003"/>
         <source>Failed to load config options from file: %1</source>
         <translation>Не вдалося завантажити конфігурацію з файлу: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="772"/>
+        <location filename="../src/conf-window.cpp" line="1025"/>
         <source>Config file(%1) is outdated</source>
         <translation>Файл конфігурації (%1) застарів</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="485"/>
         <source>RT - Realtime kernel</source>
-        <translation>RT - ядро реального часу</translation>
+        <translation type="vanished">RT - ядро реального часу</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="370"/>
+        <location filename="../src/conf-window.cpp" line="517"/>
         <source>Do you want to install build packages?</source>
         <translation>Встановити пакети, необхідні для збирання?</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="482"/>
         <source>CachyOS default scheduler (BORE+Cachy Sauce)</source>
-        <translation>Типовий планувальник CachyOS (BORE + Cachy Sauce)</translation>
+        <translation type="vanished">Типовий планувальник CachyOS (BORE + Cachy Sauce)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="483"/>
         <source>BORE - Burst-Oriented Response Enhancer</source>
-        <translation>BORE – планувальник імпульсної відповіді</translation>
+        <translation type="vanished">BORE – планувальник імпульсної відповіді</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="486"/>
         <source>RT-Bore</source>
-        <translation>RT-Bore</translation>
+        <translation type="vanished">RT-Bore</translation>
     </message>
-    <message type="vanished">
+    <message>
         <source>Sched-Ext - BPF extensible scheduler class</source>
-        <translation>Sched-Ext – розширюваний планувальник BPF</translation>
+        <translation type="vanished">Sched-Ext – розширюваний планувальник BPF</translation>
     </message>
-    <message type="vanished">
+    <message>
         <source>CachyOS - BORE + SCHED-EXT</source>
-        <translation>CachyOS - BORE + SCHED-EXT</translation>
+        <translation type="vanished">CachyOS - BORE + SCHED-EXT</translation>
     </message>
 </context>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/km-window.ui" line="17"/>
         <source>CachyOS Kernel Manager</source>
-        <translation>Менеджер ядер CachyOS</translation>
+        <translation type="vanished">Менеджер ядер CachyOS</translation>
     </message>
     <message>
         <source>&lt;html&gt;
@@ -304,47 +322,58 @@
 &lt;/html&gt;</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="64"/>
+        <location filename="../src/km-window.ui" line="17"/>
+        <location filename="../src/km-window.cpp" line="144"/>
+        <location filename="../src/km-window.cpp" line="157"/>
+        <location filename="../src/km-window.cpp" line="214"/>
+        <location filename="../src/km-window.cpp" line="240"/>
+        <location filename="../src/km-window.cpp" line="409"/>
+        <location filename="../src/km-window.cpp" line="416"/>
+        <source>Kernel Manager</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="66"/>
         <source>Choose</source>
         <translation>Вибрати</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="69"/>
+        <location filename="../src/km-window.ui" line="71"/>
         <source>PkgName</source>
         <translation>Назва</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="74"/>
+        <location filename="../src/km-window.ui" line="76"/>
         <source>Version</source>
         <translation>Версія</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="79"/>
+        <location filename="../src/km-window.ui" line="81"/>
         <source>Category</source>
         <translation>Тип</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="116"/>
+        <location filename="../src/km-window.ui" line="118"/>
         <source>sched-ext scheduler config</source>
         <translation>Параметри планувальника sched-ext</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="123"/>
+        <location filename="../src/km-window.ui" line="125"/>
         <source>Configure</source>
         <translation>Налаштувати</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="130"/>
+        <location filename="../src/km-window.ui" line="132"/>
         <source>Cancel</source>
         <translation>Скасувати</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="137"/>
+        <location filename="../src/km-window.ui" line="139"/>
         <source>Execute</source>
         <translation>Виконати</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="227"/>
+        <location filename="../src/km-window.cpp" line="240"/>
         <source>No kernels found!
 Please run `pacman -Sy` to update DB!
 This is needed for the app to work properly</source>
@@ -353,15 +382,15 @@ This is needed for the app to work properly</source>
 Це необхідно для коректної роботи застосунку.</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="201"/>
+        <location filename="../src/km-window.cpp" line="214"/>
         <source>Failed to clone repository!
 Please check your internet connection and try again</source>
         <translation>Не вдалося клонувати сховище!
 Перевірте підключення до інтернету та спробуйте ще раз</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="276"/>
-        <location filename="../src/km-window.cpp" line="340"/>
+        <location filename="../src/km-window.cpp" line="293"/>
+        <location filename="../src/km-window.cpp" line="357"/>
         <source>Please wait...
 We are preparing configuration window for you
 cloning PKGBUILDs..</source>
@@ -370,24 +399,30 @@ cloning PKGBUILDs..</source>
 Клонування PKGBUILD..</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="143"/>
+        <location filename="../src/km-window.cpp" line="144"/>
         <source>Failed to initialize alpm handle (%1)</source>
         <translation>Не вдалося ініціалізувати дескриптор alpm (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="156"/>
+        <location filename="../src/km-window.cpp" line="157"/>
         <source>Failed to release alpm handle (%1)</source>
         <translation>Не вдалося звільнити дескриптор alpm (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="361"/>
+        <location filename="../src/km-window.cpp" line="382"/>
         <source>Please wait...
 Initializing kernels..</source>
         <translation>Зачекайте...
 Ініціалізація ядер..</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="28"/>
+        <location filename="../src/km-window.cpp" line="409"/>
+        <location filename="../src/km-window.cpp" line="416"/>
+        <source>scx-manager is not installed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="27"/>
         <source>&lt;html&gt;
 &lt;body&gt;
 &lt;p&gt;Here you&apos;ll see information about currently installed and available Linux kernels.&lt;/p&gt;
@@ -407,49 +442,40 @@ Initializing kernels..</source>
 <context>
     <name>SchedExtWindow</name>
     <message>
-        <location filename="../src/schedext-window.ui" line="17"/>
         <source>CachyOS Configure sched-ext</source>
-        <translation>Налаштування sched-ext у CachyOS</translation>
+        <translation type="vanished">Налаштування sched-ext у CachyOS</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="40"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;Configure sched-ext scheduler:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;Налаштування планувальника sched-ext:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation type="vanished">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;Налаштування планувальника sched-ext:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="82"/>
         <source>Select sched-ext scheduler:</source>
-        <translation>Виберіть планувальник sched-ext:</translation>
+        <translation type="vanished">Виберіть планувальник sched-ext:</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="92"/>
         <source>Select scheduler profile:</source>
-        <translation>Виберіть профіль планувальника:</translation>
+        <translation type="vanished">Виберіть профіль планувальника:</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="115"/>
         <source>unknown</source>
-        <translation>невідомо</translation>
+        <translation type="vanished">невідомо</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="75"/>
         <source>Running sched-ext scheduler:</source>
-        <translation>Поточний планувальник sched-ext:</translation>
+        <translation type="vanished">Поточний планувальник sched-ext:</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="122"/>
         <source>Set sched-ext extra scheduler flags:</source>
-        <translation>Додаткові параметри планувальника sched-ext:</translation>
+        <translation type="vanished">Додаткові параметри планувальника sched-ext:</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="176"/>
         <source>Disable</source>
-        <translation>Вимкнути</translation>
+        <translation type="vanished">Вимкнути</translation>
     </message>
     <message>
-        <location filename="../src/schedext-window.ui" line="183"/>
         <source>Apply</source>
-        <translation>Застосувати</translation>
+        <translation type="vanished">Застосувати</translation>
     </message>
 </context>
 </TS>
