@@ -358,15 +358,21 @@ inline void list_widget_apply_edit_flag(QListWidget* list_widget) noexcept {
 }  // namespace
 
 // NOTE: we use std::string const ref intentionally to prevent conversion from string_view into QString
-void ConfWindow::run_cmd_async(std::string cmd, const std::string& working_path) noexcept {
+void ConfWindow::run_cmd_async(std::string cmd, const std::string& working_path, bool escalate) noexcept {
     using namespace std::string_literals;
     cmd += "; read -p 'Press enter to exit'"s;
 
     // remember current build working directory
     m_build_conf_path = working_path;
 
-    m_cmd.setProgram(QStringLiteral("/usr/lib/cachyos-kernel-manager/terminal-helper"));
-    m_cmd.setArguments({QString::fromStdString(cmd)});
+    m_cmd.setProgram(QStringLiteral(KM_HELPER_DIR "/terminal-helper"));
+    QStringList arguments{};
+    if (escalate) {
+        // Unified polkit privilege layer (D4): same pkexec rootshell.sh path as kernel install/remove
+        arguments << "-s" << QString("pkexec " KM_HELPER_DIR "/rootshell.sh");
+    }
+    arguments << QString::fromStdString(cmd);
+    m_cmd.setArguments(arguments);
     m_cmd.setWorkingDirectory(QString::fromStdString(working_path));
 
     m_cmd.start();
@@ -393,11 +399,11 @@ void ConfWindow::finished_proc(int exit_code, QProcess::ExitStatus) noexcept {
 
             auto pkg_glob_list = get_package_names_glob_from_pkgbuild(m_build_conf_path);
             auto pkg_globs     = pkg_glob_list | std::ranges::views::join_with(' ') | std::ranges::to<std::string>();
-            auto pacman_cmd    = fmt::format(FMT_COMPILE("sudo pacman -U {}"), pkg_globs);
+            auto pacman_cmd = fmt::format(FMT_COMPILE("pacman -U {}"), pkg_globs);
 
             fmt::print("pacman_cmd := {}\n", pacman_cmd);
             m_running = true;
-            run_cmd_async(pacman_cmd, m_build_conf_path);
+            run_cmd_async(pacman_cmd, m_build_conf_path, /*escalate=*/true);
         }
     } else {
         fmt::print(stderr, "process failed with exit code: {}\n", exit_code);

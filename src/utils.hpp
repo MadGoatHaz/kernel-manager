@@ -55,7 +55,8 @@ bool write_to_file(std::string_view filepath, std::string_view data) noexcept;
 std::string exec(std::string_view command) noexcept;
 [[nodiscard]] std::string fix_path(std::string&& path) noexcept;
 
-// Runs a command in a terminal, escalates using pkexec if escalate is true
+// Runs a command in a terminal; when escalate is true, the command is wrapped in pkexec and
+// executed through the unified polkit privilege layer (rootshell.sh, auth_admin action)
 int runCmdTerminal(QString cmd, bool escalate) noexcept;
 
 int run_process(std::string_view program, const std::vector<std::string>& args) noexcept;

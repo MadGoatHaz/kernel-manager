@@ -78,7 +78,7 @@ class ConfWindow final : public QMainWindow {
     std::vector<std::string> m_previously_set_options{};
     std::unique_ptr<Ui::ConfWindow> m_ui = std::make_unique<Ui::ConfWindow>();
 
-    void run_cmd_async(std::string cmd, const std::string& working_path) noexcept;
+    void run_cmd_async(std::string cmd, const std::string& working_path, bool escalate = false) noexcept;
     auto get_all_set_values() const noexcept -> std::string;
     void clear_patches_data_tab() noexcept;
     void connect_all_checkboxes() noexcept;
