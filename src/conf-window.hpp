@@ -49,7 +49,9 @@
 
 // A kernel build flavor discovered in the kernel source repo:
 // key = flavor name relative to the repo's family prefix, path = the
-// flavor's subdirectory inside that repo.
+// flavor's ABSOLUTE on-disk directory (repo root / subdirectory; for the
+// single-package layout — a PKGBUILD at the repo root — the repo root
+// itself).
 struct KernelFlavor {
     std::string key;
     std::string path;

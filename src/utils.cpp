@@ -185,6 +185,30 @@ inline auto build_source_clone_url(std::string_view source) noexcept -> std::str
 void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std::string_view clone_url) noexcept {
     std::error_code ec{};
 
+    // Save the caller's CWD on entry; the guard below restores it on every
+    // exit path (success and failure alike). Leaving the process inside the
+    // cloned repo would make subsequent relative paths (e.g. the flavor
+    // ".testscript" writes) resolve against the repo root.
+    std::error_code cwd_ec{};
+    const auto entry_cwd = fs::current_path(cwd_ec);
+
+    struct CwdGuard {
+        const fs::path cwd;
+        ~CwdGuard() {
+            if (cwd.empty()) {
+                return;  // could not even read the entry CWD; nothing to restore
+            }
+            std::error_code restore_ec{};
+            if (fs::equivalent(cwd, fs::current_path(restore_ec), restore_ec)) {
+                return;  // already back where we started
+            }
+            fs::current_path(cwd, restore_ec);
+            if (restore_ec) {
+                fmt::print(stderr, "prepare_git_repo: cannot restore cwd '{}': {}\n", cwd.string(), restore_ec.message());
+            }
+        }
+    } cwd_guard{entry_cwd};
+
     const auto enter = [&ec](const fs::path& dir) {
         fs::current_path(dir, ec);
         if (ec) {
