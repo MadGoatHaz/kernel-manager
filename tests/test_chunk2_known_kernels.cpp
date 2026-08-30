@@ -22,12 +22,14 @@
 // external deps), so this compiles it directly with the project's warning
 // set and asserts on:
 //   - the curated table shape (size, unique names, full fields)
-//   - default_source_for incl. the user-specified linux -> linux-cachyos
-//     override, repo-prefixed lookups, and the unknown-name fallback
+//   - default_source_for: the corrected identity mapping (linux -> linux,
+//     NO linux-cachyos override), repo-prefixed lookups, and the
+//     unknown-name fallback
+//   - the install fields (install_package/install_repo/precompiled_available/
+//     buildable) + is_installable (curated true, unknown false)
 //   - find_kernel (known entry + nullopt)
 //   - description_for (curated entry + synthesized fallback)
-//   - known_sources (non-empty, contains the mapped default, deduped,
-//     sorted)
+//   - known_sources (non-empty, deduped, sorted)
 //   - kernel_name_from_raw (repo prefix stripping)
 
 #include "known_kernels.hpp"
@@ -71,6 +73,13 @@ int main() {
     for (const auto& kernel : table) {
         check(!kernel.name.empty() && !kernel.display_name.empty() && !kernel.description.empty() && !kernel.default_source.empty(),
             "every entry has name, display_name, description, default_source");
+        // Install-field consistency: precompiled_available must match the
+        // non-emptiness of install_package, and every curated kernel is
+        // buildable with a non-empty install repo.
+        check(kernel.precompiled_available == !kernel.install_package.empty(),
+            "precompiled_available matches install_package non-emptiness");
+        check(kernel.buildable && !kernel.install_repo.empty(),
+            "every curated entry is buildable with a non-empty install_repo");
     }
 
     // ------------------------------------------------------------------
@@ -80,15 +89,17 @@ int main() {
     check(km::find_kernel("core/linux").has_value(), "find_kernel(\"core/linux\") found (prefix stripped)");
     check(!km::find_kernel("unknown-kernel").has_value(), "find_kernel(\"unknown-kernel\") is nullopt");
     if (const auto found = km::find_kernel("linux"); found.has_value()) {
-        check((*found)->name == "linux" && (*found)->default_source == "linux-cachyos", "linux entry maps to linux-cachyos");
+        check((*found)->name == "linux" && (*found)->default_source == "linux",
+            "linux entry maps to its own source (linux, not linux-cachyos)");
     }
 
     // ------------------------------------------------------------------
-    // 3. default_source_for: the user-specified override, the identity
-    //    entries, repo-prefixed lookups, and the unknown-name fallback.
+    // 3. default_source_for: the corrected identity mapping (linux ->
+    //    linux, no override), repo-prefixed lookups, and the unknown-name
+    //    fallback.
     // ------------------------------------------------------------------
-    check(km::default_source_for("linux") == "linux-cachyos", "default_source_for(\"linux\") == \"linux-cachyos\" (user-specified override)");
-    check(km::default_source_for("core/linux") == "linux-cachyos", "default_source_for(\"core/linux\") == \"linux-cachyos\" (raw name)");
+    check(km::default_source_for("linux") == "linux", "default_source_for(\"linux\") == \"linux\" (corrected identity mapping)");
+    check(km::default_source_for("core/linux") == "linux", "default_source_for(\"core/linux\") == \"linux\" (raw name, prefix stripped)");
     check(km::default_source_for("linux-zen") == "linux-zen", "default_source_for(\"linux-zen\") == \"linux-zen\"");
     check(km::default_source_for("aur/linux-zen") == "linux-zen", "default_source_for(\"aur/linux-zen\") == \"linux-zen\" (raw name)");
     check(km::default_source_for("linux-lts") == "linux-lts", "default_source_for(\"linux-lts\") == \"linux-lts\"");
@@ -115,7 +126,8 @@ int main() {
     // ------------------------------------------------------------------
     const auto sources = km::known_sources();
     check(!sources.empty(), "known_sources() is non-empty");
-    check(std::ranges::find(sources, "linux-cachyos") != sources.end(), "known_sources() contains \"linux-cachyos\"");
+    check(std::ranges::find(sources, "linux") != sources.end(), "known_sources() contains \"linux\" (identity)");
+    check(std::ranges::find(sources, "linux-cachyos") != sources.end(), "known_sources() contains \"linux-cachyos\" (its own identity entry)");
     {
         auto sorted = sources;
         std::ranges::sort(sorted);
@@ -131,6 +143,26 @@ int main() {
     check(km::kernel_name_from_raw("aur/linux-zen") == "linux-zen", "kernel_name_from_raw(\"aur/linux-zen\") == \"linux-zen\"");
     check(km::kernel_name_from_raw("linux") == "linux", "kernel_name_from_raw(\"linux\") == \"linux\" (no prefix)");
     check(km::kernel_name_from_raw("") == "", "kernel_name_from_raw(\"\") == \"\"");
+
+    // ------------------------------------------------------------------
+    // 7. is_installable + install-field spot-checks.
+    // ------------------------------------------------------------------
+    check(km::is_installable("linux"), "is_installable(\"linux\") is true (core pre-compiled)");
+    check(km::is_installable("core/linux"), "is_installable(\"core/linux\") is true (prefix-tolerant)");
+    check(km::is_installable("linux-zen"), "is_installable(\"linux-zen\") is true (extra pre-compiled)");
+    check(km::is_installable("linux-cachyos"), "is_installable(\"linux-cachyos\") is true (cachyos pre-compiled)");
+    check(km::is_installable("linux-lts"), "is_installable(\"linux-lts\") is true (core pre-compiled)");
+    check(km::is_installable("linux-hardened"), "is_installable(\"linux-hardened\") is true (extra pre-compiled)");
+    check(km::is_installable("linux-rt"), "is_installable(\"linux-rt\") is true (extra pre-compiled)");
+    check(!km::is_installable("unknown-kernel"), "is_installable(\"unknown-kernel\") is false (unknown)");
+    if (const auto found = km::find_kernel("linux"); found.has_value()) {
+        check((*found)->install_package == "linux" && (*found)->install_repo == "core" && (*found)->precompiled_available && (*found)->buildable,
+            "linux install fields: package=linux repo=core precompiled=true buildable=true");
+    }
+    if (const auto found = km::find_kernel("linux-cachyos"); found.has_value()) {
+        check((*found)->install_package == "linux-cachyos" && (*found)->install_repo == "cachyos" && (*found)->precompiled_available && (*found)->buildable,
+            "linux-cachyos install fields: package=linux-cachyos repo=cachyos precompiled=true buildable=true");
+    }
 
     if (g_failures == 0) {
         std::printf("ALL TESTS PASSED\n");

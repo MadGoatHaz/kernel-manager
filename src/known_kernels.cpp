@@ -47,39 +47,64 @@ auto humanize_name(std::string_view name) -> std::string {
 }  // namespace
 
 const std::vector<KnownKernel>& known_kernels() {
-    // The curated kernel table. The linux -> linux-cachyos row is a
-    // user-specified override: the upstream mainline kernel is built from
-    // the optimized CachyOS AUR package. All other kernels build from
-    // their own package by default.
+    // The curated kernel table. Every kernel maps to its own package as its
+    // build source (identity mapping) — there is no cross-package override.
+    // Fields per row: name, display_name, description, default_source
+    // (== name), install_package, install_repo, precompiled_available,
+    // buildable.
     static const std::vector<KnownKernel> table{{
         {"linux",
          "Linux (mainline)",
-         "The upstream mainline Linux kernel — the newest stable releases; built here from the optimized "
-             "linux-cachyos AUR package.",
-         "linux-cachyos"},
+         "Arch's default kernel — upstream stable releases; the general-purpose reference for desktops and "
+             "servers.",
+         "linux",
+         "linux",
+         "core",
+         true,
+         true},
         {"linux-zen",
          "Linux Zen",
          "Tuned for desktop responsiveness and low latency — a good general-purpose daily-driver kernel.",
-         "linux-zen"},
+         "linux-zen",
+         "linux-zen",
+         "extra",
+         true,
+         true},
         {"linux-lts",
          "Linux LTS",
          "Long-Term-Support kernel — an older, stable branch maintained for years; best for stability and "
              "hardware compatibility.",
-         "linux-lts"},
+         "linux-lts",
+         "linux-lts",
+         "core",
+         true,
+         true},
         {"linux-cachyos",
          "Linux CachyOS",
          "CachyOS's heavily-optimized mainline kernel (BPF, scheduler, and compiler tuning) — aimed at maximum "
              "performance.",
-         "linux-cachyos"},
+         "linux-cachyos",
+         "linux-cachyos",
+         "cachyos",
+         true,
+         true},
         {"linux-hardened",
          "Linux Hardened",
          "Security-hardened kernel with extra exploit-mitigation patches — for security-focused users.",
-         "linux-hardened"},
+         "linux-hardened",
+         "linux-hardened",
+         "extra",
+         true,
+         true},
         {"linux-rt",
          "Linux RT",
          "Real-time (PREEMPT_RT) patchset — for low, predictable latency in audio/automation/control "
              "workloads.",
-         "linux-rt"},
+         "linux-rt",
+         "linux-rt",
+         "extra",
+         true,
+         true},
     }};
     return table;
 }
@@ -129,6 +154,15 @@ std::vector<std::string> known_sources() {
     std::ranges::sort(sources);
     sources.erase(std::unique(sources.begin(), sources.end()), sources.end());
     return sources;
+}
+
+bool is_installable(std::string_view name) {
+    const auto entry = find_kernel(name);
+    if (!entry.has_value()) {
+        return false;
+    }
+    const auto* kernel = *entry;
+    return kernel->precompiled_available && !kernel->install_package.empty();
 }
 
 std::string_view kernel_name_from_raw(std::string_view raw) {
