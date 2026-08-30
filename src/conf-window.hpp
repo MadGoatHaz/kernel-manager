@@ -41,6 +41,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -77,6 +78,15 @@ class ConfWindow final : public QMainWindow {
     // URL) to the single utils accessor used by prepare_build_environment().
     void sync_build_source() noexcept;
 
+    // Auto-populate the build source dropdown from a kernel selected in the
+    // main window tree (raw "repo/name" PkgName): the repo prefix is
+    // stripped and the known-kernels table maps the name to its default
+    // source (e.g. "core/linux" -> "linux-cachyos"); a source that is not a
+    // known one falls back to the "Custom URL…" entry prefilled. Repeated
+    // calls for the same kernel are a no-op, so a manual source choice is
+    // preserved while the user stays on that kernel.
+    void apply_source_for_kernel(std::string_view kernel_name) noexcept;
+
     protected:
     void closeEvent(QCloseEvent* event) override;
 
@@ -90,11 +100,23 @@ class ConfWindow final : public QMainWindow {
     auto kernel_path_for_index(std::int32_t index) const noexcept -> std::string;
     void update_option_set() noexcept;
 
+    // Source dropdown plumbing: show/hide the custom URL edit per selection
+    // and keep the option rows in sync; set the effective source from a
+    // string (known item or custom entry); read the effective source the
+    // user currently has selected.
+    void update_build_source_ui() noexcept;
+    void set_build_source(const std::string& source) noexcept;
+    auto effective_build_source() const noexcept -> std::string;
+
     bool m_running{};
     QProcess m_cmd{};
     std::string m_build_conf_path{};
     std::vector<std::string> m_previously_set_options{};
     std::vector<KernelFlavor> m_flavors{};
+
+    // Last kernel name (repo prefix stripped) auto-populated via
+    // apply_source_for_kernel; a repeat for the same kernel is a no-op.
+    std::string m_last_applied_kernel{};
     std::unique_ptr<Ui::ConfWindow> m_ui = std::make_unique<Ui::ConfWindow>();
 
     void run_cmd_async(std::string cmd, const std::string& working_path, bool escalate = false) noexcept;

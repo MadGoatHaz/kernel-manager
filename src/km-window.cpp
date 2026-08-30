@@ -357,6 +357,13 @@ void MainWindow::on_configure() noexcept {
     m_conf_progress_dialog->setLabelText(tr("Please wait...\nWe are preparing configuration window for you\ncloning PKGBUILDs.."));
     m_conf_progress_dialog->show();
 
+    // Auto-populate the build source for the kernel selected in the tree
+    // (data-driven kernel -> source mapping); a repeat for the same kernel
+    // is a no-op, so a manual source choice is preserved.
+    if (auto* current = m_ui->treeKernels->currentItem()) {
+        m_conf_window->apply_source_for_kernel(current->text(TreeCol::PkgName).toStdString());
+    }
+
     // Apply the user-selected build source before the background prepare.
     m_conf_window->sync_build_source();
 

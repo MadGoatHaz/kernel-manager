@@ -19,6 +19,7 @@
 #include "conf-window.hpp"
 #include "compile_options.hpp"
 #include "config-options.hpp"
+#include "known_kernels.hpp"
 #include "utils.hpp"
 
 #include <cstdio>
@@ -43,6 +44,7 @@
 #pragma GCC diagnostic ignored "-Wconversion"
 #endif
 
+#include <QComboBox>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QLineEdit>
@@ -655,20 +657,89 @@ void ConfWindow::refresh_flavors() noexcept {
 }
 
 // Sync the build source selected in the UI into the single utils accessor
-// used by prepare_build_environment().
+// used by prepare_build_environment(): the effective source is the custom
+// URL text when the "Custom URL…" entry is selected, otherwise the selected
+// known source.
 void ConfWindow::sync_build_source() noexcept {
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    utils::set_build_source_repo(options_page_ui_obj->build_source_edit->text().toStdString());
+    utils::set_build_source_repo(effective_build_source());
 }
 
 // Make the option rows reflect the option set of the repo selected in the
 // source field (unknown sources fall back to the generic reduced set).
 void ConfWindow::update_option_set() noexcept {
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    const auto map = resolve_option_map(normalize_repo_key(options_page_ui_obj->build_source_edit->text().toStdString()));
+    const auto map = resolve_option_map(normalize_repo_key(effective_build_source()));
     for (const auto& [option_key, row] : option_row_bindings) {
         (options_page_ui_obj->*row)->setVisible(option_build_var(map, option_key).has_value());
     }
+}
+
+// The effective build source: the custom URL text when the "Custom URL…"
+// entry is selected, otherwise the selected known source.
+auto ConfWindow::effective_build_source() const noexcept -> std::string {
+    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    auto* source_combo        = options_page_ui_obj->build_source_combo;
+    const std::int32_t index  = source_combo->currentIndex();
+    if (index < 0) {
+        return {};
+    }
+    if (index == source_combo->count() - 1) {  // the trailing "Custom URL…" entry
+        return options_page_ui_obj->build_source_custom_edit->text().toStdString();
+    }
+    return source_combo->itemText(index).toStdString();
+}
+
+// Set the source dropdown to a given build source: a known item selects its
+// combo entry, anything else falls back to the "Custom URL…" entry with the
+// line edit prefilled.
+void ConfWindow::set_build_source(const std::string& source) noexcept {
+    if (source.empty()) {
+        return;
+    }
+    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    auto* source_combo        = options_page_ui_obj->build_source_combo;
+
+    {
+        // Apply the selection without firing the change handlers (which
+        // update_build_source_ui below runs exactly once, unblocked).
+        const QSignalBlocker combo_blocker(source_combo);
+        const QSignalBlocker custom_blocker(options_page_ui_obj->build_source_custom_edit);
+        if (const std::int32_t index = source_combo->findText(QString::fromStdString(source)); index >= 0) {
+            source_combo->setCurrentIndex(index);
+        } else {
+            source_combo->setCurrentIndex(source_combo->count() - 1);  // Custom URL…
+            options_page_ui_obj->build_source_custom_edit->setText(QString::fromStdString(source));
+        }
+    }
+    update_build_source_ui();
+}
+
+// Show or hide the custom URL edit according to the dropdown selection and
+// keep the visible option rows in sync with the effective source.
+void ConfWindow::update_build_source_ui() noexcept {
+    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    auto* source_combo        = options_page_ui_obj->build_source_combo;
+    const bool is_custom      = (source_combo->currentIndex() == source_combo->count() - 1);
+
+    options_page_ui_obj->build_source_custom_edit->setVisible(is_custom);
+    if (is_custom) {
+        options_page_ui_obj->build_source_custom_edit->setFocus();
+    }
+    update_option_set();
+}
+
+// Auto-populate the source dropdown from a kernel selected in the main
+// window tree: strip the repo prefix and map the name to its default source
+// from the known-kernels table (a source that is not a known one falls back
+// to the "Custom URL…" entry prefilled). A repeat for the same kernel is a
+// no-op, so this never fights a manual source choice.
+void ConfWindow::apply_source_for_kernel(std::string_view kernel_name) noexcept {
+    const std::string_view name = km::kernel_name_from_raw(kernel_name);
+    if (name.empty() || name == m_last_applied_kernel) {
+        return;
+    }
+    m_last_applied_kernel = std::string{name};
+    set_build_source(km::default_source_for(name));
 }
 
 void ConfWindow::reset_patches_data_tab() noexcept {
@@ -707,13 +778,26 @@ ConfWindow::ConfWindow(QWidget* parent)
     // names are hard-coded here.
     refresh_flavors();
 
-    // Custom build source (AUR package name or git URL): initialized from
-    // the single utils accessor; the visible option rows follow it.
-    options_page_ui_obj->build_source_edit->setText(QString::fromStdString(utils::build_source_repo()));
-    connect(options_page_ui_obj->build_source_edit, &QLineEdit::textChanged, this, [this](const QString&) {
+    // Build source dropdown: the known package sources (from the
+    // known-kernels table) plus a "Custom URL…" entry that reveals a line
+    // edit for an arbitrary AUR package name or git URL. Initialized from
+    // the single utils accessor; the visible option rows follow the
+    // effective source.
+    {
+        auto* source_combo = options_page_ui_obj->build_source_combo;
+        const QSignalBlocker combo_blocker(source_combo);
+        for (const auto& source : km::known_sources()) {
+            source_combo->addItem(QString::fromStdString(source));
+        }
+        source_combo->addItem(tr("Custom URL…"));
+    }
+    connect(options_page_ui_obj->build_source_combo, &QComboBox::currentIndexChanged, this, [this](std::int32_t) {
+        update_build_source_ui();
+    });
+    connect(options_page_ui_obj->build_source_custom_edit, &QLineEdit::textChanged, this, [this](const QString&) {
         update_option_set();
     });
-    update_option_set();
+    set_build_source(utils::build_source_repo());
 
     // Setting default options
     options_page_ui_obj->customconfig_check->setCheckState(Qt::Checked);
