@@ -10,7 +10,6 @@
 - Add logo, desktop file
 - Update configure.sh to use all CPU threads
 - ♻  Update fmtlib and cleanup the source code
-- 🔨 Add meson buildsystem
 - 🐛 Change the behaviour of "execute button" and thread logic
 
 ### v0.9.0 (2022-01-23)

@@ -1,1 +1,0 @@
-option('aur_kernels', type: 'boolean', value: false, description: 'enable aur kernels support')

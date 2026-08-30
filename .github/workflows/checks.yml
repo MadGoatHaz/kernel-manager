@@ -6,10 +6,10 @@ on:
     - '.github/ISSUE_TEMPLATE/**'
     - 'LICENSE'
     branches:
-    - develop
+    - main
   pull_request:
     branches:
-    - develop
+    - main
 
 concurrency:
   group: checks-${{ github.ref }}
