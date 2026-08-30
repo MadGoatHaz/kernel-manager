@@ -4,6 +4,12 @@ Simple kernel manager.
 That kernel manager is only supports kernels from any arch based repos.
 ###### Note: does support kernels from AUR (requires paru & awk installed). **disabled by default**.
 
+**Note on AUR builds:** kernel builds from AUR sources validate the source
+checksums declared in the PKGBUILD (`--skipchecksums` is *not* used). If an
+AUR package's source URL changes but its published checksums no longer
+match, the build will fail by design — the AUR package needs to be updated
+(re-cloned) before it can be built again.
+
 Requirements
 ------------
 * C++23 feature required (tested with GCC 14.1.1 and Clang 18)

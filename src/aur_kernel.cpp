@@ -50,7 +50,12 @@ void install_aur_kernels(std::span<std::string> kernel_list) noexcept {
         prepare_build_environment(kernel_name);
 
         // Run our build command!
-        utils::runCmdTerminal("makepkg -sicf --cleanbuild --skipchecksums", false);
+        //
+        // Source checksums are validated by default (no --skipchecksums):
+        // if an AUR package's source URL changed but the checksums array in
+        // its PKGBUILD no longer matches, the build fails by design — the
+        // AUR package must be updated before it can be built again.
+        utils::runCmdTerminal("makepkg -sicf --cleanbuild", false);
     }
 }
 
