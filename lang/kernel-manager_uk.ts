@@ -8,12 +8,12 @@
         <translation type="vanished">Увімкнути конфігурацію CachyOS</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="124"/>
+        <location filename="../src/conf-options-page.ui" line="140"/>
         <source>Tweak kernel options prior to a build via nconfig</source>
         <translation>Налаштувати параметри ядра перед збиранням через nconfig</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="153"/>
+        <location filename="../src/conf-options-page.ui" line="169"/>
         <source>Tweak kernel options prior to a build via xconfig</source>
         <translation>Налаштувати параметри ядра перед збиранням через xconfig</translation>
     </message>
@@ -22,62 +22,77 @@
         <translation type="vanished">Вимкнути NUMA</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="182"/>
+        <location filename="../src/conf-options-page.ui" line="33"/>
+        <source>Kernel source (known package or custom git URL)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="65"/>
+        <source>git URL or AUR package name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="198"/>
         <source>Use Modprobed-db</source>
         <translation>Використовувати Modprobed-db</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="211"/>
+        <location filename="../src/conf-options-page.ui" line="227"/>
         <source>Use the current kernel&apos;s config</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="240"/>
+        <location filename="../src/conf-options-page.ui" line="256"/>
         <source>Enable KBUILD_CFLAGS -O3</source>
         <translation>Увімкнути KBUILD_CFLAGS -O3</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="269"/>
+        <location filename="../src/conf-options-page.ui" line="285"/>
         <source>Set performance governor as default</source>
         <translation>Встановити регулятор продуктивності типовим</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="298"/>
+        <location filename="../src/conf-options-page.ui" line="314"/>
         <source>Enable TCP_CONG_BBR3</source>
         <translation>Увімкнути TCP_CONG_BBR3</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="327"/>
+        <location filename="../src/conf-options-page.ui" line="343"/>
         <source>Running tick rate</source>
         <translation>Частота системного таймера</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="356"/>
+        <location filename="../src/conf-options-page.ui" line="372"/>
         <source>Select tickless</source>
         <translation>Вибрати режим tickless</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="385"/>
+        <location filename="../src/conf-options-page.ui" line="401"/>
         <source>Select preempt</source>
         <translation>Вибрати режим preempt</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="530"/>
+        <location filename="../src/conf-options-page.ui" line="546"/>
         <source>Build the open NVIDIA module</source>
         <translation>Зібрати відкритий модуль NVIDIA</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="605"/>
+        <location filename="../src/conf-options-page.ui" line="621"/>
         <source>Load</source>
         <translation>Завантажити</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="612"/>
+        <location filename="../src/conf-options-page.ui" line="628"/>
         <source>Save</source>
         <translation>Зберегти</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="639"/>
+        <location filename="../src/conf-options-page.ui" line="648"/>
+        <source>Close</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="655"/>
         <source>Build kernel</source>
         <translation>Зібрати ядро</translation>
     </message>
@@ -94,7 +109,7 @@
         <translation type="vanished">Увімкнути DAMON</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="443"/>
+        <location filename="../src/conf-options-page.ui" line="459"/>
         <source>CPU compiler optimizations</source>
         <translation>Оптимізації компіляції для CPU</translation>
     </message>
@@ -103,51 +118,45 @@
         <translation type="vanished">Застосувати автоматичну оптимізацію CPU</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="472"/>
+        <location filename="../src/conf-options-page.ui" line="488"/>
         <source>Enable LTO</source>
         <translation>Увімкнути LTO</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="501"/>
+        <location filename="../src/conf-options-page.ui" line="517"/>
         <source>Build the ZFS module</source>
         <translation>Зібрати модуль ZFS</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="559"/>
+        <location filename="../src/conf-options-page.ui" line="575"/>
         <source>Include vmlinux with debug informations/symbols</source>
         <translation>Додати vmlinux із символами налагодження</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="414"/>
+        <location filename="../src/conf-options-page.ui" line="430"/>
         <source>Transparent Hugepages</source>
         <translation>Прозорі великі сторінки</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="33"/>
-        <source>Kernel source (AUR package name or git URL)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/conf-options-page.ui" line="82"/>
+        <location filename="../src/conf-options-page.ui" line="98"/>
         <source>$pkgbase-custom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="95"/>
+        <location filename="../src/conf-options-page.ui" line="111"/>
         <source>Enable custom config</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="632"/>
         <source>Cancel</source>
-        <translation>Скасувати</translation>
+        <translation type="vanished">Скасувати</translation>
     </message>
     <message>
         <source>Execute</source>
         <translation type="vanished">Виконати</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="62"/>
+        <location filename="../src/conf-options-page.ui" line="78"/>
         <source>Custom package name</source>
         <translation>Власна назва пакета</translation>
     </message>
@@ -211,61 +220,66 @@
         <translation type="vanished">BMQ (бітова черга)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="517"/>
-        <location filename="../src/conf-window.cpp" line="985"/>
-        <location filename="../src/conf-window.cpp" line="1003"/>
-        <location filename="../src/conf-window.cpp" line="1025"/>
+        <location filename="../src/conf-window.cpp" line="538"/>
+        <location filename="../src/conf-window.cpp" line="1089"/>
+        <location filename="../src/conf-window.cpp" line="1107"/>
+        <location filename="../src/conf-window.cpp" line="1129"/>
         <source>Kernel Manager</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="823"/>
+        <location filename="../src/conf-window.cpp" line="792"/>
+        <source>Custom URL…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="926"/>
         <source>Select one or more patch files</source>
         <translation>Виберіть один або кілька файлів латок</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="825"/>
+        <location filename="../src/conf-window.cpp" line="928"/>
         <source>Patch file (*.patch)</source>
         <translation>Файл латки (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="845"/>
+        <location filename="../src/conf-window.cpp" line="948"/>
         <source>Enter URL patch</source>
         <translation>Введіть URL латки</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="846"/>
+        <location filename="../src/conf-window.cpp" line="949"/>
         <source>Patch URL:</source>
         <translation>URL латки:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="976"/>
+        <location filename="../src/conf-window.cpp" line="1080"/>
         <source>Save file as</source>
         <translation>Зберегти як</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="978"/>
-        <location filename="../src/conf-window.cpp" line="995"/>
+        <location filename="../src/conf-window.cpp" line="1082"/>
+        <location filename="../src/conf-window.cpp" line="1099"/>
         <source>Config file (*.toml)</source>
         <translation>Файл конфігурації (*.toml)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="985"/>
+        <location filename="../src/conf-window.cpp" line="1089"/>
         <source>Failed to save config options to file: %1</source>
         <translation>Не вдалося зберегти конфігурацію у файл: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="993"/>
+        <location filename="../src/conf-window.cpp" line="1097"/>
         <source>Load from</source>
         <translation>Завантажити з</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1003"/>
+        <location filename="../src/conf-window.cpp" line="1107"/>
         <source>Failed to load config options from file: %1</source>
         <translation>Не вдалося завантажити конфігурацію з файлу: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1025"/>
+        <location filename="../src/conf-window.cpp" line="1129"/>
         <source>Config file(%1) is outdated</source>
         <translation>Файл конфігурації (%1) застарів</translation>
     </message>
@@ -274,7 +288,7 @@
         <translation type="vanished">RT - ядро реального часу</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="517"/>
+        <location filename="../src/conf-window.cpp" line="538"/>
         <source>Do you want to install build packages?</source>
         <translation>Встановити пакети, необхідні для збирання?</translation>
     </message>
@@ -323,12 +337,12 @@
     </message>
     <message>
         <location filename="../src/km-window.ui" line="17"/>
-        <location filename="../src/km-window.cpp" line="144"/>
-        <location filename="../src/km-window.cpp" line="157"/>
-        <location filename="../src/km-window.cpp" line="214"/>
-        <location filename="../src/km-window.cpp" line="240"/>
-        <location filename="../src/km-window.cpp" line="409"/>
-        <location filename="../src/km-window.cpp" line="416"/>
+        <location filename="../src/km-window.cpp" line="150"/>
+        <location filename="../src/km-window.cpp" line="163"/>
+        <location filename="../src/km-window.cpp" line="220"/>
+        <location filename="../src/km-window.cpp" line="246"/>
+        <location filename="../src/km-window.cpp" line="422"/>
+        <location filename="../src/km-window.cpp" line="429"/>
         <source>Kernel Manager</source>
         <translation type="unfinished"></translation>
     </message>
@@ -364,8 +378,12 @@
     </message>
     <message>
         <location filename="../src/km-window.ui" line="132"/>
+        <source>Close</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Cancel</source>
-        <translation>Скасувати</translation>
+        <translation type="vanished">Скасувати</translation>
     </message>
     <message>
         <location filename="../src/km-window.ui" line="139"/>
@@ -373,7 +391,7 @@
         <translation>Виконати</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="240"/>
+        <location filename="../src/km-window.cpp" line="246"/>
         <source>No kernels found!
 Please run `pacman -Sy` to update DB!
 This is needed for the app to work properly</source>
@@ -382,15 +400,15 @@ This is needed for the app to work properly</source>
 Це необхідно для коректної роботи застосунку.</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="214"/>
+        <location filename="../src/km-window.cpp" line="220"/>
         <source>Failed to clone repository!
 Please check your internet connection and try again</source>
         <translation>Не вдалося клонувати сховище!
 Перевірте підключення до інтернету та спробуйте ще раз</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="293"/>
-        <location filename="../src/km-window.cpp" line="357"/>
+        <location filename="../src/km-window.cpp" line="299"/>
+        <location filename="../src/km-window.cpp" line="363"/>
         <source>Please wait...
 We are preparing configuration window for you
 cloning PKGBUILDs..</source>
@@ -399,25 +417,25 @@ cloning PKGBUILDs..</source>
 Клонування PKGBUILD..</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="144"/>
+        <location filename="../src/km-window.cpp" line="150"/>
         <source>Failed to initialize alpm handle (%1)</source>
         <translation>Не вдалося ініціалізувати дескриптор alpm (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="157"/>
+        <location filename="../src/km-window.cpp" line="163"/>
         <source>Failed to release alpm handle (%1)</source>
         <translation>Не вдалося звільнити дескриптор alpm (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="382"/>
+        <location filename="../src/km-window.cpp" line="395"/>
         <source>Please wait...
 Initializing kernels..</source>
         <translation>Зачекайте...
 Ініціалізація ядер..</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="409"/>
-        <location filename="../src/km-window.cpp" line="416"/>
+        <location filename="../src/km-window.cpp" line="422"/>
+        <location filename="../src/km-window.cpp" line="429"/>
         <source>scx-manager is not installed.</source>
         <translation type="unfinished"></translation>
     </message>
