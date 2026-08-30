@@ -21,6 +21,13 @@
 
 namespace utils {
 
+// Sync repo excluded from kernel discovery. Build-configurable via the
+// KM_IGNORE_REPO CMake variable (default: empty = no exclusion), so no repo
+// name is hard-coded in the source.
+#ifndef KM_IGNORE_REPO
+#define KM_IGNORE_REPO ""
+#endif
+
 alpm_handle_t* parse_alpm(std::string_view root, std::string_view dbpath, alpm_errno_t* err) noexcept {
     // Initialize alpm.
     alpm_handle_t* alpm_handle = alpm_initialize(root.data(), dbpath.data(), err);
@@ -30,7 +37,7 @@ alpm_handle_t* parse_alpm(std::string_view root, std::string_view dbpath, alpm_e
 
     // Parse pacman config.
     static constexpr auto pacman_conf_path = "/etc/pacman.conf";
-    static constexpr auto ignored_repo     = "testing";
+    static constexpr auto ignored_repo     = KM_IGNORE_REPO;
 
     const mINI::INIFile file(pacman_conf_path);
     // next, create a structure that will hold data

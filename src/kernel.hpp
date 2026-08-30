@@ -40,7 +40,7 @@ class Kernel {
         constexpr std::string_view lts{"lts"};
         constexpr std::string_view zen{"zen"};
         constexpr std::string_view hardened{"hardened"};
-        constexpr std::string_view deckify{"deckify"};
+        constexpr std::string_view handheld{"handheld"};
         constexpr std::string_view server{"server"};
         constexpr std::string_view next{"next"};
         constexpr std::string_view mainline{"mainline"};
@@ -63,7 +63,7 @@ class Kernel {
         if (!found.empty()) {
             return "hardened kernel"sv;
         }
-        found = std::ranges::search(m_name, deckify);
+        found = std::ranges::search(m_name, handheld);
         if (!found.empty()) {
             return "handheld kernel"sv;
         }

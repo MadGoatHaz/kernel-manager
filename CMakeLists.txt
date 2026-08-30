@@ -135,6 +135,11 @@ qt_add_executable(${PROJECT_NAME}
 set(KM_HELPER_DIR "/usr/lib/kernel-manager")
 target_compile_definitions(${PROJECT_NAME} PRIVATE KM_HELPER_DIR="${KM_HELPER_DIR}")
 
+# Sync repo (pacman.conf section) excluded from kernel discovery.
+# Build-configurable: -DKM_IGNORE_REPO=<repo>; default empty = no exclusion.
+set(KM_IGNORE_REPO "" CACHE STRING "pacman.conf sync repo to ignore during kernel discovery")
+target_compile_definitions(${PROJECT_NAME} PRIVATE KM_IGNORE_REPO="${KM_IGNORE_REPO}")
+
 # Link this 'library' to use the warnings specified in CompilerWarnings.cmake
 add_library(project_warnings INTERFACE)
 set_project_warnings(project_warnings)

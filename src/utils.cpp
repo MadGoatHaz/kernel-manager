@@ -195,10 +195,14 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
     }
 }
 
-void prepare_build_environment() noexcept {
-    static const fs::path app_path       = utils::fix_path("~/.cache/kernel-manager");
+const fs::path& build_repo_path() noexcept {
     static const fs::path pkgbuilds_path = utils::fix_path("~/.cache/kernel-manager/pkgbuilds");
-    utils::prepare_git_repo(app_path, pkgbuilds_path, "https://github.com/cachyos/linux-cachyos.git");
+    return pkgbuilds_path;
+}
+
+void prepare_build_environment() noexcept {
+    static const fs::path app_path = utils::fix_path("~/.cache/kernel-manager");
+    utils::prepare_git_repo(app_path, build_repo_path(), "https://github.com/cachyos/linux-cachyos.git");
 }
 
 void restore_clean_environment(std::vector<std::string>& previously_set_options, std::string_view all_set_values) noexcept {

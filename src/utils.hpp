@@ -62,6 +62,10 @@ int runCmdTerminal(QString cmd, bool escalate) noexcept;
 int run_process(std::string_view program, const std::vector<std::string>& args) noexcept;
 void prepare_git_repo(const std::filesystem::path& parent_dir, const std::filesystem::path& repo_path, std::string_view clone_url) noexcept;
 
+// Canonical location of the cloned kernel source repo used for custom builds
+// (single source of truth shared by prepare_build_environment() and flavor
+// discovery).
+const std::filesystem::path& build_repo_path() noexcept;
 void prepare_build_environment() noexcept;
 void restore_clean_environment(std::vector<std::string>& previously_set_options, std::string_view all_set_values) noexcept;
 
