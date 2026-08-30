@@ -133,6 +133,7 @@ qt_add_executable(${PROJECT_NAME}
     src/kernel.hpp src/kernel.cpp
     src/aur_kernel.hpp src/aur_kernel.cpp
     src/known_kernels.hpp src/known_kernels.cpp
+    src/bootloader.hpp src/bootloader.cpp
     src/km-window.hpp src/km-window.cpp
     "${CMAKE_BINARY_DIR}/compile_options.hpp"
     src/config-options.hpp src/config-options.cpp
