@@ -18,6 +18,7 @@
 
 #include "alpm_utils.hpp"
 #include "ini.hpp"
+#include "utils.hpp"  // for utils::exec (AUR probe executor)
 
 namespace utils {
 
@@ -63,6 +64,60 @@ std::int32_t release_alpm(alpm_handle_t* handle, alpm_errno_t* err) noexcept {
     }
     // Release libalpm handle
     return alpm_release(handle);
+}
+
+bool is_aur_package_available(const ExecFn& exec_fn, std::string_view pkg) noexcept {
+    // The AUR can only be queried through paru; without it the package is
+    // reported as unavailable (the custom build remains the install path).
+    const std::string paru_path = exec_fn("command -v paru");
+    if (paru_path.empty() || paru_path == "-1") {
+        return false;
+    }
+
+    // `paru --aur -Si` prints the package metadata to stdout when the
+    // package exists and stays silent on stdout (error on stderr) when it
+    // does not. The name is single-quoted: pacman package names contain no
+    // shell metacharacters.
+    const std::string info = exec_fn("paru --aur -Si '" + std::string{pkg} + "'");
+    return !info.empty() && info != "-1";
+}
+
+bool is_package_in_sync_db(alpm_handle_t* handle, std::string_view repo, std::string_view pkg) noexcept {
+    if (handle == nullptr) {
+        return false;
+    }
+    // Locate the sync DB registered under `repo` (parse_alpm registers
+    // every non-ignored /etc/pacman.conf section); a missing section means
+    // the repo is not added on this system.
+    for (alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
+        auto* db = reinterpret_cast<alpm_db_t*>(i->data);
+        const char* db_name = alpm_db_get_name(db);
+        if (db_name == nullptr || std::string_view{db_name} != repo) {
+            continue;
+        }
+        return alpm_db_get_pkg(db, pkg.data()) != nullptr;
+    }
+    return false;
+}
+
+bool is_package_available(std::string_view pkg, std::string_view repo) noexcept {
+    if (classify_repo(repo) == PackageSource::AUR) {
+        // Inject utils::exec (popen-based, "-1" on spawn failure) as the
+        // AUR probe executor.
+        const ExecFn exec_fn{[](std::string_view command) noexcept { return utils::exec(command); }};
+        return is_aur_package_available(exec_fn, pkg);
+    }
+
+    // Fresh handle per call: read-only sync-DB access, no root, safe to
+    // invoke repeatedly (released on the way out).
+    alpm_errno_t err{};
+    alpm_handle_t* handle = parse_alpm(alpm_root, alpm_libdir, &err);
+    if (handle == nullptr) {
+        return false;
+    }
+    const bool available = is_package_in_sync_db(handle, repo, pkg);
+    release_alpm(handle, &err);
+    return available;
 }
 
 }  // namespace utils
