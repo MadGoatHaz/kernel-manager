@@ -42,3 +42,6 @@ config-option-lib/target
 *.exe
 *.out
 *.app
+
+# Local work directory (tests, scripts, docs, blueprints) — never uploaded
+Work/
