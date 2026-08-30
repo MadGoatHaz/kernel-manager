@@ -4,117 +4,126 @@
 <context>
     <name>ConfOptionsPage</name>
     <message>
-        <location filename="../src/conf-options-page.ui" line="33"/>
+        <location filename="../src/conf-options-page.ui" line="62"/>
         <source>Custom package name</source>
         <translation>Nombre de paquete personalizado</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="53"/>
+        <location filename="../src/conf-options-page.ui" line="82"/>
         <source>$pkgbase-custom</source>
         <translation>$pkgbase-custom</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="66"/>
         <source>Enable CachyOS config</source>
-        <translation>Habilitar configuración de CachyOS</translation>
+        <translation type="vanished">Habilitar configuración de CachyOS</translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="33"/>
+        <source>Kernel source (AUR package name or git URL)</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="95"/>
+        <source>Enable custom config</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="124"/>
         <source>Tweak kernel options prior to a build via nconfig</source>
         <translation>Ajustar opciones del kernel antes de compilar mediante nconfig</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="124"/>
+        <location filename="../src/conf-options-page.ui" line="153"/>
         <source>Tweak kernel options prior to a build via xconfig</source>
         <translation>Ajustar opciones del kernel antes de compilar mediante xconfig</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="153"/>
+        <location filename="../src/conf-options-page.ui" line="182"/>
         <source>Use Modprobed-db</source>
         <translation>Usar Modprobed-db</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="182"/>
+        <location filename="../src/conf-options-page.ui" line="211"/>
         <source>Use the current kernel&apos;s config</source>
         <translation>Usar la configuración del kernel actual</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="211"/>
+        <location filename="../src/conf-options-page.ui" line="240"/>
         <source>Enable KBUILD_CFLAGS -O3</source>
         <translation>Habilitar KBUILD_CFLAGS -O3</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="240"/>
+        <location filename="../src/conf-options-page.ui" line="269"/>
         <source>Set performance governor as default</source>
         <translation>Establecer perfil de rendimiento (governor) por defecto</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="269"/>
+        <location filename="../src/conf-options-page.ui" line="298"/>
         <source>Enable TCP_CONG_BBR3</source>
         <translation>Habilitar TCP_CONG_BBR3</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="298"/>
+        <location filename="../src/conf-options-page.ui" line="327"/>
         <source>Running tick rate</source>
         <translation>Frecuencia de reloj (tick rate)</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="327"/>
+        <location filename="../src/conf-options-page.ui" line="356"/>
         <source>Select tickless</source>
         <translation>Seleccionar tickless</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="356"/>
+        <location filename="../src/conf-options-page.ui" line="385"/>
         <source>Select preempt</source>
         <translation>Seleccionar preopción (preempt)</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="385"/>
+        <location filename="../src/conf-options-page.ui" line="414"/>
         <source>Transparent Hugepages</source>
         <translation>Páginas gigantes transparentes (THP)</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="414"/>
+        <location filename="../src/conf-options-page.ui" line="443"/>
         <source>CPU compiler optimizations</source>
         <translation>Optimizaciones de compilador para CPU</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="443"/>
+        <location filename="../src/conf-options-page.ui" line="472"/>
         <source>Enable LTO</source>
         <translation>Habilitar LTO</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="472"/>
+        <location filename="../src/conf-options-page.ui" line="501"/>
         <source>Build the ZFS module</source>
         <translation>Compilar el módulo ZFS</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="501"/>
+        <location filename="../src/conf-options-page.ui" line="530"/>
         <source>Build the open NVIDIA module</source>
         <translation>Compilar el módulo abierto de NVIDIA</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="530"/>
+        <location filename="../src/conf-options-page.ui" line="559"/>
         <source>Include vmlinux with debug informations/symbols</source>
         <translation>Incluir vmlinux con información/símbolos de depuración</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="576"/>
+        <location filename="../src/conf-options-page.ui" line="605"/>
         <source>Load</source>
         <translation>Cargar</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="583"/>
+        <location filename="../src/conf-options-page.ui" line="612"/>
         <source>Save</source>
         <translation>Guardar</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="603"/>
+        <location filename="../src/conf-options-page.ui" line="632"/>
         <source>Cancel</source>
         <translation>Cancelar</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="610"/>
+        <location filename="../src/conf-options-page.ui" line="639"/>
         <source>Build kernel</source>
         <translation>Compilar kernel</translation>
     </message>
@@ -135,9 +144,13 @@
 <context>
     <name>ConfWindow</name>
     <message>
-        <location filename="../src/conf-window.ui" line="17"/>
         <source>CachyOS Kernel Manager Configure</source>
-        <translation>Configuración de CachyOS Kernel Manager</translation>
+        <translation type="vanished">Configuración de CachyOS Kernel Manager</translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.ui" line="17"/>
+        <source>Kernel Manager Configure</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/conf-window.ui" line="40"/>
@@ -150,93 +163,94 @@
         <translation>Parches</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="362"/>
+        <location filename="../src/conf-window.cpp" line="517"/>
         <source>Do you want to install build packages?</source>
         <translation>¿Desea instalar los paquetes de compilación?</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="468"/>
         <source>CachyOS default Scheduler (tuned EEVDF)</source>
-        <translation>Planificador por defecto de CachyOS (EEVDF ajustado)</translation>
+        <translation type="vanished">Planificador por defecto de CachyOS (EEVDF ajustado)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="469"/>
         <source>BORE - Burst-Oriented Response Enhancer</source>
-        <translation>BORE - Burst-Oriented Response Enhancer</translation>
+        <translation type="vanished">BORE - Burst-Oriented Response Enhancer</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="470"/>
         <source>RC - Release Candidate</source>
-        <translation>RC - Candidata a lanzamiento</translation>
+        <translation type="vanished">RC - Candidata a lanzamiento</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="471"/>
         <source>RT - Realtime kernel</source>
-        <translation>RT - Kernel en tiempo real</translation>
+        <translation type="vanished">RT - Kernel en tiempo real</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="472"/>
         <source>LTS - Long-term support kernel</source>
-        <translation>LTS - Kernel con soporte a largo plazo</translation>
+        <translation type="vanished">LTS - Kernel con soporte a largo plazo</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="473"/>
         <source>EEVDF</source>
-        <translation>EEVDF</translation>
+        <translation type="vanished">EEVDF</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="474"/>
         <source>BMQ (BitMap Queue)</source>
-        <translation>BMQ (BitMap Queue)</translation>
+        <translation type="vanished">BMQ (BitMap Queue)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="566"/>
+        <location filename="../src/conf-window.cpp" line="517"/>
+        <location filename="../src/conf-window.cpp" line="985"/>
+        <location filename="../src/conf-window.cpp" line="1003"/>
+        <location filename="../src/conf-window.cpp" line="1025"/>
+        <source>Kernel Manager</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="823"/>
         <source>Select one or more patch files</source>
         <translation>Seleccione uno o más archivos de parche</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="568"/>
+        <location filename="../src/conf-window.cpp" line="825"/>
         <source>Patch file (*.patch)</source>
         <translation>Archivo de parche (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="588"/>
+        <location filename="../src/conf-window.cpp" line="845"/>
         <source>Enter URL patch</source>
         <translation>Introduzca la URL del parche</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="589"/>
+        <location filename="../src/conf-window.cpp" line="846"/>
         <source>Patch URL:</source>
         <translation>URL del parche:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="707"/>
+        <location filename="../src/conf-window.cpp" line="976"/>
         <source>Save file as</source>
         <translation>Guardar archivo como</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="709"/>
-        <location filename="../src/conf-window.cpp" line="726"/>
+        <location filename="../src/conf-window.cpp" line="978"/>
+        <location filename="../src/conf-window.cpp" line="995"/>
         <source>Config file (*.toml)</source>
         <translation>Archivo de configuración (*.toml)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="716"/>
+        <location filename="../src/conf-window.cpp" line="985"/>
         <source>Failed to save config options to file: %1</source>
         <translation>Error al guardar las opciones de configuración en el archivo: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="724"/>
+        <location filename="../src/conf-window.cpp" line="993"/>
         <source>Load from</source>
         <translation>Cargar desde</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="734"/>
+        <location filename="../src/conf-window.cpp" line="1003"/>
         <source>Failed to load config options from file: %1</source>
         <translation>Error al cargar las opciones de configuración desde el archivo: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="765"/>
+        <location filename="../src/conf-window.cpp" line="1025"/>
         <source>Config file(%1) is outdated</source>
         <translation>El archivo de configuración (%1) está desactualizado</translation>
     </message>
@@ -244,9 +258,19 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/km-window.ui" line="17"/>
         <source>CachyOS Kernel Manager</source>
-        <translation>CachyOS Kernel Manager</translation>
+        <translation type="vanished">CachyOS Kernel Manager</translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="17"/>
+        <location filename="../src/km-window.cpp" line="144"/>
+        <location filename="../src/km-window.cpp" line="157"/>
+        <location filename="../src/km-window.cpp" line="214"/>
+        <location filename="../src/km-window.cpp" line="240"/>
+        <location filename="../src/km-window.cpp" line="409"/>
+        <location filename="../src/km-window.cpp" line="416"/>
+        <source>Kernel Manager</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/km-window.ui" line="27"/>
@@ -316,14 +340,14 @@
         <translation>Error al liberar el manejador de alpm (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="203"/>
+        <location filename="../src/km-window.cpp" line="214"/>
         <source>Failed to clone repository!
 Please check your internet connection and try again</source>
         <translation>¡Error al clonar el repositorio!
 Por favor, verifique su conexión a internet e inténtelo de nuevo</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="229"/>
+        <location filename="../src/km-window.cpp" line="240"/>
         <source>No kernels found!
 Please run `pacman -Sy` to update DB!
 This is needed for the app to work properly</source>
@@ -332,8 +356,8 @@ This is needed for the app to work properly</source>
 Esto es necesario para que la aplicación funcione correctamente</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="278"/>
-        <location filename="../src/km-window.cpp" line="342"/>
+        <location filename="../src/km-window.cpp" line="293"/>
+        <location filename="../src/km-window.cpp" line="357"/>
         <source>Please wait...
 We are preparing configuration window for you
 cloning PKGBUILDs..</source>
@@ -342,11 +366,17 @@ Estamos preparando la ventana de configuración
 clonando PKGBUILDs...</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="363"/>
+        <location filename="../src/km-window.cpp" line="382"/>
         <source>Please wait...
 Initializing kernels..</source>
         <translation>Por favor, espere...
 Inicializando kernels...</translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="409"/>
+        <location filename="../src/km-window.cpp" line="416"/>
+        <source>scx-manager is not installed.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 </TS>

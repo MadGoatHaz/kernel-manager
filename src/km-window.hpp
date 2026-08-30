@@ -44,7 +44,9 @@
 #include "kernel.hpp"
 #include "utils.hpp"
 
+#ifdef WITH_SCX_MANAGER
 #include <scx-manager/schedext-window.hpp>
+#endif
 
 #include <array>
 #include <condition_variable>
@@ -141,7 +143,12 @@ class MainWindow final : public QMainWindow {
     std::vector<Kernel> m_kernels                          = Kernel::get_kernels(m_handle);
     std::unique_ptr<Ui::MainWindow> m_ui                   = std::make_unique<Ui::MainWindow>();
     std::unique_ptr<ConfWindow> m_conf_window              = std::make_unique<ConfWindow>();
-    std::unique_ptr<scxctl::SchedExtWindow> m_sched_window = std::make_unique<scxctl::SchedExtWindow>();
+#ifdef WITH_SCX_MANAGER
+    // Optional scx-manager support (WU-5): nullable on purpose. Instantiated in
+    // the ctor only when scx-manager is compiled in, so generic builds never
+    // require the scxctl::SchedExtWindow constructor to succeed.
+    std::unique_ptr<scxctl::SchedExtWindow> m_sched_window{nullptr};
+#endif
 
     void build_change_list(QTreeWidgetItem* item) noexcept;
     void set_progress_dialog() noexcept;

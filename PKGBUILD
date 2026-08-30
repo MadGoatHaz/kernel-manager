@@ -25,10 +25,17 @@
 #     qt6-base    -> libQt6Widgets/Gui/Core/Concurrent/DBus .so.6
 #     pacman      -> libalpm.so.16
 #     glib2       -> libglib-2.0.so.0
-#     scx-manager -> libscxctl-ui.so.1 (sched-ext SCX control library, from
-#                    the AUR package `scx-manager`)
 #     polkit      -> pkexec, used by /usr/lib/kernel-manager/rootshell.sh for
 #                    the privilege-escalation path (auth_admin polkit action)
+#
+#   optdepends:
+#     scx-manager -> optional sched-ext (BPF) scheduler management. The default
+#                    build has WITH_SCX_MANAGER=OFF (find_package(scxctl-ui
+#                    QUIET) not found -> feature compiled out, schedext button
+#                    hidden). Installing scx-manager and rebuilding with
+#                    -DWITH_SCX_MANAGER=ON (auto-enabled when its scxctl-ui
+#                    CMake config is present) lights the feature up; the
+#                    binary then additionally links libscxctl-ui.so.1.
 #
 #   makedepends (build time only):
 #     cmake make gcc -> toolchain (C++23, Release, LTO). The build uses the
@@ -42,10 +49,12 @@
 #     python       -> Python3, runs src/mkoptions.py code generation
 #     pacman glib2 -> headers/.pc for the build (same package is also a runtime
 #                     dep; on Arch one package provides both)
-#     scx-manager  -> scxctl-ui CMake config for find_package(scxctl-ui 1)
 #     polkit-qt6   -> PolkitQt6-1 CMake config for find_package(PolkitQt6-1).
 #                     Build-time only: the polkit-qt6 library is NOT linked into
 #                     the binary (verified via ldd), so it is not a runtime dep.
+#
+#   scx-manager is intentionally NOT a (make)dep: the default build is
+#   WITH_SCX_MANAGER=OFF and needs no scxctl-ui headers/config (WU-5).
 #
 #   fmt + frozen are CPM-vendored (fetched at configure time) -- build-only,
 #   not runtime deps.
@@ -66,8 +75,9 @@ license=(GPL-3.0-or-later)
 conflicts=(cachyos-kernel-manager)
 provides=(cachyos-kernel-manager)
 
-depends=(qt6-base pacman glib2 scx-manager polkit)
-makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 scx-manager polkit-qt6)
+depends=(qt6-base pacman glib2 polkit)
+optdepends=("scx-manager: sched-ext (BPF) scheduler management")
+makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polkit-qt6)
 
 # Defensive polkit reload so the shipped policy is picked up on (re)install.
 install=kernel-manager.install

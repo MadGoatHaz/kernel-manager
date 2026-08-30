@@ -4,94 +4,106 @@
 <context>
     <name>ConfOptionsPage</name>
     <message>
-        <location filename="../src/conf-options-page.ui" line="33"/>
+        <location filename="../src/conf-options-page.ui" line="62"/>
         <source>Custom package name</source>
         <translation>カスタムパッケージ名</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="53"/>
         <source>$pkgbase</source>
-        <translation>$pkgbase</translation>
+        <translation type="vanished">$pkgbase</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="66"/>
         <source>Enable CachyOS config</source>
-        <translation>CachyOS のカスタム設定を有効化</translation>
+        <translation type="vanished">CachyOS のカスタム設定を有効化</translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="33"/>
+        <source>Kernel source (AUR package name or git URL)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="82"/>
+        <source>$pkgbase-custom</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="95"/>
+        <source>Enable custom config</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-options-page.ui" line="124"/>
         <source>Tweak kernel options prior to a build via nconfig</source>
         <translation>ビルド前にカーネル設定を nconfig で変更</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="124"/>
+        <location filename="../src/conf-options-page.ui" line="153"/>
         <source>Tweak kernel options prior to a build via xconfig</source>
         <translation>ビルド前にカーネル設定を xconfig で変更</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="153"/>
+        <location filename="../src/conf-options-page.ui" line="182"/>
         <source>Use Modprobed-db</source>
         <translation>Modprobed-db を使用</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="182"/>
+        <location filename="../src/conf-options-page.ui" line="211"/>
         <source>Use the current kernel&apos;s config</source>
         <translation>現在のカーネル設定を使用</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="211"/>
+        <location filename="../src/conf-options-page.ui" line="240"/>
         <source>Enable KBUILD_CFLAGS -O3</source>
         <translation>KBUILD_CFLAGS -O3 を有効化</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="240"/>
+        <location filename="../src/conf-options-page.ui" line="269"/>
         <source>Set performance governor as default</source>
         <translation>パフォーマンスガバナーをデフォルトに設定</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="269"/>
+        <location filename="../src/conf-options-page.ui" line="298"/>
         <source>Enable TCP_CONG_BBR3</source>
         <translation>TCP_CONG_BBR3 を有効化</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="298"/>
+        <location filename="../src/conf-options-page.ui" line="327"/>
         <source>Running tick rate</source>
         <translation>ティックレート</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="327"/>
+        <location filename="../src/conf-options-page.ui" line="356"/>
         <source>Select tickless</source>
         <translation>tickless 設定</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="356"/>
+        <location filename="../src/conf-options-page.ui" line="385"/>
         <source>Select preempt</source>
         <translation>preempt 設定</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="385"/>
+        <location filename="../src/conf-options-page.ui" line="414"/>
         <source>Transparent Hugepages</source>
         <translation>Transparent Hugepage</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="414"/>
+        <location filename="../src/conf-options-page.ui" line="443"/>
         <source>CPU compiler optimizations</source>
         <translation>CPU コンパイラ最適化設定</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="443"/>
+        <location filename="../src/conf-options-page.ui" line="472"/>
         <source>Enable LTO</source>
         <translation>LTO を有効化</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="472"/>
+        <location filename="../src/conf-options-page.ui" line="501"/>
         <source>Build the ZFS module</source>
         <translation>ZFS モジュールをビルド</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="501"/>
         <source>Build the NVIDIA module</source>
-        <translation>NVIDIA モジュールをビルド</translation>
+        <translation type="vanished">NVIDIA モジュールをビルド</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="530"/>
@@ -140,9 +152,13 @@
 <context>
     <name>ConfWindow</name>
     <message>
-        <location filename="../src/conf-window.ui" line="17"/>
         <source>CachyOS Kernel Manager Configure</source>
-        <translation>CachyOS カーネルマネージャー設定</translation>
+        <translation type="vanished">CachyOS カーネルマネージャー設定</translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.ui" line="17"/>
+        <source>Kernel Manager Configure</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/conf-window.ui" line="40"/>
@@ -155,93 +171,94 @@
         <translation>パッチ</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="362"/>
+        <location filename="../src/conf-window.cpp" line="517"/>
         <source>Do you want to install build packages?</source>
         <translation>ビルドパッケージをインストールしますか？</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="470"/>
         <source>CachyOS default scheduler (BORE+Cachy Sauce)</source>
-        <translation>CachyOS 標準スケジューラ (BORE+Cachy Sauce)</translation>
+        <translation type="vanished">CachyOS 標準スケジューラ (BORE+Cachy Sauce)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="471"/>
         <source>BORE - Burst-Oriented Response Enhancer</source>
-        <translation>BORE - Burst-Oriented Response Enhancer</translation>
+        <translation type="vanished">BORE - Burst-Oriented Response Enhancer</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="472"/>
         <source>RC - Release Candidate</source>
-        <translation>RC - リリース候補</translation>
+        <translation type="vanished">RC - リリース候補</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="473"/>
         <source>RT - Realtime kernel</source>
-        <translation>RT - リアルタイムカーネル</translation>
+        <translation type="vanished">RT - リアルタイムカーネル</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="474"/>
         <source>LTS - Long-term support kernel</source>
-        <translation>LTS - 長期サポートカーネル</translation>
+        <translation type="vanished">LTS - 長期サポートカーネル</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="475"/>
         <source>EEVDF</source>
-        <translation>EEVDF</translation>
+        <translation type="vanished">EEVDF</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="476"/>
         <source>BMQ (BitMap Queue)</source>
-        <translation>BMQ (BitMap Queue)</translation>
+        <translation type="vanished">BMQ (BitMap Queue)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="568"/>
+        <location filename="../src/conf-window.cpp" line="517"/>
+        <location filename="../src/conf-window.cpp" line="985"/>
+        <location filename="../src/conf-window.cpp" line="1003"/>
+        <location filename="../src/conf-window.cpp" line="1025"/>
+        <source>Kernel Manager</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="823"/>
         <source>Select one or more patch files</source>
         <translation>一つ以上のパッチファイルを選択</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="570"/>
+        <location filename="../src/conf-window.cpp" line="825"/>
         <source>Patch file (*.patch)</source>
         <translation>パッチファイル (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="590"/>
+        <location filename="../src/conf-window.cpp" line="845"/>
         <source>Enter URL patch</source>
         <translation>URL パッチを入力</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="591"/>
+        <location filename="../src/conf-window.cpp" line="846"/>
         <source>Patch URL:</source>
         <translation>パッチ URL:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="710"/>
+        <location filename="../src/conf-window.cpp" line="976"/>
         <source>Save file as</source>
         <translation>名前を付けて保存</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="712"/>
-        <location filename="../src/conf-window.cpp" line="729"/>
+        <location filename="../src/conf-window.cpp" line="978"/>
+        <location filename="../src/conf-window.cpp" line="995"/>
         <source>Config file (*.toml)</source>
         <translation>構成ファイル (*.toml)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="719"/>
+        <location filename="../src/conf-window.cpp" line="985"/>
         <source>Failed to save config options to file: %1</source>
         <translation>ファイルへの構成設定の保存に失敗しました: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="727"/>
+        <location filename="../src/conf-window.cpp" line="993"/>
         <source>Load from</source>
         <translation>読み込むファイルを選択</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="737"/>
+        <location filename="../src/conf-window.cpp" line="1003"/>
         <source>Failed to load config options from file: %1</source>
         <translation>ファイルからの構成設定の読み込みに失敗しました: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="769"/>
+        <location filename="../src/conf-window.cpp" line="1025"/>
         <source>Config file(%1) is outdated</source>
         <translation>構成ファイル(%1) が古くなっています</translation>
     </message>
@@ -249,9 +266,19 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/km-window.ui" line="17"/>
         <source>CachyOS Kernel Manager</source>
-        <translation>CachyOS カーネルマネージャー</translation>
+        <translation type="vanished">CachyOS カーネルマネージャー</translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="17"/>
+        <location filename="../src/km-window.cpp" line="144"/>
+        <location filename="../src/km-window.cpp" line="157"/>
+        <location filename="../src/km-window.cpp" line="214"/>
+        <location filename="../src/km-window.cpp" line="240"/>
+        <location filename="../src/km-window.cpp" line="409"/>
+        <location filename="../src/km-window.cpp" line="416"/>
+        <source>Kernel Manager</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/km-window.ui" line="27"/>
@@ -321,14 +348,14 @@
         <translation>alpm ハンドルを解放できませんでした (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="202"/>
+        <location filename="../src/km-window.cpp" line="214"/>
         <source>Failed to clone repository!
 Please check your internet connection and try again</source>
         <translation>リポジトリのクローンに失敗しました。
 インターネット接続を確認してから再度実行してください</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="228"/>
+        <location filename="../src/km-window.cpp" line="240"/>
         <source>No kernels found!
 Please run `pacman -Sy` to update DB!
 This is needed for the app to work properly</source>
@@ -337,8 +364,8 @@ This is needed for the app to work properly</source>
 この作業はアプリが正常に動作するために必要です</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="277"/>
-        <location filename="../src/km-window.cpp" line="341"/>
+        <location filename="../src/km-window.cpp" line="293"/>
+        <location filename="../src/km-window.cpp" line="357"/>
         <source>Please wait...
 We are preparing configuration window for you
 cloning PKGBUILDs..</source>
@@ -347,11 +374,17 @@ cloning PKGBUILDs..</source>
 PKGBUILD をクローン中..</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="362"/>
+        <location filename="../src/km-window.cpp" line="382"/>
         <source>Please wait...
 Initializing kernels..</source>
         <translation>しばらくお待ちください...
 カーネルを初期化中..</translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="409"/>
+        <location filename="../src/km-window.cpp" line="416"/>
+        <source>scx-manager is not installed.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 </TS>
