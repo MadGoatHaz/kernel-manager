@@ -1,0 +1,75 @@
+# Maintainer: MadGoat <ghazlett@gmail.com>
+#
+# Distro-agnostic (generic Arch) ROLLING packaging for kernel-manager.
+#
+# Tracks the `main` branch of the fork (per D7, `#branch=main`). See PKGBUILD
+# for the stable (fixed-commit) variant. depends/makedepends/conflicts are
+# identical to the stable PKGBUILD -- read that file for the full, verified
+# dependency breakdown (ldd + CMake). The only differences here are:
+#   * pkgname  : kernel-manager-git
+#   * source   : the git repository (branch=main), not a fixed tarball
+#   * pkgver() : the short commit sha of `main` (hyphen-free; makepkg forbids
+#     the descriptive `git describe --long` form, which contains hyphens)
+#   * conflicts/provides : also cover the stable `kernel-manager` package so
+#     the rolling and stable builds are interchangeable and cannot coexist.
+
+pkgname=kernel-manager-git
+# Placeholder only. makepkg overwrites this with the value returned by
+# pkgver() after the first real build. A non-zero value is required because
+# makepkg >= 7.1 lints an empty `pkgver=` before pkgver() ever runs.
+pkgver=19f1e06
+pkgrel=1
+pkgdesc="Qt6 GUI for kernel configuration, compilation, and sched-ext (BPF) scheduler management (git)"
+arch=(x86_64)
+url="https://github.com/MadGoatHaz/kernel-manager"
+license=(GPL-3.0-or-later)
+
+conflicts=(cachyos-kernel-manager kernel-manager)
+provides=(cachyos-kernel-manager kernel-manager)
+
+depends=(qt6-base pacman glib2 scx-manager polkit)
+makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 scx-manager polkit-qt6)
+
+install=kernel-manager.install
+
+# D7: pin the main branch. The `::` prefix names the clone dir `kernel-manager`.
+source=("kernel-manager::git+https://github.com/MadGoatHaz/kernel-manager#branch=main")
+sha256sums=("SKIP")
+
+pkgver() {
+  cd "$srcdir/kernel-manager"
+  # makepkg (>=7.1; see lint_pkgbuild/pkgver.sh) forbids hyphens in pkgver, so
+  # the usual descriptive form `git describe --tags --long` (e.g.
+  # 1.19.0-11-g19f1e06) would be rejected by `makepkg --check`. We instead use
+  # the short commit sha of the checked-out branch (main), which is unique,
+  # hyphen-free, and exactly identifies the source being built. This matches the
+  # sibling `scx-manager-git` package's short-sha convention.
+  git rev-parse --short HEAD
+}
+
+build() {
+  # Fat LTO objects so makepkg can strip the LTO-built binary/static archives;
+  # see https://archlinux.org/todo/lto-fat-objects/ (this project enables LTO
+  # for Release builds in CMakeLists).
+  CFLAGS+=" -ffat-lto-objects"
+  CXXFLAGS+=" -ffat-lto-objects"
+
+  cd "$srcdir/kernel-manager"
+  cmake -S . -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build
+}
+
+package() {
+  cd "$srcdir/kernel-manager"
+  # Stages every artifact under $pkgdir/usr/... (binary, helpers, polkit
+  # policy, desktop, 10 icons). DESTDIR correctly prepends the staging dir to
+  # the ABSOLUTE helper/policy destinations in CMakeLists. The .qm translations
+  # are embedded into the binary via km_locale.qrc and are NOT installed as
+  # separate files.
+  DESTDIR="$pkgdir" cmake --install build --prefix /usr
+
+  # Ship the project license (matches the sibling `scx-manager` package).
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
