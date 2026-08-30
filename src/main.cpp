@@ -19,8 +19,10 @@
 #include "km-window.hpp"
 
 #include <QApplication>
+#include <QIcon>
 #include <QSharedMemory>
 #include <QTranslator>
+#include <cstdio>
 
 #if defined(__clang__)
 #pragma clang diagnostic push
@@ -127,7 +129,18 @@ auto main(int argc, char** argv) -> std::int32_t {
     QApplication::setDesktopFileName("org.archlinux.KernelManager");
 
     // Set application attributes
-    const QApplication app(argc, argv);
+    QApplication app(argc, argv);
+
+    // Window icon from the bundled resource (src/km_icons.qrc): works when
+    // running from the build directory, where the .ui <iconset theme=...>
+    // lookups cannot resolve; the theme iconsets remain the installed-use path.
+    {
+        const QIcon window_icon(QStringLiteral(":/km-icons/org.archlinux.KernelManager.png"));
+        if (window_icon.isNull()) {
+            std::fprintf(stderr, "[kernel-manager] warning: bundled app icon resource is missing\n");
+        }
+        app.setWindowIcon(window_icon);
+    }
 
     /// 3. Initialization of translations
     QTranslator qtTranslatorBase;
