@@ -311,17 +311,33 @@ inline auto convert_to_var_assign_empty_wrapped(option_map_ref map, std::string_
     return convert_to_var_assign(map, option_name, "no"sv);
 }
 
-auto get_source_array_from_pkgbuild(std::string_view kernel_name_path, std::string_view options_set) noexcept {
-    const auto& testscript_src  = fmt::format(FMT_COMPILE("#!/usr/bin/bash\n{}\nsource \"$1\"\n{}"), options_set, "echo \"${source[@]}\"");
-    const auto& testscript_path = fmt::format(FMT_COMPILE("{}/.testscript"), kernel_name_path);
-
-    if (utils::write_to_file(testscript_path, testscript_src)) {
-        fs::permissions(testscript_path,
+// Creates a transient executable testscript, runs it, and removes the file
+// on every return path (success, command failure, and popen error alike):
+// the script only sources the PKGBUILD / makepkg.conf so it can be parsed,
+// and must never linger in the source tree or the user's working directory.
+auto run_and_remove_testscript(std::string_view script_path, std::string_view script_src, std::string_view args = {}) noexcept -> std::string {
+    if (utils::write_to_file(script_path, script_src)) {
+        fs::permissions(script_path,
             fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
             fs::perm_options::add);
     }
 
-    const auto& src_entries = utils::exec(fmt::format(FMT_COMPILE("{} {}/PKGBUILD"), testscript_path, kernel_name_path));
+    const std::string command = args.empty() ? std::string{script_path} : fmt::format(FMT_COMPILE("{} {}"), std::string{script_path}, std::string{args});
+    const std::string result  = utils::exec(command);
+
+    std::error_code ec{};
+    fs::remove(script_path, ec);
+    if (ec) {
+        fmt::print(stderr, "failed to remove testscript '{}': {}\n", std::string{script_path}, ec.message());
+    }
+    return result;
+}
+
+auto get_source_array_from_pkgbuild(std::string_view kernel_name_path, std::string_view options_set) noexcept {
+    const auto& testscript_src  = fmt::format(FMT_COMPILE("#!/usr/bin/bash\n{}\nsource \"$1\"\n{}"), options_set, "echo \"${source[@]}\"");
+    const auto& testscript_path = fmt::format(FMT_COMPILE("{}/.testscript"), kernel_name_path);
+
+    const auto& src_entries = run_and_remove_testscript(testscript_path, testscript_src, fmt::format(FMT_COMPILE("{}/PKGBUILD"), kernel_name_path));
     return utils::make_multiline(src_entries, ' ');
 }
 
@@ -331,13 +347,8 @@ auto get_pkgext_value_from_makepkgconf() noexcept -> std::string {
     static constexpr auto testscript_src = "#!/usr/bin/bash\nsource \"/etc/makepkg.conf\"\necho \"${PKGEXT}\""sv;
 
     const auto& testscript_path = fmt::format(FMT_COMPILE("{}/.testscriptpkgext"), fs::current_path().string());
-    if (utils::write_to_file(testscript_path, testscript_src)) {
-        fs::permissions(testscript_path,
-            fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
-            fs::perm_options::add);
-    }
 
-    auto pkgext_val = utils::exec(testscript_path);
+    auto pkgext_val = run_and_remove_testscript(testscript_path, testscript_src);
     if (pkgext_val.empty()) {
         fmt::print(stderr, "failed to get PKGEXT from /etc/makepkg.conf");
         return ".pkg.tar.zst"s;
@@ -387,13 +398,8 @@ auto get_package_names_glob_from_pkgbuild(std::string_view kernel_name_path) noe
     static constexpr auto pkgver_prefix  = "pkgver: "sv;
 
     const auto& testscript_path = fmt::format(FMT_COMPILE("{}/.testscriptpkgnames"), kernel_name_path);
-    if (utils::write_to_file(testscript_path, testscript_src)) {
-        fs::permissions(testscript_path,
-            fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
-            fs::perm_options::add);
-    }
 
-    const auto& src_entries = utils::exec(fmt::format(FMT_COMPILE("{} {}/PKGBUILD"), testscript_path, kernel_name_path));
+    const auto& src_entries = run_and_remove_testscript(testscript_path, testscript_src, fmt::format(FMT_COMPILE("{}/PKGBUILD"), kernel_name_path));
     const auto& parse_lines = utils::make_multiline(src_entries, '\n');
 
     auto it = std::ranges::find_if(parse_lines, [](auto&& line) { return line.starts_with(pkgver_prefix); });
@@ -938,7 +944,11 @@ void ConfWindow::on_execute() noexcept {
     const auto& build_working_path = fmt::format(FMT_COMPILE("{}/{}"), saved_working_path, cpusched_path);
 
     // Run our build command!
-    run_cmd_async("makepkg -scf --cleanbuild --skipchecksums && touch .done-status", build_working_path);
+    //
+    // Source checksums are validated by default (no --skipchecksums): a
+    // stale/mismatched source in the build repo fails the build until the
+    // source is refreshed or the AUR package is updated.
+    run_cmd_async("makepkg -scf --cleanbuild && touch .done-status", build_working_path);
 }
 
 void ConfWindow::on_save() noexcept {
