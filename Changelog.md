@@ -1,5 +1,18 @@
 # Changelog
 
+### v1.20.0 (2026-08-30) — release candidate
+
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/4e26423...148b961)
+
+- 🐛 Fix custom-build runtime crash: working directory is restored after the source clone (CwdGuard), kernel flavor/build paths are absolute, and PKGBUILD insert is guarded against empty reads
+- 🔥 Build source is now a dropdown of known kernel packages plus a "Custom URL…" field for any git URL, backed by a curated known-kernels table
+- ⚡ Selecting a kernel auto-populates the build source (e.g. mainline `linux` → `linux-cachyos`); manual choices are never clobbered
+- ℹ️ Kernel description tooltips on the package-name column for every kernel (curated or synthesized)
+- 🖼️ App icon embedded as a Qt resource — window/taskbar icon shows without installation
+- ♻️ The two "Cancel" buttons are now "Close"; all 16 translation catalogs resynced
+
+> Note: release candidate only — the AUR `PKGBUILD` source pin is still the pre-decoupling `19f1e06` and must be repointed to a current commit/tag (with a pkgver bump) before AUR submission; no version has been cut for this entry yet.
+
 ### v0.9.1 (2022-01-27)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/v0.9.0...v0.9.1)
