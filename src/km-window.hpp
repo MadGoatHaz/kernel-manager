@@ -137,7 +137,7 @@ class MainWindow final : public QMainWindow {
     Work* m_worker{nullptr};
 
     alpm_errno_t m_err{};
-    alpm_handle_t* m_handle                                = utils::parse_alpm("/", "/var/lib/pacman/", &m_err);
+    alpm_handle_t* m_handle                                = utils::parse_alpm(utils::alpm_root, utils::alpm_libdir, &m_err);
     std::vector<Kernel> m_kernels                          = Kernel::get_kernels(m_handle);
     std::unique_ptr<Ui::MainWindow> m_ui                   = std::make_unique<Ui::MainWindow>();
     std::unique_ptr<ConfWindow> m_conf_window              = std::make_unique<ConfWindow>();

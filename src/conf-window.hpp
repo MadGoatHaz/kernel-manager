@@ -47,6 +47,14 @@
 #include <QMainWindow>
 #include <QProcess>
 
+// A kernel build flavor discovered in the kernel source repo:
+// key = flavor name relative to the repo's family prefix, path = the
+// flavor's subdirectory inside that repo.
+struct KernelFlavor {
+    std::string key;
+    std::string path;
+};
+
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #elif defined(__GNUC__)
@@ -61,21 +69,25 @@ class ConfWindow final : public QMainWindow {
     ~ConfWindow() = default;
 
     void reset_patches_data_tab() noexcept;
+    void refresh_flavors() noexcept;
 
- protected:
+    protected:
     void closeEvent(QCloseEvent* event) override;
 
- private:
+    private:
     void on_cancel() noexcept;
     void on_execute() noexcept;
     void on_save() noexcept;
     void on_load() noexcept;
     void finished_proc(int exit_code, QProcess::ExitStatus exit_status) noexcept;
 
+    auto kernel_path_for_index(std::int32_t index) const noexcept -> std::string;
+
     bool m_running{};
     QProcess m_cmd{};
     std::string m_build_conf_path{};
     std::vector<std::string> m_previously_set_options{};
+    std::vector<KernelFlavor> m_flavors{};
     std::unique_ptr<Ui::ConfWindow> m_ui = std::make_unique<Ui::ConfWindow>();
 
     void run_cmd_async(std::string cmd, const std::string& working_path, bool escalate = false) noexcept;

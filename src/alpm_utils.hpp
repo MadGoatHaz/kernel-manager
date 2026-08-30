@@ -26,6 +26,11 @@
 
 namespace utils {
 
+// Single named constants for the alpm filesystem locations (root and package
+// DB dir), shared by every parse_alpm call site.
+inline constexpr std::string_view alpm_root   = "/";
+inline constexpr std::string_view alpm_libdir = "/var/lib/pacman/";
+
 alpm_handle_t* parse_alpm(std::string_view root, std::string_view dbpath, alpm_errno_t* err) noexcept;
 std::int32_t release_alpm(alpm_handle_t* handle, alpm_errno_t* err) noexcept;
 

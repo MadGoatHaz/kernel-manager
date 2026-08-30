@@ -100,7 +100,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-GENERATE_CONST_LOOKUP_OPTION_VALUES(kernel_name, "cachyos", "bore", "rc", "rt", "lts", "eevdf", "bmq", "hardened", "deckify", "server")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(hz_tick, "1000", "750", "600", "500", "300", "250", "100")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(tickless_mode, "full", "idle", "periodic")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(preempt_mode, "full", "lazy", "voluntary", "none")
@@ -110,41 +109,79 @@ GENERATE_CONST_LOOKUP_OPTION_VALUES(cpu_opt_mode, "manual", "native", "generic_v
 
 // NOLINTEND(cppcoreguidelines-macro-usage)
 
-static_assert(lookup_kernel_name("cachyos") == 0, "Invalid position");
-static_assert(lookup_kernel_name("bore") == 1, "Invalid position");
-static_assert(lookup_kernel_name("rc") == 2, "Invalid position");
-static_assert(lookup_kernel_name("rt") == 3, "Invalid position");
-static_assert(lookup_kernel_name("lts") == 4, "Invalid position");
-static_assert(lookup_kernel_name("eevdf") == 5, "Invalid position");
-static_assert(lookup_kernel_name("bmq") == 6, "Invalid position");
-static_assert(lookup_kernel_name("hardened") == 7, "Invalid position");
-static_assert(lookup_kernel_name("deckify") == 8, "Invalid position");
-static_assert(lookup_kernel_name("server") == 9, "Invalid position");
-
-constexpr auto get_kernel_name_path(std::string_view kernel_name) noexcept {
-    using namespace std::string_view_literals;
-    if (kernel_name == "cachyos"sv) {
-        return "linux-cachyos"sv;
-    } else if (kernel_name == "bmq"sv) {
-        return "linux-cachyos-bmq"sv;
-    } else if (kernel_name == "bore"sv) {
-        return "linux-cachyos-bore"sv;
-    } else if (kernel_name == "hardened"sv) {
-        return "linux-cachyos-hardened"sv;
-    } else if (kernel_name == "lts"sv) {
-        return "linux-cachyos-lts"sv;
-    } else if (kernel_name == "rc"sv) {
-        return "linux-cachyos-rc"sv;
-    } else if (kernel_name == "rt"sv) {
-        return "linux-cachyos-rt-bore"sv;
-    } else if (kernel_name == "eevdf"sv) {
-        return "linux-cachyos-eevdf"sv;
-    } else if (kernel_name == "deckify"sv) {
-        return "linux-cachyos-deckify"sv;
-    } else if (kernel_name == "server"sv) {
-        return "linux-cachyos-server"sv;
+// Neutral display label for a discovered flavor key: "Default" for the base
+// flavor, otherwise the humanized key ("rt-bore" -> "Rt Bore").
+auto flavor_display_name(const std::string& key, const std::string& base_key) noexcept -> std::string {
+    if (key == base_key) {
+        return "Default";
     }
-    return "linux-cachyos"sv;
+    std::string label{};
+    bool capitalize_next{true};
+    for (const char c : key) {
+        if (c == '-') {
+            label += ' ';
+            capitalize_next = true;
+        } else {
+            label += (capitalize_next && c >= 'a' && c <= 'z') ? static_cast<char>(c - 'a' + 'A') : c;
+            capitalize_next = false;
+        }
+    }
+    return label;
+}
+
+// Discover the flavors offered by the kernel source repo: every subdirectory
+// containing a PKGBUILD is one flavor. Keys are derived from the directory
+// names relative to their common family prefix, so no flavor names are
+// hard-coded here.
+auto discover_repo_flavors(const fs::path& repo_root) noexcept -> std::vector<KernelFlavor> {
+    std::vector<std::string> dirs{};
+    std::error_code ec{};
+    if (fs::is_directory(repo_root, ec)) {
+        for (const auto& entry : fs::directory_iterator(repo_root, ec)) {
+            if (entry.is_directory(ec) && fs::is_regular_file(entry.path() / "PKGBUILD", ec)) {
+                dirs.push_back(entry.path().filename().string());
+            }
+        }
+    }
+    std::sort(dirs.begin(), dirs.end());
+    if (dirs.empty()) {
+        return {};
+    }
+
+    // Longest common prefix of all flavor dirs = the kernel family.
+    std::string family{dirs.front()};
+    for (const auto& dir : dirs) {
+        std::size_t i = 0;
+        while (i < family.size() && i < dir.size() && family[i] == dir[i]) {
+            ++i;
+        }
+        family = family.substr(0, i);
+        if (family.empty()) {
+            break;
+        }
+    }
+    while (family.ends_with('-')) {
+        family.pop_back();
+    }
+
+    // Base flavor key = the family minus the generic "linux" base.
+    std::string base_key = family;
+    if (base_key.starts_with("linux-")) {
+        base_key = base_key.substr(6);
+    }
+    if (base_key.empty()) {
+        base_key = family;
+    }
+
+    std::vector<KernelFlavor> flavors{};
+    flavors.reserve(dirs.size());
+    for (const auto& dir : dirs) {
+        KernelFlavor flavor{};
+        flavor.path = dir;
+        flavor.key  = (dir == family) ? base_key : dir.substr(family.size() + 1);
+        flavors.emplace_back(std::move(flavor));
+    }
+    return flavors;
 }
 
 inline bool checkstate_checked(QCheckBox* checkbox) noexcept {
@@ -393,7 +430,7 @@ void ConfWindow::finished_proc(int exit_code, QProcess::ExitStatus) noexcept {
 
         fmt::print("success\n");
 
-        auto res = QMessageBox::question(this, "CachyOS Kernel Manager", tr("Do you want to install build packages?"));
+        auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Do you want to install build packages?"));
         if (res == QMessageBox::Yes) {
             fmt::print("pressed yes\n");
 
@@ -461,12 +498,61 @@ void ConfWindow::clear_patches_data_tab() noexcept {
     patches_page_ui_obj->list_widget->clear();
 }
 
+auto ConfWindow::kernel_path_for_index(std::int32_t index) const noexcept -> std::string {
+    if (index < 0 || index >= static_cast<std::int32_t>(m_flavors.size())) {
+        return {};
+    }
+    return m_flavors[static_cast<std::size_t>(index)].path;
+}
+
+// (Re)discover the build flavors from the kernel source repo and repopulate
+// the flavor combo, preserving the user's current selection when possible.
+void ConfWindow::refresh_flavors() noexcept {
+    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    auto* combo               = options_page_ui_obj->main_combo_box;
+
+    // remember the currently selected flavor key (if any) to restore it
+    std::string previous_key{};
+    if (const std::int32_t cur = combo->currentIndex(); cur >= 0 && cur < static_cast<std::int32_t>(m_flavors.size())) {
+        previous_key = m_flavors[static_cast<std::size_t>(cur)].key;
+    }
+
+    m_flavors = discover_repo_flavors(utils::build_repo_path());
+    if (m_flavors.empty()) {
+        return;
+    }
+
+    const std::string base_key = m_flavors.front().key;
+
+    {
+        const QSignalBlocker blocker(combo);
+        combo->clear();
+        for (const auto& flavor : m_flavors) {
+            combo->addItem(QString::fromStdString(flavor_display_name(flavor.key, base_key)), QString::fromStdString(flavor.key));
+        }
+    }
+
+    // restore the previous selection, falling back to the base flavor
+    std::int32_t target_index = 0;
+    for (std::int32_t i = 0; i < static_cast<std::int32_t>(m_flavors.size()); ++i) {
+        if (m_flavors[static_cast<std::size_t>(i)].key == previous_key) {
+            target_index = i;
+            break;
+        }
+    }
+    combo->setCurrentIndex(target_index);
+}
+
 void ConfWindow::reset_patches_data_tab() noexcept {
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
     auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
 
-    const std::int32_t main_combo_index  = options_page_ui_obj->main_combo_box->currentIndex();
-    const std::string_view cpusched_path = get_kernel_name_path(get_kernel_name(static_cast<size_t>(main_combo_index)));
+    const std::int32_t main_combo_index = options_page_ui_obj->main_combo_box->currentIndex();
+    const auto cpusched_path            = kernel_path_for_index(main_combo_index);
+    if (cpusched_path.empty()) {
+        fmt::print(stderr, "no kernel flavor available yet (source repo not prepared?); use Configure first\n");
+        return;
+    }
 
     auto current_array_items = get_source_array_from_pkgbuild(cpusched_path, get_all_set_values());
     std::erase_if(current_array_items, [](auto&& item_el) { return !item_el.ends_with(".patch"); });
@@ -488,19 +574,10 @@ ConfWindow::ConfWindow(QWidget* parent)
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
     auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
 
-    // Selecting the CPU scheduler
-    QStringList kernel_names;
-    kernel_names << tr("CachyOS default Scheduler (tuned EEVDF)")
-                 << tr("BORE - Burst-Oriented Response Enhancer")
-                 << tr("RC - Release Candidate")
-                 << tr("RT - Realtime kernel")
-                 << tr("LTS - Long-term support kernel")
-                 << tr("EEVDF")
-                 << tr("BMQ (BitMap Queue)")
-                 << tr("Hardened - Hardened Linux kernel")
-                 << tr("Deckify - Handheld optimized kernel")
-                 << tr("Server - Server optimized kernel");
-    options_page_ui_obj->main_combo_box->addItems(kernel_names);
+    // Selecting the kernel flavor: the list is discovered from the kernel
+    // source repo (populated/refreshed via refresh_flavors), so no flavor
+    // names are hard-coded here.
+    refresh_flavors();
 
     // Setting default options
     options_page_ui_obj->cachyconfig_check->setCheckState(Qt::Checked);
@@ -543,7 +620,7 @@ ConfWindow::ConfWindow(QWidget* parent)
               << "Thin"
               << "Thin-dist";
     options_page_ui_obj->lto_combo_box->addItems(lto_modes);
-    // Default for cachyos (initial selection) is Thin
+    // Default (initial selection) is Thin
     options_page_ui_obj->lto_combo_box->setCurrentIndex(static_cast<int>(lookup_lto_mode("thin")));
 
     QStringList hugepage_modes;
@@ -557,8 +634,12 @@ ConfWindow::ConfWindow(QWidget* parent)
     connect(options_page_ui_obj->save_button, &QPushButton::clicked, this, &ConfWindow::on_save);
     connect(options_page_ui_obj->load_button, &QPushButton::clicked, this, &ConfWindow::on_load);
     connect(options_page_ui_obj->main_combo_box, &QComboBox::currentIndexChanged, this, [this, options_page_ui_obj](std::int32_t main_combo_index) {
+        if (main_combo_index < 0 || main_combo_index >= static_cast<std::int32_t>(m_flavors.size())) {
+            return;
+        }
         using namespace std::string_view_literals;
-        const std::string_view kernel_name = get_kernel_name(static_cast<size_t>(main_combo_index));
+        const std::string_view kernel_name = m_flavors[static_cast<std::size_t>(main_combo_index)].key;
+        const std::string_view base_key    = m_flavors.front().key;
 
         // Block signals to prevent cascading combo box updates
         const QSignalBlocker preempt_blocker(options_page_ui_obj->preempt_combo_box);
@@ -575,8 +656,8 @@ ConfWindow::ConfWindow(QWidget* parent)
             options_page_ui_obj->lto_combo_box->removeItem(options_page_ui_obj->lto_combo_box->count() - 1);
         }
 
-        // thin for cachyos/rc, none for others
-        const bool lto_thin_default = (kernel_name == "cachyos"sv || kernel_name == "rc"sv);
+        // thin for base/rc flavors, none for others
+        const bool lto_thin_default = (kernel_name == base_key || kernel_name == "rc"sv);
         options_page_ui_obj->lto_combo_box->setCurrentIndex(static_cast<int>(lto_thin_default ? lookup_lto_mode("thin") : lookup_lto_mode("none")));
 
         // voluntary/none only available for hardened and lts
@@ -599,8 +680,9 @@ ConfWindow::ConfWindow(QWidget* parent)
         set_checkstate(options_page_ui_obj->cachyconfig_check, kernel_name != "server"sv);
 
         // incompatible with realtime kernels
-        options_page_ui_obj->builtin_zfs_check->setEnabled(kernel_name != "rt"sv);
-        if (kernel_name == "rt"sv) {
+        const bool is_realtime = kernel_name.starts_with("rt"sv);
+        options_page_ui_obj->builtin_zfs_check->setEnabled(!is_realtime);
+        if (is_realtime) {
             set_checkstate(options_page_ui_obj->builtin_zfs_check, false);
         }
 
@@ -709,9 +791,16 @@ void ConfWindow::on_execute() noexcept {
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
     auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
 
-    const std::int32_t main_combo_index  = options_page_ui_obj->main_combo_box->currentIndex();
-    const std::string_view cpusched_path = get_kernel_name_path(get_kernel_name(static_cast<size_t>(main_combo_index)));
     utils::prepare_build_environment();
+    refresh_flavors();  // re-discover flavors from the refreshed source repo
+
+    const std::int32_t main_combo_index = options_page_ui_obj->main_combo_box->currentIndex();
+    const auto cpusched_path            = kernel_path_for_index(main_combo_index);
+    if (cpusched_path.empty()) {
+        m_running = false;
+        fmt::print(stderr, "no kernel flavor available (source repo not prepared?)\n");
+        return;
+    }
 
     // Restore clean environment.
     const auto& all_set_values = get_all_set_values();
@@ -771,7 +860,7 @@ void ConfWindow::on_save() noexcept {
     /* clang-format on */
 
     if (!ConfigOptions::write_config_file(config_options, save_file_path)) {
-        QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Failed to save config options to file: %1").arg(QString::fromStdString(save_file_path)));
+        QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to save config options to file: %1").arg(QString::fromStdString(save_file_path)));
         return;
     }
 }
@@ -789,7 +878,7 @@ void ConfWindow::on_load() noexcept {
 
     auto config_options = ConfigOptions::parse_from_file(load_file_path);
     if (!config_options) {
-        QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Failed to load config options from file: %1").arg(QString::fromStdString(load_file_path)));
+        QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to load config options from file: %1").arg(QString::fromStdString(load_file_path)));
         return;
     }
 
@@ -811,6 +900,6 @@ void ConfWindow::on_load() noexcept {
     options_page_ui_obj->custom_name_edit->setText(QString::fromStdString(config_options->custom_name_edit));
 
     if (combobox_stat != 0) {
-        QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Config file(%1) is outdated").arg(QString::fromStdString(load_file_path)));
+        QMessageBox::critical(this, tr("Kernel Manager"), tr("Config file(%1) is outdated").arg(QString::fromStdString(load_file_path)));
     }
 }

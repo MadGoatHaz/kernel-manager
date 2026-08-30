@@ -139,9 +139,9 @@ MainWindow::MainWindow(QWidget* parent)
                 auto& kernel_removal_list = Kernel::get_removal_list();
 
                 // NOTE: we don't want to override handle, because we would need to invalidate kernels then.
-                auto* temp_handle = utils::parse_alpm("/", "/var/lib/pacman/", &m_err);
+                auto* temp_handle = utils::parse_alpm(utils::alpm_root, utils::alpm_libdir, &m_err);
                 if (temp_handle == nullptr) {
-                    QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Failed to initialize alpm handle (%1)").arg(alpm_strerror(m_err)));
+                    QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to initialize alpm handle (%1)").arg(alpm_strerror(m_err)));
                 }
 
                 // [1.2]
@@ -154,7 +154,7 @@ MainWindow::MainWindow(QWidget* parent)
                 // fetch kernels and repopulate tree widget again
                 if (is_kernel_status_changed) {
                     if (m_handle != nullptr && utils::release_alpm(m_handle, &m_err) != 0) {
-                        QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Failed to release alpm handle (%1)").arg(alpm_strerror(m_err)));
+                        QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to release alpm handle (%1)").arg(alpm_strerror(m_err)));
                     }
 
                     m_handle = temp_handle;
@@ -200,7 +200,7 @@ MainWindow::MainWindow(QWidget* parent)
             m_conf_window->show();
             return;
         }
-        QMessageBox::critical(this, "CachyOS Kernel Manager", tr("Failed to clone repository!\nPlease check your internet connection and try again"));
+        QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to clone repository!\nPlease check your internet connection and try again"));
     });
     connect(m_conf_progress_dialog, &QProgressDialog::canceled, this, [&]() {
         fmt::print("the operation was canceled!\n");
@@ -226,7 +226,7 @@ MainWindow::MainWindow(QWidget* parent)
     });
 
     if (m_kernels.empty()) {
-        QMessageBox::critical(this, "CachyOS Kernel Manager", tr("No kernels found!\nPlease run `pacman -Sy` to update DB!\nThis is needed for the app to work properly"));
+        QMessageBox::critical(this, tr("Kernel Manager"), tr("No kernels found!\nPlease run `pacman -Sy` to update DB!\nThis is needed for the app to work properly"));
     }
 
     // Connect buttons signal
@@ -346,6 +346,7 @@ void MainWindow::on_configure() noexcept {
     // prepare in the background, without blocking the UI
     m_future_watcher.setFuture(QtConcurrent::run([this] {
         utils::prepare_build_environment();
+        m_conf_window->refresh_flavors();
         m_conf_window->reset_patches_data_tab();
     }));
 }

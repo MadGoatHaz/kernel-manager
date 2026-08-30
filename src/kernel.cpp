@@ -22,10 +22,12 @@
 
 #include <cstdio>
 
-#include <algorithm>   // for any_of, find_if
-#include <filesystem>  // for exists
-#include <ranges>      // for ranges::*
-#include <utility>     // for move
+#include <algorithm>        // for any_of, find_if
+#include <filesystem>       // for exists
+#include <initializer_list> // for initializer_list
+#include <ranges>           // for ranges::*
+#include <string>           // for string
+#include <utility>          // for move
 
 #include <fmt/compile.h>
 #include <fmt/core.h>
@@ -41,15 +43,88 @@ static std::vector<std::string> g_kernel_removal_list{};                        
 static const bool is_root_on_zfs = utils::exec("findmnt -ln -o FSTYPE /") == "zfs";  // NOLINT
 
 // NOLINTNEXTLINE
+static const bool has_chwd = [] {
+    // Probe availability before use: chwd is distro-specific tooling and is
+    // absent on a generic install, where detection must rely on alpm-DB checks only.
+    const auto& probe = utils::exec("command -v chwd 2>/dev/null");
+    return !probe.empty() && probe != "-1";
+}();
+// NOLINTNEXTLINE
 static const bool is_nvidia_card_prebuild_module = [] {
+    if (!has_chwd) {
+        return false;
+    }
     const auto& profile_names = utils::exec("chwd --list-installed -d 2>/dev/null | grep Name | awk '{print $4}'");
     return std::ranges::any_of(utils::make_split_view(profile_names, '\n'), [](auto&& profile_name) { return profile_name.starts_with("nvidia-dkms"); });
 }();
 // NOLINTNEXTLINE
 static const bool is_nvidia_card_prebuild_open_module = [] {
+    if (!has_chwd) {
+        return false;
+    }
     const auto& profile_names = utils::exec("chwd --list-installed -d 2>/dev/null | grep Name | awk '{print $4}'");
     return std::ranges::any_of(utils::make_split_view(profile_names, '\n'), [](auto&& profile_name) { return profile_name.starts_with("nvidia-open-dkms"); });
 }();
+
+// ---------------------------------------------------------------------------
+// Data-driven module pairing, keyed by kernel base.
+//
+// A kernel package pairs with a module package derived as:
+//     module = stem + (kernel_name with the kernel_base prefix removed) + suffix
+// so a row whose stem equals its base reduces to "kernel_name + suffix"
+// (e.g. base "foo" -> "foo-zfs", "foo-nvidia", "foo-nvidia-open"), while a row
+// with a different stem re-prefixes the kernel's own suffix
+// (e.g. "linux-lts" -> "nvidia-lts" / "nvidia-open-lts").
+//
+// The first row per kind whose kernel_base is a prefix of the kernel name
+// wins, so more specific bases must precede more general ones. All module
+// lookups (sync-DB pairing and installed-family queries) derive from this
+// table; no per-distro package name patterns exist outside of it.
+// ---------------------------------------------------------------------------
+enum class ModuleKind { Zfs, Nvidia, NvidiaOpen };
+
+struct KernelModuleSpec {
+    std::string_view kernel_base;
+    std::string_view module_stem;
+    std::string_view module_suffix;
+    ModuleKind kind;
+};
+
+static constexpr KernelModuleSpec kKernelModuleTable[] = {
+    // family-based kernels: modules are suffixed onto the full kernel name
+    {"linux-cachyos", "linux-cachyos", "-zfs", ModuleKind::Zfs},
+    {"linux-cachyos", "linux-cachyos", "-nvidia", ModuleKind::Nvidia},
+    {"linux-cachyos", "linux-cachyos", "-nvidia-open", ModuleKind::NvidiaOpen},
+    // generic "linux" family kernels: modules are the stem plus the kernel's
+    // suffix (linux -> nvidia, linux-lts -> nvidia-lts, ...)
+    {"linux", "nvidia", "", ModuleKind::Nvidia},
+    {"linux", "nvidia-open", "", ModuleKind::NvidiaOpen},
+};
+
+// Resolve the module package for a kernel name and kind (nullptr when absent).
+static alpm_pkg_t* find_module_pkg(alpm_db_t* db, const std::string& kernel_name, ModuleKind kind) {
+    for (const auto& spec : kKernelModuleTable) {
+        if (spec.kind != kind || !kernel_name.starts_with(spec.kernel_base)) {
+            continue;
+        }
+        std::string module_name{spec.module_stem};
+        module_name += kernel_name.substr(spec.kernel_base.size());
+        module_name += spec.module_suffix;
+        return alpm_db_get_pkg(db, module_name.c_str());
+    }
+    return nullptr;
+}
+
+// Installed-module family regex for a kind, derived from the first (most
+// specific) table row: "^<stem>.*<suffix>$".
+static auto module_family_query(ModuleKind kind) {
+    for (const auto& spec : kKernelModuleTable) {
+        if (spec.kind == kind) {
+            return fmt::format(FMT_COMPILE("^{}.*{}$"), spec.module_stem, spec.module_suffix);
+        }
+    }
+    return std::string{};
+}
 
 }  // namespace
 
@@ -111,8 +186,11 @@ bool Kernel::install() const noexcept {
 
     // if we have any of the modules already installed,
     // then just use whatever is installed. skipping chwd detection
-    const bool is_nvidia_modules_installed      = !utils::exec("pacman -Qqs '^linux-cachyos.*-nvidia$' 2>/dev/null").empty();
-    const bool is_nvidia_open_modules_installed = !utils::exec("pacman -Qqs '^linux-cachyos.*-nvidia-open$' 2>/dev/null").empty();
+    // (queries derived from the module pairing table, not hard-coded regexes)
+    const auto nvidia_family_query      = module_family_query(ModuleKind::Nvidia);
+    const bool is_nvidia_modules_installed = !nvidia_family_query.empty() && !utils::exec(fmt::format(FMT_COMPILE("pacman -Qqs '{}' 2>/dev/null"), nvidia_family_query)).empty();
+    const auto nvidia_open_family_query = module_family_query(ModuleKind::NvidiaOpen);
+    const bool is_nvidia_open_modules_installed = !nvidia_open_family_query.empty() && !utils::exec(fmt::format(FMT_COMPILE("pacman -Qqs '{}' 2>/dev/null"), nvidia_open_family_query)).empty();
 
     bool should_install_nvidia      = (is_nvidia_card_prebuild_module && m_nvidia_module != nullptr);
     bool should_install_nvidia_open = (is_nvidia_card_prebuild_open_module && m_nvidia_open_module != nullptr);
@@ -162,16 +240,16 @@ bool Kernel::remove() const noexcept {
     return true;
 }
 
-// Find kernel packages by finding packages which have words 'linux' and 'headers'.
-// From the output of 'pacman -Sl'
-// - find lines that have words: 'linux' and 'headers'
-// - drop lines containing 'testing' (=testing repo, causes duplicates) and 'linux-api-headers' (=not a kernel header)
-// - show the (header) package names
-// Now we have names of the kernel headers.
-// Then add the kernel packages to proper places and output the result.
-// Then display possible kernels and headers added by the user.
+// Find kernel packages in every sync DB by the generic "linux*-headers"
+// needle, which covers any distribution's kernel flavors (linux, linux-lts,
+// AUR linux-zen, ...). For each header package the paired kernel package is
+// resolved in the same DB, and the optional module packages (zfs/nvidia/
+// nvidia-open) are paired via the data-driven module table (kKernelModuleTable).
+// The "linux-api-headers" package is ignored (not a kernel header), and the
+// sync DB named by KM_IGNORE_REPO (build-configurable, default: none) is
+// skipped.
 
-// The output consists of a list of reponame and a package name formatted as: "reponame/pkgname"
+// The result consists of a list of reponame and a package name formatted as: "reponame/pkgname"
 // For example:
 //    reponame/linux-xxx reponame/linux-xxx-headers
 //    reponame/linux-yyy reponame/linux-yyy-headers
@@ -223,25 +301,9 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
                 }
             }
 #endif
-            if (pkg_name.starts_with("linux-cachyos")) {
-                const auto& zfs_pkgname = fmt::format(FMT_COMPILE("{}-zfs"), pkg_name);
-                kernel_obj.m_zfs_module = alpm_db_get_pkg(db, zfs_pkgname.c_str());
-
-                const auto& nvidia_pkgname = fmt::format(FMT_COMPILE("{}-nvidia"), pkg_name);
-                kernel_obj.m_nvidia_module = alpm_db_get_pkg(db, nvidia_pkgname.c_str());
-
-                const auto& nvidia_open_pkgname = fmt::format(FMT_COMPILE("{}-nvidia-open"), pkg_name);
-                kernel_obj.m_nvidia_open_module = alpm_db_get_pkg(db, nvidia_open_pkgname.c_str());
-            } else if (pkg_name == "linux" || pkg_name == "linux-lts") {
-                auto kernel_module = pkg_name;
-                utils::remove_all(kernel_module, "linux");
-
-                const auto& nvidia_pkgname = fmt::format(FMT_COMPILE("nvidia{}"), kernel_module);
-                kernel_obj.m_nvidia_module = alpm_db_get_pkg(db, nvidia_pkgname.c_str());
-
-                const auto& nvidia_open_pkgname = fmt::format(FMT_COMPILE("nvidia-open{}"), kernel_module);
-                kernel_obj.m_nvidia_open_module = alpm_db_get_pkg(db, nvidia_open_pkgname.c_str());
-            }
+            kernel_obj.m_zfs_module         = find_module_pkg(db, pkg_name, ModuleKind::Zfs);
+            kernel_obj.m_nvidia_module      = find_module_pkg(db, pkg_name, ModuleKind::Nvidia);
+            kernel_obj.m_nvidia_open_module = find_module_pkg(db, pkg_name, ModuleKind::NvidiaOpen);
 
             kernels.emplace_back(std::move(kernel_obj));
         }
@@ -254,7 +316,11 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
     namespace fs = std::filesystem;
 
     bool is_paru_installed{true};
-    if (!fs::exists("/sbin/paru") || !fs::exists("/sbin/awk")) {
+    // accept both /sbin and /usr/bin locations (usr-merge systems)
+    const auto exists_any = [](std::initializer_list<const char*> paths) {
+        return std::ranges::any_of(paths, [](const char* path) { return fs::exists(path); });
+    };
+    if (!exists_any({"/sbin/paru", "/usr/bin/paru"}) || !exists_any({"/sbin/awk", "/usr/bin/awk"})) {
         fmt::print(stderr, "Paru and/or AWK are not installed! Disabling AUR kernels support\n");
         is_paru_installed = false;
     }
