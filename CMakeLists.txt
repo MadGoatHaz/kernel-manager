@@ -104,7 +104,7 @@ add_custom_command(
 ## Target
 ##
 add_custom_command(
-    DEPENDS "${CMAKE_SOURCE_DIR}/src/mkoptions.py"
+    DEPENDS "${CMAKE_SOURCE_DIR}/src/mkoptions.py" "${CMAKE_SOURCE_DIR}/src/compile_options.json"
     OUTPUT "${CMAKE_BINARY_DIR}/compile_options.hpp"
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/src/mkoptions.py" "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_SOURCE_DIR}"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"

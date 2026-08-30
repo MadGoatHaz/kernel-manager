@@ -66,7 +66,29 @@ void prepare_git_repo(const std::filesystem::path& parent_dir, const std::filesy
 // (single source of truth shared by prepare_build_environment() and flavor
 // discovery).
 const std::filesystem::path& build_repo_path() noexcept;
+
+// User-selectable custom-build source: an AUR package name or a git URL.
+// A single accessor shared by prepare_build_environment() and the Configure
+// UI; no clone URL is hard-coded (AUR names resolve to
+// https://aur.archlinux.org/<name>.git at runtime).
+const std::string& build_source_repo() noexcept;
+void set_build_source_repo(std::string source) noexcept;
 void prepare_build_environment() noexcept;
+
+// Result of a generic PKGBUILD custom-name rewrite: when ok is false the
+// error message explains the failure and the file must be left untouched.
+struct PkgbuildRenameResult {
+    bool ok{};
+    std::string error{};
+    std::string new_content{};
+};
+
+// Generic PKGBUILD custom-name handling (no vendor-specific anchors):
+// detects the top-level pkgver= / pkgbase= assignments and rewrites the
+// first pkgbase= line with the requested name (expanding a "$pkgbase"
+// placeholder with the file's original pkgbase value). A PKGBUILD lacking
+// the expected structure fails cleanly (ok = false, file left untouched).
+PkgbuildRenameResult apply_pkgbuild_custom_name(std::string content, std::string_view custom_name) noexcept;
 void restore_clean_environment(std::vector<std::string>& previously_set_options, std::string_view all_set_values) noexcept;
 
 }  // namespace utils

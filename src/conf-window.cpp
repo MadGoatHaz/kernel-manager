@@ -26,6 +26,7 @@
 
 #include <algorithm>    // for for_each, transform
 #include <filesystem>   // for permissions
+#include <optional>     // for optional
 #include <ranges>       // for ranges::*
 #include <string_view>  // for string_view
 
@@ -132,8 +133,9 @@ auto flavor_display_name(const std::string& key, const std::string& base_key) no
 // Discover the flavors offered by the kernel source repo: every subdirectory
 // containing a PKGBUILD is one flavor. Keys are derived from the directory
 // names relative to their common family prefix, so no flavor names are
-// hard-coded here.
-auto discover_repo_flavors(const fs::path& repo_root) noexcept -> std::vector<KernelFlavor> {
+// hard-coded here. A single-package layout (a PKGBUILD at the repo root,
+// e.g. an AUR repo) yields the repo itself as its sole flavor.
+auto discover_repo_flavors(const fs::path& repo_root, std::string_view fallback_repo_name) noexcept -> std::vector<KernelFlavor> {
     std::vector<std::string> dirs{};
     std::error_code ec{};
     if (fs::is_directory(repo_root, ec)) {
@@ -142,6 +144,9 @@ auto discover_repo_flavors(const fs::path& repo_root) noexcept -> std::vector<Ke
                 dirs.push_back(entry.path().filename().string());
             }
         }
+    }
+    if (dirs.empty() && !fallback_repo_name.empty() && fs::is_regular_file(repo_root / "PKGBUILD", ec)) {
+        dirs.push_back(std::string{fallback_repo_name});
     }
     std::sort(dirs.begin(), dirs.end());
     if (dirs.empty()) {
@@ -202,7 +207,7 @@ inline constexpr std::array<CheckboxBinding, 11> checkbox_bindings{{
     {&Ui::ConfOptionsPage::hardly_check, &ConfigOptions::hardly_check, "hardly"},
     {&Ui::ConfOptionsPage::perfgovern_check, &ConfigOptions::per_gov_check, "per_gov"},
     {&Ui::ConfOptionsPage::tcpbbr_check, &ConfigOptions::tcp_bbr3_check, "tcp_bbr3"},
-    {&Ui::ConfOptionsPage::cachyconfig_check, &ConfigOptions::cachy_config_check, "cachy_config"},
+    {&Ui::ConfOptionsPage::customconfig_check, &ConfigOptions::custom_config_check, "custom_config"},
     {&Ui::ConfOptionsPage::nconfig_check, &ConfigOptions::nconfig_check, "nconfig"},
     {&Ui::ConfOptionsPage::xconfig_check, &ConfigOptions::xconfig_check, "xconfig"},
     {&Ui::ConfOptionsPage::localmodcfg_check, &ConfigOptions::localmodcfg_check, "localmodcfg"},
@@ -210,6 +215,28 @@ inline constexpr std::array<CheckboxBinding, 11> checkbox_bindings{{
     {&Ui::ConfOptionsPage::builtin_zfs_check, &ConfigOptions::builtin_zfs_check, "builtin_zfs"},
     {&Ui::ConfOptionsPage::builtin_nvidia_open_check, &ConfigOptions::builtin_nvidia_open_check, "builtin_nvidia_open"},
     {&Ui::ConfOptionsPage::build_debug_check, &ConfigOptions::build_debug_check, "build_debug"},
+}};
+
+// Option rows of the Configure page mapped to their per-repo option key, so
+// the visible option set can follow the selected build source.
+inline constexpr std::array<std::pair<std::string_view, QWidget* Ui::ConfOptionsPage::*>, 17> option_row_bindings{{
+    {"hardly", &Ui::ConfOptionsPage::hardly_widget},
+    {"per_gov", &Ui::ConfOptionsPage::perfgovern_widget},
+    {"tcp_bbr3", &Ui::ConfOptionsPage::tcpbbr_widget},
+    {"custom_config", &Ui::ConfOptionsPage::customconfig_widget},
+    {"nconfig", &Ui::ConfOptionsPage::nconfig_widget},
+    {"xconfig", &Ui::ConfOptionsPage::xconfig_widget},
+    {"localmodcfg", &Ui::ConfOptionsPage::localmodcfg_widget},
+    {"use_current", &Ui::ConfOptionsPage::use_current_widget},
+    {"builtin_zfs", &Ui::ConfOptionsPage::builtin_zfs_widget},
+    {"builtin_nvidia_open", &Ui::ConfOptionsPage::builtin_nvidia_open_widget},
+    {"build_debug", &Ui::ConfOptionsPage::build_debug_widget},
+    {"HZ_ticks", &Ui::ConfOptionsPage::hzticks_widget},
+    {"tickrate", &Ui::ConfOptionsPage::tickless_widget},
+    {"preempt", &Ui::ConfOptionsPage::preempt_widget},
+    {"hugepage", &Ui::ConfOptionsPage::hugepage_widget},
+    {"cpu_opt", &Ui::ConfOptionsPage::processor_opt_widget},
+    {"lto", &Ui::ConfOptionsPage::lto_widget},
 }};
 
 inline auto set_combobox_val(QComboBox* combobox, ssize_t index) noexcept {
@@ -220,22 +247,68 @@ inline auto set_combobox_val(QComboBox* combobox, ssize_t index) noexcept {
     return 0;
 }
 
-constexpr auto convert_to_varname(std::string_view option) noexcept {
-    // force constexpr call with lambda
-    return [option] { return detail::option_map.at(option); }();
+// The last path component of a build source (scheme and ".git" stripped).
+auto repo_basename(std::string_view source) noexcept -> std::string {
+    auto name = source;
+    if (const auto scheme_pos = name.find("://"); scheme_pos != std::string_view::npos) {
+        name = name.substr(scheme_pos + 3);
+    }
+    if (const auto slash = name.find_last_of('/'); slash != std::string_view::npos) {
+        name = name.substr(slash + 1);
+    }
+    if (name.ends_with(".git")) {
+        name.remove_suffix(4);
+    }
+    return std::string{name};
 }
 
-inline auto convert_to_var_assign(std::string_view option, std::string_view value) noexcept {
-    return fmt::format(FMT_COMPILE("{}={}\n"), convert_to_varname(option), value);
+// Normalize a user-typed build source (AUR package name or git URL) to the
+// per-repo option-map key (repo basename with '-' replaced by '_').
+auto normalize_repo_key(std::string_view source) noexcept -> std::string {
+    auto key = repo_basename(source);
+    std::ranges::replace(key.begin(), key.end(), '-', '_');
+    return key;
+}
+
+// Per-repo option map selection: a known source identifier resolves to its
+// dedicated map (frozen, generated from src/compile_options.json); any other
+// source falls back to the generic reduced set (no dedicated options).
+using option_map_type = decltype(detail::linux_cachyos);
+using option_map_ref  = std::optional<const option_map_type*>;
+
+auto resolve_option_map(std::string_view repo_key) noexcept -> option_map_ref {
+    if (repo_key == "linux_cachyos") {
+        return &detail::linux_cachyos;
+    }
+    return std::nullopt;
+}
+
+// Look up the build variable an option maps to in the given per-repo map
+// (nullopt when the repo does not offer the option).
+auto option_build_var(option_map_ref map, std::string_view option) noexcept -> std::optional<std::string_view> {
+    if (!map) {
+        return std::nullopt;
+    }
+    if (const auto it = (*map)->find(frozen::string{option}); it != (*map)->end()) {
+        return std::string_view{it->second};
+    }
+    return std::nullopt;
+}
+
+inline auto convert_to_var_assign(option_map_ref map, std::string_view option, std::string_view value) noexcept -> std::string {
+    if (const auto var = option_build_var(map, option)) {
+        return fmt::format(FMT_COMPILE("{}={}\n"), *var, value);
+    }
+    return std::string{};  // the active repo does not offer this option
 }
 
 /// return flag to enable if the option is enabled, otherwise do nothing
-constexpr auto convert_to_var_assign_empty_wrapped(std::string_view option_name, bool option_enabled) noexcept {
+inline auto convert_to_var_assign_empty_wrapped(option_map_ref map, std::string_view option_name, bool option_enabled) noexcept -> std::string {
     using namespace std::string_view_literals;
     if (option_enabled) {
-        return convert_to_var_assign(option_name, "yes"sv);
+        return convert_to_var_assign(map, option_name, "yes"sv);
     }
-    return convert_to_var_assign(option_name, "no"sv);
+    return convert_to_var_assign(map, option_name, "no"sv);
 }
 
 auto get_source_array_from_pkgbuild(std::string_view kernel_name_path, std::string_view options_set) noexcept {
@@ -365,14 +438,19 @@ bool insert_new_source_array_into_pkgbuild(std::string_view kernel_name_path, QL
 bool set_custom_name_in_pkgbuild(std::string_view kernel_name_path, std::string_view custom_name) noexcept {
     const auto& pkgbuild_path = fmt::format(FMT_COMPILE("{}/PKGBUILD"), kernel_name_path);
     auto pkgbuildsrc          = utils::read_whole_file(pkgbuild_path);
-
-    const auto& custom_name_var = fmt::format(FMT_COMPILE("\n\npkgbase=\"{}\""), custom_name);
-    if (auto foundpos = pkgbuildsrc.find("_major="); foundpos != std::string::npos) {
-        if (auto last_newline_before = pkgbuildsrc.find_last_of('\n', foundpos); last_newline_before != std::string::npos) {
-            pkgbuildsrc.insert(last_newline_before, custom_name_var);
-        }
+    if (pkgbuildsrc.empty()) {
+        fmt::print(stderr, "set_custom_name: cannot read '{}'\n", pkgbuild_path);
+        return false;
     }
-    return utils::write_to_file(pkgbuild_path, pkgbuildsrc);
+
+    // Generic pkgbase=/pkgver= detection: a foreign PKGBUILD lacking the
+    // expected structure fails cleanly and the file is left untouched.
+    const auto result = utils::apply_pkgbuild_custom_name(std::move(pkgbuildsrc), custom_name);
+    if (!result.ok) {
+        fmt::print(stderr, "set_custom_name: {}\n", result.error);
+        return false;
+    }
+    return utils::write_to_file(pkgbuild_path, result.new_content);
 }
 
 auto convert_vector_of_strings_to_stringlist(const std::vector<std::string>& vec) noexcept {
@@ -465,29 +543,37 @@ std::string ConfWindow::get_all_set_values() const noexcept {
     std::string result{};
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
 
+    // The option set is per-repo: resolved from the selected build source
+    // (single utils accessor, synced from the UI before builds). Options the
+    // active repo does not offer are skipped entirely.
+    const auto map = resolve_option_map(normalize_repo_key(utils::build_source_repo()));
+
     // checkboxes values,
     // which becomes enabled with any value passed,
     // and if nothing passed means it's disabled.
     for (const auto& binding : checkbox_bindings) {
-        result += convert_to_var_assign_empty_wrapped(binding.build_var, checkstate_checked(options_page_ui_obj->*binding.widget));
+        result += convert_to_var_assign_empty_wrapped(map, binding.build_var, checkstate_checked(options_page_ui_obj->*binding.widget));
     }
 
     // combobox values
-    result += convert_to_var_assign("HZ_ticks", get_hz_tick(static_cast<size_t>(options_page_ui_obj->hzticks_combo_box->currentIndex())));
-    result += convert_to_var_assign("tickrate", get_tickless_mode(static_cast<size_t>(options_page_ui_obj->tickless_combo_box->currentIndex())));
-    result += convert_to_var_assign("preempt", get_preempt_mode(static_cast<size_t>(options_page_ui_obj->preempt_combo_box->currentIndex())));
-    result += convert_to_var_assign("hugepage", get_hugepage_mode(static_cast<size_t>(options_page_ui_obj->hugepage_combo_box->currentIndex())));
-    result += convert_to_var_assign("lto", get_lto_mode(static_cast<size_t>(options_page_ui_obj->lto_combo_box->currentIndex())));
+    result += convert_to_var_assign(map, "HZ_ticks", get_hz_tick(static_cast<size_t>(options_page_ui_obj->hzticks_combo_box->currentIndex())));
+    result += convert_to_var_assign(map, "tickrate", get_tickless_mode(static_cast<size_t>(options_page_ui_obj->tickless_combo_box->currentIndex())));
+    result += convert_to_var_assign(map, "preempt", get_preempt_mode(static_cast<size_t>(options_page_ui_obj->preempt_combo_box->currentIndex())));
+    result += convert_to_var_assign(map, "hugepage", get_hugepage_mode(static_cast<size_t>(options_page_ui_obj->hugepage_combo_box->currentIndex())));
+    result += convert_to_var_assign(map, "lto", get_lto_mode(static_cast<size_t>(options_page_ui_obj->lto_combo_box->currentIndex())));
 
     const std::string_view cpu_opt_mode = get_cpu_opt_mode(static_cast<size_t>(options_page_ui_obj->processor_opt_combo_box->currentIndex()));
     if (cpu_opt_mode != "manual") {
-        result += convert_to_var_assign("cpu_opt", cpu_opt_mode);
+        result += convert_to_var_assign(map, "cpu_opt", cpu_opt_mode);
     }
 
     // NOTE: workaround PKGBUILD incorrectly working with custom pkgname
-    const std::string_view lto_mode = get_lto_mode(static_cast<size_t>(options_page_ui_obj->lto_combo_box->currentIndex()));
-    if (lto_mode != "none" && options_page_ui_obj->custom_name_edit->text() != "$pkgbase") {
-        result += "_use_lto_suffix=n\n";
+    // (only for repos whose map offers LTO)
+    if (option_build_var(map, "lto").has_value()) {
+        const std::string_view lto_mode = get_lto_mode(static_cast<size_t>(options_page_ui_obj->lto_combo_box->currentIndex()));
+        if (lto_mode != "none" && options_page_ui_obj->custom_name_edit->text() != "$pkgbase") {
+            result += "_use_lto_suffix=n\n";
+        }
     }
 
     return result;
@@ -517,7 +603,7 @@ void ConfWindow::refresh_flavors() noexcept {
         previous_key = m_flavors[static_cast<std::size_t>(cur)].key;
     }
 
-    m_flavors = discover_repo_flavors(utils::build_repo_path());
+    m_flavors = discover_repo_flavors(utils::build_repo_path(), repo_basename(utils::build_source_repo()));
     if (m_flavors.empty()) {
         return;
     }
@@ -541,6 +627,23 @@ void ConfWindow::refresh_flavors() noexcept {
         }
     }
     combo->setCurrentIndex(target_index);
+}
+
+// Sync the build source selected in the UI into the single utils accessor
+// used by prepare_build_environment().
+void ConfWindow::sync_build_source() noexcept {
+    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    utils::set_build_source_repo(options_page_ui_obj->build_source_edit->text().toStdString());
+}
+
+// Make the option rows reflect the option set of the repo selected in the
+// source field (unknown sources fall back to the generic reduced set).
+void ConfWindow::update_option_set() noexcept {
+    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto map = resolve_option_map(normalize_repo_key(options_page_ui_obj->build_source_edit->text().toStdString()));
+    for (const auto& [option_key, row] : option_row_bindings) {
+        (options_page_ui_obj->*row)->setVisible(option_build_var(map, option_key).has_value());
+    }
 }
 
 void ConfWindow::reset_patches_data_tab() noexcept {
@@ -579,8 +682,16 @@ ConfWindow::ConfWindow(QWidget* parent)
     // names are hard-coded here.
     refresh_flavors();
 
+    // Custom build source (AUR package name or git URL): initialized from
+    // the single utils accessor; the visible option rows follow it.
+    options_page_ui_obj->build_source_edit->setText(QString::fromStdString(utils::build_source_repo()));
+    connect(options_page_ui_obj->build_source_edit, &QLineEdit::textChanged, this, [this](const QString&) {
+        update_option_set();
+    });
+    update_option_set();
+
     // Setting default options
-    options_page_ui_obj->cachyconfig_check->setCheckState(Qt::Checked);
+    options_page_ui_obj->customconfig_check->setCheckState(Qt::Checked);
     options_page_ui_obj->hardly_check->setCheckState(Qt::Checked);
 
     QStringList hz_ticks;
@@ -645,7 +756,7 @@ ConfWindow::ConfWindow(QWidget* parent)
         const QSignalBlocker preempt_blocker(options_page_ui_obj->preempt_combo_box);
         const QSignalBlocker lto_blocker(options_page_ui_obj->lto_combo_box);
         const QSignalBlocker hz_blocker(options_page_ui_obj->hzticks_combo_box);
-        const QSignalBlocker cachyconfig_blocker(options_page_ui_obj->cachyconfig_check);
+        const QSignalBlocker customconfig_blocker(options_page_ui_obj->customconfig_check);
         const QSignalBlocker zfs_blocker(options_page_ui_obj->builtin_zfs_check);
 
         // thin-dist is not available for lts and hardened
@@ -677,7 +788,7 @@ ConfWindow::ConfWindow(QWidget* parent)
         options_page_ui_obj->hzticks_combo_box->setCurrentIndex(static_cast<int>((kernel_name == "server"sv) ? lookup_hz_tick("300") : lookup_hz_tick("1000")));
 
         // unchecked for server, checked for others
-        set_checkstate(options_page_ui_obj->cachyconfig_check, kernel_name != "server"sv);
+        set_checkstate(options_page_ui_obj->customconfig_check, kernel_name != "server"sv);
 
         // incompatible with realtime kernels
         const bool is_realtime = kernel_name.starts_with("rt"sv);
@@ -791,6 +902,7 @@ void ConfWindow::on_execute() noexcept {
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
     auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
 
+    sync_build_source();  // apply the user-selected build source first
     utils::prepare_build_environment();
     refresh_flavors();  // re-discover flavors from the refreshed source repo
 

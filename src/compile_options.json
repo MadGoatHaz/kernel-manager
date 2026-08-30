@@ -1,6 +1,6 @@
 {
-    "option_map": {
-        "cachy_config": "_cachy_config",
+    "linux_cachyos": {
+        "custom_config": "_cachy_config",
         "nconfig": "_makenconfig",
         "xconfig": "_makexconfig",
         "localmodcfg": "_localmodcfg",

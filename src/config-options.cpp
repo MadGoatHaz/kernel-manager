@@ -41,10 +41,10 @@
 #include <fmt/core.h>
 
 auto ConfigOptions::parse_from_file(std::string_view filepath) noexcept -> std::optional<ConfigOptions> {
-    ::cachyos_km::Config rust_config_options{};
+    ::km::Config rust_config_options{};
     try {
         const ::rust::Str filepath_rust(filepath.data(), filepath.size());
-        rust_config_options = cachyos_km::parse_config_file(filepath_rust);
+        rust_config_options = km::parse_config_file(filepath_rust);
     } catch (const std::exception& e) {
         fmt::print(stderr, "Failed to parse config file: {}\n", e.what());
         return std::nullopt;
@@ -55,7 +55,7 @@ auto ConfigOptions::parse_from_file(std::string_view filepath) noexcept -> std::
         .per_gov_check  = rust_config_options.per_gov_check,
         .tcp_bbr3_check = rust_config_options.tcp_bbr3_check,
 
-        .cachy_config_check        = rust_config_options.cachy_config_check,
+        .custom_config_check       = rust_config_options.custom_config_check,
         .nconfig_check             = rust_config_options.nconfig_check,
         .xconfig_check             = rust_config_options.xconfig_check,
         .localmodcfg_check         = rust_config_options.localmodcfg_check,
@@ -77,12 +77,12 @@ auto ConfigOptions::parse_from_file(std::string_view filepath) noexcept -> std::
 }
 
 auto ConfigOptions::write_config_file(const ConfigOptions& config_options, std::string_view filepath) noexcept -> bool {
-    const ::cachyos_km::Config rust_config_options{
+    const ::km::Config rust_config_options{
         .hardly_check   = config_options.hardly_check,
         .per_gov_check  = config_options.per_gov_check,
         .tcp_bbr3_check = config_options.tcp_bbr3_check,
 
-        .cachy_config_check        = config_options.cachy_config_check,
+        .custom_config_check       = config_options.custom_config_check,
         .nconfig_check             = config_options.nconfig_check,
         .xconfig_check             = config_options.xconfig_check,
         .localmodcfg_check         = config_options.localmodcfg_check,
@@ -103,7 +103,7 @@ auto ConfigOptions::write_config_file(const ConfigOptions& config_options, std::
 
     try {
         const ::rust::Str filepath_rust(filepath.data(), filepath.size());
-        cachyos_km::write_config_file(rust_config_options, filepath_rust);
+        km::write_config_file(rust_config_options, filepath_rust);
     } catch (const std::exception& e) {
         fmt::print(stderr, "Failed to write config file: {}\n", e.what());
         return false;
