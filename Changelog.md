@@ -1,6 +1,6 @@
 # Changelog
 
-### v1.22.0 (2026-08-31) — release candidate
+### v1.22.0 (2026-08-31)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/4c66803...738e24c)
 
@@ -8,7 +8,7 @@
 - 🖼️ The dedicated application icon now shows correctly on both the window titlebar and the system taskbar — the Wayland "W" placeholder is gone (bundled multi-size icon; the per-window theme-icon override that nulled it out is removed)
 - ⚡ The main-window kernel list is complete: kernels that live in not-enabled repos now appear as curated info-rows (clearly marked non-selectable, with the reason — repo not enabled vs. package not in the repo), and the `Install` column is renamed **Installed** and now truthfully reports whether the kernel is installed on this system (pacman local DB); install availability is reported by the row's context menu instead
 
-> Note: release candidate only — 476/476 unit assertions green across all 8 harnesses, clean build with 1 pre-existing baseline warning, 0 defects. An optional `lupdate` resync of the 16 locale catalogs for the new UI strings (e.g. the `Installed` header) is deferred. The AUR `PKGBUILD` source pin is still the pre-decoupling `19f1e06` and must be repointed to a current commit/tag (with a pkgver bump) before AUR submission; no version has been cut for this entry yet.
+> Note: released — 476/476 unit assertions green across all 8 harnesses, clean build with 1 pre-existing baseline warning, 0 defects. An optional `lupdate` resync of the 16 locale catalogs for the new UI strings (e.g. the `Installed` header) is deferred. The v1.22.0 tag is cut at aad790e and the PKGBUILD pinned to it (pkgver 1.22.0).
 
 ### v1.21.0 (2026-08-31) — release candidate
 

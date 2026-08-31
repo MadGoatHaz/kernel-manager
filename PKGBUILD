@@ -8,16 +8,16 @@
 #
 # --------------------------------------------------------------------------
 # VERSIONING
-#   pkgver mirrors the project's own version (CMakeLists `project(... VERSION
-#   1.19.0)`) and the fork's latest tag NUMBER (v1.19.0).
+#   pkgver mirrors the version of the pinned source tree: the v1.22.0 tag
+#   (the fork's first tag after the distro-agnostic rename to
+#   `kernel-manager`). The pre-rebrand tags (incl. v1.19.0) package the
+#   WRONG (CachyOS-branded) content and are not used.
 #
-#   IMPORTANT: the v1.19.0 TAG is the pre-rebrand upstream code (it is an
-#   ancestor of main, 11 commits behind, and predates the distro-agnostic
-#   rename to `kernel-manager`). A v1.19.0 archive would therefore package the
-#   WRONG (CachyOS-branded) content. The stable source below is instead pinned
-#   to the rebranded commit 19f1e06 (= main HEAD at the chunk-5 merge, the
-#   verified rebranded tree). When a proper release tag (e.g. v1.20.0) is cut
-#   on the fork, bump pkgver and point `source` at that tag's archive.
+#   The stable source below is pinned to the v1.22.0 tag's commit aad790e
+#   (= main HEAD at the v1.22.0 cut — the QA-passed tree), so the package
+#   source is exactly the tag contents. When the next release tag (e.g.
+#   v1.23.0) is cut on the fork, bump pkgver and re-pin `_commit` to that
+#   tag's commit (+ refresh `sha256sums`).
 #
 # --------------------------------------------------------------------------
 # DEPENDENCIES  (verified against `ldd` on the built binary + the CMake build)
@@ -65,7 +65,7 @@
 #   conflict + provide make it drop-in replace the CachyOS package cleanly.
 
 pkgname=kernel-manager
-pkgver=1.19.0
+pkgver=1.22.0
 pkgrel=1
 pkgdesc="Qt6 GUI for kernel configuration, compilation, and sched-ext (BPF) scheduler management"
 arch=(x86_64)
@@ -82,11 +82,11 @@ makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polki
 # Defensive polkit reload so the shipped policy is picked up on (re)install.
 install=kernel-manager.install
 
-# Pinned rebranded commit (main HEAD at the chunk-5 merge). See the VERSIONING
-# note above for why this is a commit, not the v1.19.0 tag.
-_commit=19f1e0611452b0d497410a879270f98692d4733a
+# Pinned v1.22.0 tag commit (main HEAD at the v1.22.0 cut). See the
+# VERSIONING note above.
+_commit=aad790ebb1b8d0b4a7e46c51a0e2a6eb21bbe4f4
 source=("https://github.com/MadGoatHaz/kernel-manager/archive/${_commit}.tar.gz")
-sha256sums=("a9b3d29ee09b3275e62049fe72d78729bb0242ba9873145bb455cbb087be9dbe")
+sha256sums=("ffe275c1d38827d9c38dba87bdacb6287816ef6873fc67972f7c797dbe391d88")
 
 # GitHub archive top dir for a commit is `<repo>-<full-sha>`.
 _srcdir="kernel-manager-${_commit}"
