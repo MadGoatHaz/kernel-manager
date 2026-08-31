@@ -279,18 +279,10 @@ auto normalize_repo_key(std::string_view source) noexcept -> std::string {
     return key;
 }
 
-// Per-repo option map selection: a known source identifier resolves to its
-// dedicated map (frozen, generated from src/compile_options.json); any other
-// source falls back to the generic reduced set (no dedicated options).
-using option_map_type = decltype(detail::linux_cachyos);
-using option_map_ref  = std::optional<const option_map_type*>;
-
-auto resolve_option_map(std::string_view repo_key) noexcept -> option_map_ref {
-    if (repo_key == "linux_cachyos") {
-        return &detail::linux_cachyos;
-    }
-    return std::nullopt;
-}
+// Per-repo option map selection: the resolver and the maps themselves are
+// generated from src/compile_options.json (detail::resolve_option_map); a
+// source without a dedicated map yields nullopt (no dedicated options).
+using option_map_ref = std::optional<detail::option_maps_variant>;
 
 // Look up the build variable an option maps to in the given per-repo map
 // (nullopt when the repo does not offer the option).
@@ -298,26 +290,69 @@ auto option_build_var(option_map_ref map, std::string_view option) noexcept -> s
     if (!map) {
         return std::nullopt;
     }
-    if (const auto it = (*map)->find(frozen::string{option}); it != (*map)->end()) {
-        return std::string_view{it->second};
-    }
-    return std::nullopt;
+    return std::visit(
+        [&](const auto* m) noexcept -> std::optional<std::string_view> {
+            if (const auto it = m->find(frozen::string{option}); it != m->end()) {
+                return std::string_view{it->second};
+            }
+            return std::nullopt;
+        },
+        *map);
 }
 
-inline auto convert_to_var_assign(option_map_ref map, std::string_view option, std::string_view value) noexcept -> std::string {
-    if (const auto var = option_build_var(map, option)) {
-        return fmt::format(FMT_COMPILE("{}={}\n"), *var, value);
+// True when the repo carries a values table for the option, i.e. at least
+// one "<repo>|<option>|*" entry in the generated translation map. For such
+// options the table is the closed set of buildable UI values.
+auto has_value_xform_table(std::string_view repo, std::string_view option) noexcept -> bool {
+    const std::string prefix{std::string{repo} + "|" + std::string{option} + "|"};
+    for (const auto& entry : detail::value_xforms) {
+        if (std::string_view{entry.first.data(), entry.first.size()}.starts_with(prefix)) {
+            return true;
+        }
     }
-    return std::string{};  // the active repo does not offer this option
+    return false;
+}
+
+// Translate a UI option value to the value the active repo's build machinery
+// expects (generated detail::value_xforms, "<repo>|<option>|<ui_value>" ->
+// dst): nullopt (the caller emits nothing, the cpu_opt "manual" contract)
+// when the value has no build value — an empty translation, or a value
+// absent from the option's closed values table; otherwise the translation,
+// or the value itself when the option carries no table (plain pass-through).
+auto xformed_value(std::string_view repo, std::string_view option, std::string_view value) noexcept -> std::optional<std::string> {
+    const std::string key{std::string{repo} + "|" + std::string{option} + "|" + std::string{value}};
+    if (const auto it = detail::value_xforms.find(frozen::string{key}); it != detail::value_xforms.end()) {
+        if (it->second.empty()) {
+            fmt::print(stderr, "option {}={} has no build value for repo {}; not emitted\n", option, value, repo);
+            return std::nullopt;
+        }
+        return std::string{it->second};
+    }
+    if (has_value_xform_table(repo, option)) {
+        fmt::print(stderr, "option {}={} is not buildable for repo {}; not emitted\n", option, value, repo);
+        return std::nullopt;
+    }
+    return std::string{value};
+}
+
+inline auto convert_to_var_assign(option_map_ref map, std::string_view repo, std::string_view option, std::string_view value) noexcept -> std::string {
+    const auto var = option_build_var(map, option);
+    if (!var) {
+        return std::string{};  // the active repo does not offer this option
+    }
+    if (const auto xformed = xformed_value(repo, option, value)) {
+        return fmt::format(FMT_COMPILE("{}={}\n"), *var, *xformed);
+    }
+    return std::string{};  // the value has no build value for this repo (not emitted, like "manual")
 }
 
 /// return flag to enable if the option is enabled, otherwise do nothing
-inline auto convert_to_var_assign_empty_wrapped(option_map_ref map, std::string_view option_name, bool option_enabled) noexcept -> std::string {
+inline auto convert_to_var_assign_empty_wrapped(option_map_ref map, std::string_view repo, std::string_view option_name, bool option_enabled) noexcept -> std::string {
     using namespace std::string_view_literals;
     if (option_enabled) {
-        return convert_to_var_assign(map, option_name, "yes"sv);
+        return convert_to_var_assign(map, repo, option_name, "yes"sv);
     }
-    return convert_to_var_assign(map, option_name, "no"sv);
+    return convert_to_var_assign(map, repo, option_name, "no"sv);
 }
 
 // Creates a transient executable testscript, runs it, and removes the file
@@ -571,27 +606,30 @@ std::string ConfWindow::get_all_set_values() const noexcept {
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
 
     // The option set is per-repo: resolved from the selected build source
-    // (single utils accessor, synced from the UI before builds). Options the
-    // active repo does not offer are skipped entirely.
-    const auto map = resolve_option_map(normalize_repo_key(utils::build_source_repo()));
+    // (single utils accessor, synced from the UI before builds) by the
+    // generated resolver. Options the active repo does not offer are skipped
+    // entirely; emitted values pass through the generated value translation
+    // (xformed_value), which may also withhold an unbuildable value.
+    const std::string repo_key = normalize_repo_key(utils::build_source_repo());
+    const auto map = detail::resolve_option_map(repo_key);
 
     // checkboxes values,
     // which becomes enabled with any value passed,
     // and if nothing passed means it's disabled.
     for (const auto& binding : checkbox_bindings) {
-        result += convert_to_var_assign_empty_wrapped(map, binding.build_var, checkstate_checked(options_page_ui_obj->*binding.widget));
+        result += convert_to_var_assign_empty_wrapped(map, repo_key, binding.build_var, checkstate_checked(options_page_ui_obj->*binding.widget));
     }
 
     // combobox values
-    result += convert_to_var_assign(map, "HZ_ticks", get_hz_tick(static_cast<size_t>(options_page_ui_obj->hzticks_combo_box->currentIndex())));
-    result += convert_to_var_assign(map, "tickrate", get_tickless_mode(static_cast<size_t>(options_page_ui_obj->tickless_combo_box->currentIndex())));
-    result += convert_to_var_assign(map, "preempt", get_preempt_mode(static_cast<size_t>(options_page_ui_obj->preempt_combo_box->currentIndex())));
-    result += convert_to_var_assign(map, "hugepage", get_hugepage_mode(static_cast<size_t>(options_page_ui_obj->hugepage_combo_box->currentIndex())));
-    result += convert_to_var_assign(map, "lto", get_lto_mode(static_cast<size_t>(options_page_ui_obj->lto_combo_box->currentIndex())));
+    result += convert_to_var_assign(map, repo_key, "HZ_ticks", get_hz_tick(static_cast<size_t>(options_page_ui_obj->hzticks_combo_box->currentIndex())));
+    result += convert_to_var_assign(map, repo_key, "tickrate", get_tickless_mode(static_cast<size_t>(options_page_ui_obj->tickless_combo_box->currentIndex())));
+    result += convert_to_var_assign(map, repo_key, "preempt", get_preempt_mode(static_cast<size_t>(options_page_ui_obj->preempt_combo_box->currentIndex())));
+    result += convert_to_var_assign(map, repo_key, "hugepage", get_hugepage_mode(static_cast<size_t>(options_page_ui_obj->hugepage_combo_box->currentIndex())));
+    result += convert_to_var_assign(map, repo_key, "lto", get_lto_mode(static_cast<size_t>(options_page_ui_obj->lto_combo_box->currentIndex())));
 
     const std::string_view cpu_opt_mode = get_cpu_opt_mode(static_cast<size_t>(options_page_ui_obj->processor_opt_combo_box->currentIndex()));
     if (cpu_opt_mode != "manual") {
-        result += convert_to_var_assign(map, "cpu_opt", cpu_opt_mode);
+        result += convert_to_var_assign(map, repo_key, "cpu_opt", cpu_opt_mode);
     }
 
     // NOTE: workaround PKGBUILD incorrectly working with custom pkgname
@@ -668,7 +706,7 @@ void ConfWindow::sync_build_source() noexcept {
 // source field (unknown sources fall back to the generic reduced set).
 void ConfWindow::update_option_set() noexcept {
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    const auto map = resolve_option_map(normalize_repo_key(effective_build_source()));
+    const auto map = detail::resolve_option_map(normalize_repo_key(effective_build_source()));
     for (const auto& [option_key, row] : option_row_bindings) {
         (options_page_ui_obj->*row)->setVisible(option_build_var(map, option_key).has_value());
     }
