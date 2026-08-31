@@ -105,7 +105,16 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         widget_item->setToolTip(TreeCol::PkgName, QString::fromStdString(km::description_for(kernel.get_raw(), kernel.category())));
         widget_item->setText(TreeCol::Version, QString::fromStdString(kernel.version()));
         widget_item->setText(TreeCol::Category, QString::fromStdString(std::string{kernel.category()}));
-        widget_item->setText(TreeCol::Displayed, QStringLiteral("true"));
+        // K10: pre-compiled install availability indicator: "✓" when the
+        // curated table documents a pre-compiled install path for this
+        // kernel (name = PkgName with the "repo/" prefix stripped), "—"
+        // otherwise (build-only kernels like linux-tkg, unknown packages).
+        // Row flags: display-only text cells (no ItemIsEditable — the
+        // indicator, and the other text columns, are read-only) while the
+        // Choose checkbox (ItemIsUserCheckable) keeps working.
+        const std::string_view kernel_name = km::kernel_name_from_raw(kernel.get_raw());
+        widget_item->setText(TreeCol::Install, km::is_installable(kernel_name) ? QStringLiteral("✓") : QStringLiteral("—"));
+        widget_item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
         if (kernel.is_installed()) {
             const std::string_view kernel_installed_db = kernel.get_installed_db();
             if (!kernel_installed_db.empty() && kernel_installed_db != kernel.get_repo()) {
@@ -258,7 +267,8 @@ MainWindow::MainWindow(QWidget* parent)
 
     // Setup tree widget
     auto* tree_kernels = m_ui->treeKernels;
-    tree_kernels->hideColumn(TreeCol::Displayed);  // Displayed status true/false
+    // The Install indicator column (K10) stays visible; only the internal
+    // Immutable status column is hidden.
     tree_kernels->hideColumn(TreeCol::Immutable);  // Immutable status true/false
     tree_kernels->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
 

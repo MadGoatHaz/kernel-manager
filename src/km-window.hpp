@@ -92,7 +92,7 @@ enum { Check,
     PkgName,
     Version,
     Category,
-    Displayed,
+    Install,   // K10: pre-compiled install availability indicator ("✓" / "—"), read-only
     Immutable };
 }
 
