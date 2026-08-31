@@ -49,6 +49,9 @@ def needs_run():
         return True
     return False
 
+def map_type(values_count):
+    return 'frozen::unordered_map<frozen::string, std::string_view, {}>'.format(values_count)
+
 def main():
     if needs_run():
         header_file = HEADER_ROOT + '/compile_options.hpp'
@@ -80,21 +83,66 @@ def main():
 #endif
 
 #include <string_view>
+#include <optional>
+#include <variant>
 
 namespace detail {
 
 """)
 
+        # Per-repo option maps. A string value maps option -> PKGBUILD var
+        # directly (as before); an object value {"var", "values"} maps
+        # option -> obj["var"] and feeds each obj["values"] pair into the
+        # global flat value_xforms translation map keyed
+        # "<repo>|<option>|<ui_value>".
+        value_xforms = []
+        distinct_map_sizes = []
         for map_name in compile_options.keys():
-            values_count = len(compile_options[map_name])
-            header.write('constexpr frozen::unordered_map<frozen::string, std::string_view, {}> {} '.format(values_count, map_name))
-            header.write('{\n')
             map_obj = compile_options[map_name]
+            values_count = len(map_obj)
+            if values_count not in distinct_map_sizes:
+                distinct_map_sizes.append(values_count)
+            header.write('constexpr {} {} '.format(map_type(values_count), map_name))
+            header.write('{\n')
             for key in map_obj:
-                header.write('    {')
-                header.write('"{}", "{}"'.format(key, map_obj[key]))
-                header.write('},\n')
+                value = map_obj[key]
+                if isinstance(value, dict):
+                    header.write('    {{"{0}", "{1}"}},\n'.format(key, value['var']))
+                    for src, dst in value.get('values', {}).items():
+                        value_xforms.append((map_name + '|' + key + '|' + src, dst))
+                else:
+                    header.write('    {{"{0}", "{1}"}},\n'.format(key, value))
             header.write('\n};\n')
+
+        # Global flat UI-value translation table: "<repo>|<option>|<ui_value>"
+        # -> PKGBUILD value. An absent key means no translation (pass-through).
+        header.write('// "<repo>|<option>|<ui_value>" -> PKGBUILD value (absent key = pass-through)\n')
+        header.write('constexpr {} value_xforms {{\n'.format(map_type(len(value_xforms))))
+        for key, dst in value_xforms:
+            header.write('    {{"{0}", "{1}"}},\n'.format(key, dst))
+        header.write('\n};\n')
+
+        # One variant alternative per distinct per-repo map type: frozen maps
+        # of differing sizes are distinct types, so repos sharing a size share
+        # the alternative (std::variant alternatives must be distinct types);
+        # the if-chain below still points at the specific per-repo map.
+        header.write('\n')
+        if distinct_map_sizes:
+            alternatives = ', '.join('const {} *'.format(map_type(size)) for size in distinct_map_sizes)
+            header.write('using option_maps_variant = std::variant<{}>;\n\n'.format(alternatives))
+            header.write('inline std::optional<option_maps_variant> resolve_option_map(std::string_view repo)\n{\n')
+            for map_name in compile_options.keys():
+                index = distinct_map_sizes.index(len(compile_options[map_name]))
+                header.write('    if (repo == "{0}") return std::optional<option_maps_variant>{{std::in_place_t{{}}, std::in_place_index<{1}>, &{0}}};\n'.format(map_name, index))
+            header.write('    return std::nullopt;\n')
+            header.write('}\n')
+        else:
+            # No per-repo maps in the JSON: nothing to resolve.
+            header.write('using option_maps_variant = std::monostate;\n\n')
+            header.write('inline std::optional<option_maps_variant> resolve_option_map(std::string_view repo)\n{\n')
+            header.write('    (void) repo;\n')
+            header.write('    return std::nullopt;\n')
+            header.write('}\n')
 
         header.write("\n} // namespace detail\n")
         header.close()
