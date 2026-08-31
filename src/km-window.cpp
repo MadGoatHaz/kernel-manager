@@ -93,7 +93,41 @@ bool is_kernels_change_state(alpm_handle_t* handle, std::span<std::string> kerne
     return false;
 }
 
-void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kernels) noexcept {
+// E14: whether the named repo section is registered among the handle's sync
+// DBs (scans alpm_get_syncdbs by name, same list-walk as
+// alpm_utils.cpp:is_package_in_sync_db). A section absent from
+// /etc/pacman.conf is simply not found (=> false).
+bool is_repo_in_syncdbs(alpm_handle_t* handle, std::string_view repo) {
+    if (handle == nullptr) {
+        return false;
+    }
+    for (alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
+        auto* db = reinterpret_cast<alpm_db_t*>(i->data);
+        const char* db_name = alpm_db_get_name(db);
+        if (db_name == nullptr) {
+            continue;
+        }
+        if (repo == db_name) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// E14: live availability of a kernel's pre-compiled package: the table flags
+// AND the package actually present where it's documented (a pacman repo in an
+// enabled sync DB, or the AUR; the AUR probe degrades to false without the
+// AUR tooling).
+bool is_precompiled_available_live(const std::string& name) {
+    if (auto e = km::find_kernel(name)) {
+        const KnownKernel* k = *e;
+        return k->precompiled_available && !k->install_package.empty()
+            && utils::is_package_available(k->install_package, k->install_repo);
+    }
+    return false;
+}
+
+void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kernels, alpm_handle_t* handle) noexcept {
     for (auto& kernel : kernels) {
         auto* widget_item = new KernelTreeWidgetItem(tree_kernels);
         widget_item->setCheckState(TreeCol::Check, Qt::Unchecked);
@@ -102,19 +136,34 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         // for. description_for() accepts the repo-prefixed raw name and
         // always returns a non-empty string (curated entry or a synthesized
         // fallback line), so every row gets a tooltip.
-        widget_item->setToolTip(TreeCol::PkgName, QString::fromStdString(km::description_for(kernel.get_raw(), kernel.category())));
+        const QString base_tooltip{QString::fromStdString(km::description_for(kernel.get_raw(), kernel.category()))};
+        // E14: info-rows (curated kernels absent from every enabled repo,
+        // m_pkg == nullptr) gain a suffix explaining WHY they're not
+        // installable right now: the repo is registered but the package is
+        // not in its DB (=> `pacman -Sy`) vs. the repo is not enabled at all
+        // (=> add the section to /etc/pacman.conf). Live rows keep the
+        // plain base tooltip.
+        widget_item->setToolTip(TreeCol::PkgName, kernel.has_pkg()
+                ? base_tooltip
+                : base_tooltip + (is_repo_in_syncdbs(handle, kernel.get_repo())
+                        ? QStringLiteral(" — not in the '%1' DB (pacman -Sy)").arg(QString::fromStdString(std::string{kernel.get_repo()}))
+                        : QStringLiteral(" — repo '%1' not enabled (add it to /etc/pacman.conf)").arg(QString::fromStdString(std::string{kernel.get_repo()}))));
         widget_item->setText(TreeCol::Version, QString::fromStdString(kernel.version()));
         widget_item->setText(TreeCol::Category, QString::fromStdString(std::string{kernel.category()}));
-        // K10: pre-compiled install availability indicator: "✓" when the
-        // curated table documents a pre-compiled install path for this
-        // kernel (name = PkgName with the "repo/" prefix stripped), "—"
-        // otherwise (build-only kernels like linux-tkg, unknown packages).
+        // E14: installed-on-system indicator (D4): "✓" when the package is
+        // in the alpm local DB (kernel.is_installed(), name-based lookup —
+        // valid for live and info rows alike), "—" otherwise. Availability
+        // (whether it CAN be installed right now) is the context menu's
+        // concern, not this column's.
         // Row flags: display-only text cells (no ItemIsEditable — the
-        // indicator, and the other text columns, are read-only) while the
-        // Choose checkbox (ItemIsUserCheckable) keeps working.
-        const std::string_view kernel_name = km::kernel_name_from_raw(kernel.get_raw());
-        widget_item->setText(TreeCol::Install, km::is_installable(kernel_name) ? QStringLiteral("✓") : QStringLiteral("—"));
-        widget_item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+        // indicator, and the other text columns, are read-only); the Choose
+        // checkbox (ItemIsUserCheckable) stays live for installable rows but
+        // is dropped for info-rows (m_pkg == nullptr) whose Choose cell must
+        // be disabled — they cannot be selected for install/remove.
+        widget_item->setText(TreeCol::Install, kernel.is_installed() ? QStringLiteral("✓") : QStringLiteral("—"));
+        widget_item->setFlags(kernel.has_pkg()
+                ? Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable
+                : Qt::ItemIsEnabled | Qt::ItemIsSelectable);
         if (kernel.is_installed()) {
             const std::string_view kernel_installed_db = kernel.get_installed_db();
             if (!kernel_installed_db.empty() && kernel_installed_db != kernel.get_repo()) {
@@ -283,7 +332,7 @@ MainWindow::MainWindow(QWidget* parent)
     // TODO(vnepogodin): parallelize it
     auto a2 = std::async(std::launch::deferred, [&] {
         const std::lock_guard<std::mutex> guard(m_mutex);
-        init_kernels_tree_widget(tree_kernels, std::span{m_kernels});
+        init_kernels_tree_widget(tree_kernels, std::span{m_kernels}, m_handle);
     });
 
     if (m_kernels.empty()) {
@@ -456,7 +505,11 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
     QMenu menu(this);
 
     auto* install_action = menu.addAction(tr("Install pre-compiled %1").arg(display));
-    install_action->setEnabled(km::is_installable(name));
+    // E14: the action is only offered when the kernel has a documented
+    // pre-compiled path AND the package is actually available where it's
+    // documented (an enabled sync DB / the AUR) — never promising a pacman
+    // run that would fail at the missing/disabled repo.
+    install_action->setEnabled(km::is_installable(name) && is_precompiled_available_live(name));
 
     auto* build_action = menu.addAction(tr("Build custom %1").arg(display));
 
@@ -529,7 +582,7 @@ void MainWindow::init_kernels() noexcept {
     tree_kernels->clear();
 
     // NOTE: I don't think this should be parallelized, because it's already not running on the main thread
-    init_kernels_tree_widget(tree_kernels, std::span{m_kernels});
+    init_kernels_tree_widget(tree_kernels, std::span{m_kernels}, m_handle);
 
     tree_kernels->blockSignals(false);
     m_conf_progress_dialog->hide();
