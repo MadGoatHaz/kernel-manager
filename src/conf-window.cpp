@@ -804,6 +804,7 @@ void ConfWindow::reset_patches_data_tab() noexcept {
 ConfWindow::ConfWindow(QWidget* parent)
   : QMainWindow(parent) {
     m_ui->setupUi(this);
+    setWindowIcon(QApplication::windowIcon());  // explicit dedicated icon; the .ui no longer overrides; robust to Qt app-fallback semantics
 
     setAttribute(Qt::WA_NativeWindow);
     setWindowFlags(Qt::Window);  // for the close, min and max buttons
