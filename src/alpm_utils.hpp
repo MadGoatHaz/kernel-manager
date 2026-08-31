@@ -75,6 +75,30 @@ using ExecFn = std::function<std::string(std::string_view)>;
 // releases its own handle, so repeated calls are safe.
 [[nodiscard]] bool is_package_available(std::string_view pkg, std::string_view repo) noexcept;
 
+// Whether a pacman sync repo is enabled: true iff the config file (the
+// system /etc/pacman.conf by default) has an active (uncommented) [repo]
+// section — the same mINI comment-skip semantics as parse_alpm's sync-DB
+// registration (commented-out sections never register). Read-only, safe to
+// call repeatedly.
+[[nodiscard]] bool is_repo_enabled(std::string_view repo, std::string_view conf_path = "/etc/pacman.conf") noexcept;
+
+// Command runner with the utils::runCmdTerminal contract (the pkexec
+// terminal path; 0 on success, non-zero on failure). Injected so the
+// launch is unit-testable without a real terminal (k8 CommandRunner
+// precedent); a null runner selects the real one, resolved in the .cpp so
+// this header stays Qt-free.
+using RepoCmdRunner = std::function<int(std::string_view cmd, bool escalate)>;
+
+// Enable a curated pacman repo for pre-compiled kernel installs: builds
+// the single command "$KM_HELPER_DIR/repo_add.sh '<repo>'" and runs it
+// through `runner` (default: utils::runCmdTerminal(cmd, true) — the
+// unified polkit privilege layer). Guards (return -1, the runner is NEVER
+// called): an empty repo, "aur" (the AUR is not a pacman repo), a
+// character-set violation (any char outside [a-z0-9-]), or a repo absent
+// from the curated table's install_repo set. Returns the runner's exit
+// code on a valid launch.
+[[nodiscard]] int add_repo_to_pacman_conf(std::string_view repo, RepoCmdRunner runner = RepoCmdRunner{}) noexcept;
+
 }  // namespace utils
 
 #endif  // ALPM_UTILS_HPP
