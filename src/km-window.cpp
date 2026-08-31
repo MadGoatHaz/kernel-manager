@@ -38,6 +38,8 @@
 #include <QCoreApplication>
 #include <QDialog>
 #include <QFutureWatcher>
+#include <QIcon>
+#include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
@@ -189,6 +191,37 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         widget_item->setFlags(kernel.has_pkg()
                 ? Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable
                 : Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+        // D3 (plan v1.23.0): an info-row (m_pkg == nullptr) Choose cell gets a
+        // non-interactive lock QLabel instead of the confusing disabled
+        // checkbox. Glyph resolution: theme icon "dialog-lock-symbolic", then
+        // "locked", then a centered "🔒" text fallback (a non-null icon is
+        // rendered at 16x16). The tooltip names the state + the remediation and
+        // reuses C1's shared repo_enabled (one sync-DB result per row): repo
+        // enabled but the package missing from its DB (=> `pacman -Sy`) vs.
+        // repo not enabled at all (=> right-click to add it — C5 wires that
+        // action). Live rows keep the native checkbox (no setItemWidget); the
+        // flags above already drop ItemIsUserCheckable on info-rows, so no
+        // checkbox renders behind the label. build_change_list /
+        // item_changed / check_uncheck_item are untouched: an info-row cannot
+        // be toggled, so no new signal paths.
+        if (!kernel.has_pkg()) {
+            auto* lock = new QLabel(tree_kernels);
+            QIcon icon = QIcon::fromTheme(QStringLiteral("dialog-lock-symbolic"));
+            if (icon.isNull()) {
+                icon = QIcon::fromTheme(QStringLiteral("locked"));
+            }
+            if (icon.isNull()) {
+                lock->setText(QStringLiteral("🔒"));
+                lock->setAlignment(Qt::AlignCenter);
+            } else {
+                lock->setPixmap(icon.pixmap(16, 16));
+            }
+            lock->setToolTip((repo_enabled
+                    ? QStringLiteral("Not in the '%1' DB — run `pacman -Sy`")
+                    : QStringLiteral("Repo '%1' not enabled — right-click the row to add it"))
+                    .arg(QString::fromStdString(std::string{kernel.get_repo()})));
+            tree_kernels->setItemWidget(widget_item, TreeCol::Check, lock);
+        }
         if (kernel.is_installed()) {
             const std::string_view kernel_installed_db = kernel.get_installed_db();
             if (!kernel_installed_db.empty() && kernel_installed_db != kernel.get_repo()) {
