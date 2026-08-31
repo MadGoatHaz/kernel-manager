@@ -20,8 +20,8 @@
 // included so the window can be driven directly; no CTest infra in this
 // project — run via tests/run_chunk2_ui.sh). Verifies:
 //   - the combo holds the known sources + the trailing "Custom URL…" entry
-//   - applying "core/linux" auto-populates the user-specified
-//     "linux-cachyos" source and keeps the custom edit hidden
+//   - applying "core/linux" auto-populates the "linux" source
+//     (identity mapping) and keeps the custom edit hidden
 //   - re-applying the same kernel is a no-op (manual choice preserved)
 //   - switching to "aur/linux-zen" maps to "linux-zen"
 //   - an unknown kernel falls back to "Custom URL…" prefilled with its name
@@ -71,12 +71,12 @@ int main(int argc, char** argv) {
     // NOTE: the window itself is never shown in this offscreen driver, so
     // chain-dependent QWidget::isVisible() is not used; the edit's own
     // hidden state (WA_WState_Hidden, set by setVisible) is asserted.
-    // 1. core/linux -> the user-specified linux-cachyos source.
+    // 1. core/linux -> the "linux" source (identity mapping).
     conf.apply_source_for_kernel("core/linux");
-    check(combo->currentText().toStdString() == "linux-cachyos", "core/linux auto-populates the combo with linux-cachyos");
+    check(combo->currentText().toStdString() == "linux", "core/linux auto-populates the combo with linux");
     check(custom_edit->isHidden(), "custom edit hidden for a known source");
     conf.sync_build_source();
-    check(utils::build_source_repo() == "linux-cachyos", "sync_build_source persists linux-cachyos");
+    check(utils::build_source_repo() == "linux", "sync_build_source persists linux");
 
     // 2. Re-applying the same kernel must not clobber a manual choice.
     combo->setCurrentIndex(combo->count() - 1);  // Custom URL…
