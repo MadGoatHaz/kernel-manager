@@ -20,6 +20,7 @@
 
 #include "km-window.hpp"
 #include "conf-window.hpp"
+#include "install_kernel.hpp"
 #include "kernel.hpp"
 #include "known_kernels.hpp"
 #include "utils.hpp"
@@ -35,10 +36,15 @@
 #include <fmt/core.h>
 
 #include <QCoreApplication>
+#include <QDialog>
 #include <QFutureWatcher>
+#include <QMenu>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QScreen>
 #include <QShortcut>
+#include <QTextEdit>
+#include <QVBoxLayout>
 #include <QTimer>
 #include <QTreeWidgetItem>
 #include <QtConcurrent/QtConcurrent>
@@ -109,6 +115,31 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
             widget_item->setCheckState(TreeCol::Check, Qt::Checked);
         }
     }
+}
+
+// Show the ordered boot-selection steps (boot_instructions_for output) in a
+// small read-only dialog: one numbered step per line, text is selectable
+// so the user can copy it.
+void show_boot_instructions(QWidget* parent, const std::vector<std::string>& instructions) {
+    QDialog dialog(parent);
+    dialog.setWindowTitle(QObject::tr("Boot instructions"));
+
+    auto* layout = new QVBoxLayout(&dialog);
+
+    auto* text = new QTextEdit(&dialog);
+    text->setReadOnly(true);
+    QStringList lines;
+    for (std::size_t i = 0; i < instructions.size(); ++i) {
+        lines << QStringLiteral("%1. %2").arg(static_cast<int>(i + 1)).arg(QString::fromStdString(instructions[i]));
+    }
+    text->setPlainText(lines.join(QLatin1Char('\n')));
+    layout->addWidget(text);
+
+    auto* close_button = new QPushButton(QObject::tr("Close"), &dialog);
+    layout->addWidget(close_button, 0, Qt::AlignRight);
+    QObject::connect(close_button, &QPushButton::clicked, &dialog, &QDialog::accept);
+
+    dialog.exec();
 }
 }  // namespace
 
@@ -231,8 +262,10 @@ MainWindow::MainWindow(QWidget* parent)
     tree_kernels->hideColumn(TreeCol::Immutable);  // Immutable status true/false
     tree_kernels->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
 
-    // Set context menu policy
+    // Set context menu policy and wire the per-kernel actions
+    // (install pre-compiled / build custom / show boot instructions).
     tree_kernels->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(tree_kernels, &QTreeWidget::customContextMenuRequested, this, &MainWindow::on_kernel_context_menu);
 
     tree_kernels->blockSignals(true);
 
@@ -380,6 +413,91 @@ void MainWindow::on_configure() noexcept {
         m_conf_window->refresh_flavors();
         m_conf_window->reset_patches_data_tab();
     }));
+}
+
+// Right-click on a kernel row: offer the per-kernel actions "Install
+// pre-compiled <name>" (enabled only when the curated table has a
+// pre-compiled path for it — build-only kernels like linux-tkg get it
+// disabled), "Build custom <name>" (the existing Configure flow), and
+// "Show boot instructions" (the post-install selection steps for the
+// detected bootloader, K5+K6+K8).
+void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
+    auto* tree_kernels = m_ui->treeKernels;
+
+    // The row under the cursor (customContextMenuRequested positions are
+    // viewport coordinates); fall back to the current row.
+    QTreeWidgetItem* item = tree_kernels->itemAt(pos);
+    if (item == nullptr) {
+        item = tree_kernels->currentItem();
+    }
+    if (item == nullptr) {
+        return;
+    }
+    tree_kernels->setCurrentItem(item);
+
+    // The tree PkgName is "repo/name"; the table and the install lookups
+    // key on the bare kernel name (prefix stripped by the shared helper —
+    // the same one the row tooltip uses).
+    const QString pkg_raw = item->text(TreeCol::PkgName);
+    const std::string name{km::kernel_name_from_raw(pkg_raw.toStdString())};
+    const QString display = QString::fromStdString(name);
+
+    QMenu menu(this);
+
+    auto* install_action = menu.addAction(tr("Install pre-compiled %1").arg(display));
+    install_action->setEnabled(km::is_installable(name));
+
+    auto* build_action = menu.addAction(tr("Build custom %1").arg(display));
+
+    auto* boot_action = menu.addAction(tr("Show boot instructions"));
+
+    const QAction* chosen = menu.exec(tree_kernels->viewport()->mapToGlobal(pos));
+    if (chosen == nullptr) {
+        return;
+    }
+
+    if (chosen == install_action) {
+        QMessageBox confirm(this);
+        confirm.setText(tr("Install the pre-compiled package for '%1'?").arg(display));
+        confirm.setInformativeText(tr("This installs the package as root (pacman) and refreshes the initramfs."));
+        confirm.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        confirm.setDefaultButton(QMessageBox::No);
+        if (confirm.exec() != QMessageBox::Yes) {
+            return;
+        }
+
+        // The K8 name-based API: plan from the table, then execute the
+        // steps through the existing pkexec terminal path. Synchronous
+        // for now (a progress dialog is a later refinement); the
+        // outcome is reported below either way.
+        const auto plan = plan_install(name);
+        std::string error;
+        if (!execute_plan(plan, error)) {
+            QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to install '%1':\n%2").arg(display, QString::fromStdString(error)));
+            return;
+        }
+
+        QString message = tr("Installed '%1'. Select it at the next boot:").arg(display);
+        const auto instructions = boot_instructions_for(name);
+        for (std::size_t i = 0; i < instructions.size(); ++i) {
+            message += QLatin1Char('\n');
+            message += QStringLiteral("%1. %2").arg(static_cast<int>(i + 1)).arg(QString::fromStdString(instructions[i]));
+        }
+        QMessageBox::information(this, tr("Kernel Manager"), message);
+        return;
+    }
+
+    if (chosen == build_action) {
+        // The existing Configure flow: on_configure auto-populates the
+        // build source from the current tree row (set above), prepares
+        // the build environment in the background, then shows the window.
+        on_configure();
+        return;
+    }
+
+    if (chosen == boot_action) {
+        show_boot_instructions(this, boot_instructions_for(name));
+    }
 }
 
 void MainWindow::on_cancel() noexcept {

@@ -59,6 +59,7 @@
 
 #include <QFutureWatcher>
 #include <QMainWindow>
+#include <QPoint>
 #include <QProgressBar>
 #include <QProgressDialog>
 #include <QThread>
@@ -117,6 +118,7 @@ class MainWindow final : public QMainWindow {
     void on_execute() noexcept;
     void on_schedext_config() noexcept;
     void on_configure() noexcept;
+    void on_kernel_context_menu(const QPoint& pos) noexcept;
 
     void check_uncheck_item() noexcept;
 
