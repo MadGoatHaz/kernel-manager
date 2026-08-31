@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- KernelManager project mark: the scx-manager gauge lineage (rounded chip
+       outline, circular dial, three tick marks, upper-left needle, center dot)
+       recolored to amber #F57F17, the "core processing" accent — distinct from
+       both the inherited CachyOS green artwork and the scx-manager blue.
+       Stroke-based geometry on a 128 viewBox, transparent background. -->
+  <rect x="16" y="16" width="96" height="96" rx="20" fill="none" stroke="#F57F17" stroke-width="8"/>
+  <circle cx="64" cy="64" r="28" fill="none" stroke="#F57F17" stroke-width="8"/>
+  <line x1="64" y1="36" x2="64" y2="44" stroke="#F57F17" stroke-width="6" stroke-linecap="round"/>
+  <line x1="36" y1="64" x2="44" y2="64" stroke="#F57F17" stroke-width="6" stroke-linecap="round"/>
+  <line x1="84" y1="64" x2="92" y2="64" stroke="#F57F17" stroke-width="6" stroke-linecap="round"/>
+  <line x1="64" y1="64" x2="51" y2="51" stroke="#F57F17" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="64" cy="64" r="4.5" fill="#F57F17"/>
+</svg>
