@@ -80,7 +80,7 @@
       </column>
       <column>
        <property name="text">
-        <string>Install</string>
+        <string>Installed</string>
        </property>
       </column>
       <column>
