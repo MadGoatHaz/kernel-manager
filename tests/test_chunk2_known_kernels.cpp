@@ -60,7 +60,7 @@ int main() {
     // 1. The curated table: shape.
     // ------------------------------------------------------------------
     const auto& table = km::known_kernels();
-    check(table.size() == 6, "table holds the six known kernels");
+    check(table.size() == 13, "table holds the thirteen known kernels (6 official + 7 cachyos)");
     {
         std::vector<std::string> names{};
         for (const auto& kernel : table) {
