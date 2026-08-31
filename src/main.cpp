@@ -135,7 +135,9 @@ auto main(int argc, char** argv) -> std::int32_t {
     // running from the build directory, where the .ui <iconset theme=...>
     // lookups cannot resolve; the theme iconsets remain the installed-use path.
     {
-        const QIcon window_icon(QStringLiteral(":/km-icons/org.archlinux.KernelManager.png"));
+        QIcon window_icon;
+        window_icon.addFile(QStringLiteral(":/km-icons/48x48.png"));
+        window_icon.addFile(QStringLiteral(":/km-icons/256x256.png"));
         if (window_icon.isNull()) {
             std::fprintf(stderr, "[kernel-manager] warning: bundled app icon resource is missing\n");
         }
