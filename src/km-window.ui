@@ -16,9 +16,6 @@
    <property name="windowTitle">
     <string>Kernel Manager</string>
    </property>
-   <property name="windowIcon">
-    <iconset theme="org.archlinux.KernelManager"/>
-   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
