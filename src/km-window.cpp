@@ -536,9 +536,11 @@ void MainWindow::on_configure() noexcept {
 // Right-click on a kernel row: offer the per-kernel actions "Install
 // pre-compiled <name>" (enabled only when the curated table has a
 // pre-compiled path for it — build-only kernels like linux-tkg get it
-// disabled), "Build custom <name>" (the existing Configure flow), and
-// "Show boot instructions" (the post-install selection steps for the
-// detected bootloader, K5+K6+K8).
+// disabled), "Add repo '<repo>'" (D2, conditional: curated pacman-repo
+// kernels whose repo is not enabled in /etc/pacman.conf), "Build custom
+// <name>" (the existing Configure flow), and "Show boot instructions"
+// (the post-install selection steps for the detected bootloader,
+// K5+K6+K8).
 void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
     auto* tree_kernels = m_ui->treeKernels;
 
@@ -568,6 +570,23 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
     // documented (an enabled sync DB / the AUR) — never promising a pacman
     // run that would fail at the missing/disabled repo.
     install_action->setEnabled(km::is_installable(name) && is_precompiled_available_live(name));
+
+    // D2 (plan v1.23.0): "Add repo '<repo>'" — offered only for a curated
+    // pacman-repo kernel whose repo is not enabled in /etc/pacman.conf:
+    // the repo name is table-derived (never user text; the AUR is excluded
+    // via classify_repo) and is_repo_enabled reads the live config (not the
+    // alpm handle, which predates the add). Already-enabled repos get no
+    // action. The click flow (confirm → add_repo_to_pacman_conf → list
+    // refresh) is handled after the install block below.
+    QAction* add_repo_action = nullptr;
+    std::string repo_to_add{};
+    if (auto e = km::find_kernel(name)) {
+        const KnownKernel* k = *e;
+        if (utils::classify_repo(k->install_repo) == utils::PackageSource::PACMAN_REPO && !utils::is_repo_enabled(k->install_repo)) {
+            repo_to_add = k->install_repo;
+            add_repo_action = menu.addAction(tr("Add repo '%1'").arg(QString::fromStdString(repo_to_add)));
+        }
+    }
 
     auto* build_action = menu.addAction(tr("Build custom %1").arg(display));
 
@@ -609,6 +628,35 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
         return;
     }
 
+    if (chosen == add_repo_action) {
+        // D2 (plan v1.23.0): confirm first (default No), then enable the
+        // repo through the existing pkexec terminal layer —
+        // utils::add_repo_to_pacman_conf runs
+        // "$KM_HELPER_DIR/repo_add.sh '<repo>'" as an administrator
+        // (backup + append + `pacman -Sy`, C4+C6); the synchronous
+        // terminal blocks until the user presses enter, so the exit code
+        // is known before we report back.
+        const QString repo = QString::fromStdString(repo_to_add);
+        QMessageBox confirm(this);
+        confirm.setText(tr("Enable the '%1' pacman repository?").arg(repo));
+        confirm.setInformativeText(tr("This appends the [%1] section to /etc/pacman.conf (a backup is written first) and runs `pacman -Sy` as an administrator.").arg(repo));
+        confirm.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        confirm.setDefaultButton(QMessageBox::No);
+        if (confirm.exec() != QMessageBox::Yes) {
+            return;
+        }
+        const int rc = utils::add_repo_to_pacman_conf(repo_to_add);
+        if (rc != 0) {
+            QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to enable repository '%1' (exit code %2). Check the terminal output.").arg(repo).arg(rc));
+            return;
+        }
+        QMessageBox::information(this, tr("Kernel Manager"), tr("Repository '%1' enabled — refreshing the kernel list…").arg(repo));
+        // Same-thread slot: re-parse the alpm handle + re-fetch + rebuild
+        // so the just-enabled repo's rows go live immediately (D2).
+        init_kernels();
+        return;
+    }
+
     if (chosen == build_action) {
         // The existing Configure flow: on_configure auto-populates the
         // build source from the current tree row (set above), prepares
@@ -634,6 +682,30 @@ void MainWindow::init_kernels() noexcept {
     // show progress dialog to indicate user something is happening
     m_conf_progress_dialog->setLabelText(tr("Please wait...\nInitializing kernels.."));
     m_conf_progress_dialog->show();
+
+    // D2 (plan v1.23.0): re-establish the sync-DB view before the rebuild —
+    // a repo enabled after app start (this slot's Add-repo success path, or
+    // the worker's post-transaction re-init) is only visible through a
+    // fresh alpm handle, so release + re-parse it and re-fetch the kernel
+    // list under m_mutex (serializes with the worker's transaction swap;
+    // the worker's own pre-swap parse stays untouched, the double parse is
+    // harmless).
+    {
+        const std::lock_guard<std::mutex> guard(m_mutex);
+        if (m_handle != nullptr) {
+            utils::release_alpm(m_handle, &m_err);
+        }
+        m_handle = utils::parse_alpm(utils::alpm_root, utils::alpm_libdir, &m_err);
+    }
+    if (m_handle == nullptr) {
+        QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to initialize alpm handle (%1)").arg(alpm_strerror(m_err)));
+        m_conf_progress_dialog->hide();
+        return;
+    }
+    {
+        const std::lock_guard<std::mutex> guard(m_mutex);
+        m_kernels = Kernel::get_kernels(m_handle);
+    }
 
     auto* tree_kernels = m_ui->treeKernels;
     tree_kernels->blockSignals(true);
