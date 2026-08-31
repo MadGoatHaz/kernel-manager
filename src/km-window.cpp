@@ -155,6 +155,7 @@ void show_boot_instructions(QWidget* parent, const std::vector<std::string>& ins
 MainWindow::MainWindow(QWidget* parent)
   : QMainWindow(parent) {
     m_ui->setupUi(this);
+    setWindowIcon(QApplication::windowIcon());  // explicit dedicated icon; the .ui no longer overrides; robust to Qt app-fallback semantics
 
     setAttribute(Qt::WA_NativeWindow);
     setWindowFlags(Qt::Window);  // for the close, min and max buttons
