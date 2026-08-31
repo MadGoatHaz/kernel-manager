@@ -143,12 +143,37 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         // not in its DB (=> `pacman -Sy`) vs. the repo is not enabled at all
         // (=> add the section to /etc/pacman.conf). Live rows keep the
         // plain base tooltip.
+        // D4 (plan v1.23.0): one shared sync-DB result per row, used by both
+        // the PkgName tooltip below and the Version annotation (no second
+        // is_repo_in_syncdbs call per row).
+        const bool repo_enabled = is_repo_in_syncdbs(handle, kernel.get_repo());
         widget_item->setToolTip(TreeCol::PkgName, kernel.has_pkg()
                 ? base_tooltip
-                : base_tooltip + (is_repo_in_syncdbs(handle, kernel.get_repo())
+                : base_tooltip + (repo_enabled
                         ? QStringLiteral(" — not in the '%1' DB (pacman -Sy)").arg(QString::fromStdString(std::string{kernel.get_repo()}))
                         : QStringLiteral(" — repo '%1' not enabled (add it to /etc/pacman.conf)").arg(QString::fromStdString(std::string{kernel.get_repo()}))));
-        widget_item->setText(TreeCol::Version, QString::fromStdString(kernel.version()));
+        // D4 (plan v1.23.0): widget-level Version annotation. An info-row
+        // (m_pkg == nullptr) whose repo is absent from the handle's sync DBs
+        // — i.e. not enabled — shows "— (repo not enabled)" plus a
+        // Version-cell tooltip naming the repo and the right-click
+        // remediation; an info-row whose repo IS enabled but whose package is
+        // missing from its DB (the E14 `pacman -Sy` case) keeps the bare
+        // "—". Live rows show kernel.version() byte-identical to today.
+        // Data layer untouched: Kernel::version() still returns "—" for
+        // info-rows (the k11 assertions hold) — this is presentation only.
+        // Sort note: operator< passes the cell text through
+        // alpm_pkg_vercmp, which already tolerates non-version strings like
+        // the bare "—"; the annotation only appears on rows that were
+        // already "—", so relative row order is unchanged and the
+        // comparator stays untouched.
+        widget_item->setText(TreeCol::Version, kernel.has_pkg()
+                ? QString::fromStdString(kernel.version())
+                : (repo_enabled ? QStringLiteral("—") : QStringLiteral("— (repo not enabled)")));
+        if (!kernel.has_pkg() && !repo_enabled) {
+            widget_item->setToolTip(TreeCol::Version, QStringLiteral(
+                        "Version unavailable — repo '%1' is not enabled. Right-click the row to add it.")
+                        .arg(QString::fromStdString(std::string{kernel.get_repo()})));
+        }
         widget_item->setText(TreeCol::Category, QString::fromStdString(std::string{kernel.category()}));
         // E14: installed-on-system indicator (D4): "✓" when the package is
         // in the alpm local DB (kernel.is_installed(), name-based lookup —
