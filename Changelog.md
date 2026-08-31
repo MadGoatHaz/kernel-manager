@@ -1,5 +1,16 @@
 # Changelog
 
+### v1.21.0 (2026-08-31) — release candidate
+
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/33fe35a...262e59a)
+
+- 🔥 Kernel list expanded from 6 to 21 maintained Arch kernels (official, CachyOS, XanMod, TKG, Liquorix, Clear, mainline) — each now maps to its own build source; the old `linux` → `linux-cachyos` auto-populate special case is gone
+- 🔥 New context menu on every kernel row (right-click): **Install pre-compiled** (pacman repo, or AUR via `paru`; fails gracefully if the repo or `paru` is missing), **Build custom** (existing Configure flow), **Show boot instructions**
+- 🔥 Post-install boot selection: the bootloader is detected automatically (GRUB / systemd-boot / UKI / unknown) and the app shows numbered steps for selecting the new kernel at next boot (incl. the `/boot/vmlinuz-<pkg>` note)
+- ⚡ Per-kernel install-availability indicator (✓/—) in the kernel list — build-only kernels (e.g. `linux-tkg`) are clearly marked
+
+> Note: release candidate only — the AUR `PKGBUILD` source pin is still the pre-decoupling `19f1e06` and must be repointed to a current commit/tag (with a pkgver bump) before AUR submission; no version has been cut for this entry yet. An optional `lupdate` resync of the 16 locale catalogs for the new UI strings (context-menu labels, "Install" header) is pending.
+
 ### v1.20.0 (2026-08-30) — release candidate
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/4e26423...148b961)
