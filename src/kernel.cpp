@@ -18,6 +18,7 @@
 
 #include "kernel.hpp"
 #include "aur_kernel.hpp"
+#include "known_kernels.hpp"
 #include "utils.hpp"
 
 #include <cstdio>
@@ -134,6 +135,8 @@ std::string Kernel::version() noexcept {
     if (m_repo == "aur") { return m_version; }
     /* clang-format on */
 #endif
+    // Curated info-row (m_pkg == nullptr): display-only, no sync-DB version.
+    if (m_pkg == nullptr) { return "—"; }
     const char* sync_pkg_ver = alpm_pkg_get_version(m_pkg);
     /* clang-format off */
     if (!is_installed()) { return sync_pkg_ver; }
@@ -168,6 +171,10 @@ bool Kernel::install() const noexcept {
         return true;
     }
 #endif
+    // Curated info-row (m_pkg == nullptr): not installable, never dereference m_pkg/m_headers.
+    if (m_pkg == nullptr) {
+        return false;
+    }
     const char* pkg_name    = alpm_pkg_get_name(m_pkg);
     const char* pkg_headers = alpm_pkg_get_name(m_headers);
     if (is_root_on_zfs && m_zfs_module != nullptr) {
@@ -213,6 +220,12 @@ bool Kernel::install() const noexcept {
 }
 
 bool Kernel::remove() const noexcept {
+    // Curated info-row (m_pkg == nullptr): display-only, not removable —
+    // even if the same kernel name is installed (previously added from a
+    // since-disabled repo), the info-row itself must never hit the removal list.
+    if (m_pkg == nullptr) {
+        return false;
+    }
     if (!is_installed()) {
         return false;
     }
@@ -347,6 +360,30 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
         }
     }
 #endif
+
+    // Curated info-rows: known-kernels entries (with a pre-compiled package)
+    // that no enabled repo/AUR pass listed. Constructed null-safe (m_pkg ==
+    // nullptr, the default — the 5-arg ctor is unusable here because it
+    // initializes m_name from alpm_pkg_get_name(pkg), which aborts on null):
+    // version() yields "—", install()/remove() guard on m_pkg and return
+    // false, is_installed() stays valid via the local-DB name lookup. A
+    // repo/AUR row wins on name, so no duplicates are introduced;
+    // build-only entries (e.g. linux-tkg) are skipped.
+    for (const auto& e : km::known_kernels()) {
+        if (!e.precompiled_available) {
+            continue;
+        }
+        const auto already_listed_by_name = std::ranges::find_if(kernels, [&](const auto& kernel) { return kernel.m_name == e.name; }) != kernels.end();
+        if (already_listed_by_name) {
+            continue;
+        }
+        Kernel kernel_obj{};
+        kernel_obj.m_handle = handle;
+        kernel_obj.m_repo   = e.install_repo;
+        kernel_obj.m_name   = e.name;
+        kernel_obj.m_raw    = fmt::format(FMT_COMPILE("{}/{}"), e.install_repo, e.name);
+        kernels.emplace_back(std::move(kernel_obj));
+    }
 
     return kernels;
 }
