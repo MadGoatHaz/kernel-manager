@@ -18,6 +18,7 @@
 
 #include "alpm_utils.hpp"
 #include "ini.hpp"
+#include "known_kernels.hpp"  // for km::known_kernels (the curated install_repo set)
 #include "utils.hpp"  // for utils::exec (AUR probe executor)
 
 namespace utils {
@@ -28,6 +29,44 @@ namespace utils {
 #ifndef KM_IGNORE_REPO
 #define KM_IGNORE_REPO ""
 #endif
+
+// Install prefix for the pkexec helpers (terminal-helper, rootshell.sh,
+// repo_add.sh). Defined by CMake (the single KM_HELPER_DIR source of
+// truth); the fallback mirrors the KM_IGNORE_REPO pattern so standalone
+// compile contexts (the k7-style harnesses) build without it.
+#ifndef KM_HELPER_DIR
+#define KM_HELPER_DIR "/usr/lib/kernel-manager"
+#endif
+
+namespace {
+
+// Character set of a valid pacman repo name: lowercase alphanumerics and
+// dashes. Enforced before the name is embedded in the repo_add.sh command
+// line — the single quote makes any violation inert, and the curated-table
+// guard is the last wall.
+[[gnu::pure]] [[nodiscard]] bool valid_repo_chars(std::string_view repo) noexcept {
+    for (const char c : repo) {
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Whether the repo appears as an install_repo value in the curated kernel
+// table — the set of repos kernels are pre-compiled against. core/extra
+// pass this guard (they are table repos) but are base-install repos that
+// the repo_add.sh allowlist rejects; the script is the final wall.
+[[nodiscard]] bool is_known_repo(std::string_view repo) noexcept {
+    for (const auto& k : km::known_kernels()) {
+        if (k.install_repo == repo) {
+            return true;
+        }
+    }
+    return false;
+}
+
+}  // namespace
 
 alpm_handle_t* parse_alpm(std::string_view root, std::string_view dbpath, alpm_errno_t* err) noexcept {
     // Initialize alpm.
@@ -118,6 +157,49 @@ bool is_package_available(std::string_view pkg, std::string_view repo) noexcept 
     const bool available = is_package_in_sync_db(handle, repo, pkg);
     release_alpm(handle, &err);
     return available;
+}
+
+bool is_repo_enabled(std::string_view repo, std::string_view conf_path) noexcept {
+    // The same mINI read as parse_alpm's sync-DB registration: an active
+    // (uncommented) [repo] section lands in the structure, a commented-out
+    // one never does.
+    const mINI::INIFile file(conf_path);
+    mINI::INIStructure ini;
+    file.read(ini);
+    for (const auto& it : ini) {
+        if (it.first == repo) {
+            return true;
+        }
+    }
+    return false;
+}
+
+int add_repo_to_pacman_conf(std::string_view repo, RepoCmdRunner runner) noexcept {
+    // Guard: reject without ever calling the runner (k8 CommandRunner
+    // precedent) — an empty name, "aur" (the AUR is not a pacman repo), a
+    // character-set violation, or a repo outside the curated table's
+    // install_repo set.
+    if (repo.empty() || repo == "aur" || !valid_repo_chars(repo) || !is_known_repo(repo)) {
+        return -1;
+    }
+
+    // A null runner selects the real one: the unified polkit privilege
+    // layer (an escalated command is wrapped in pkexec rootshell — see
+    // utils.cpp).
+    if (!runner) {
+        runner = [](std::string_view cmd, bool escalate) noexcept {
+            return utils::runCmdTerminal(QString::fromUtf8(cmd.data()), escalate);
+        };
+    }
+
+    // Single-quoted: the charset guard above makes the quote inert (no
+    // char can break out of the argument), and the script's own allowlist
+    // is the final wall.
+    std::string cmd{KM_HELPER_DIR};
+    cmd += "/repo_add.sh '";
+    cmd.append(repo);
+    cmd += "'";
+    return runner(cmd, true);
 }
 
 }  // namespace utils
