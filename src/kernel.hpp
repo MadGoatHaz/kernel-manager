@@ -28,6 +28,17 @@
 #include <alpm.h>
 
 class Kernel {
+    // Two kinds of rows may appear in the kernel list:
+    // (1) LIVE rows — repo/AUR-sourced, m_pkg set (today's behavior): the
+    //     package is present in an enabled sync DB or the AUR; fully
+    //     installable/removable; version()/install()/remove() dereference
+    //     m_pkg.
+    // (2) CURATED INFO-rows — m_pkg == nullptr: a known-kernels entry not
+    //     present in any enabled repo/AUR. Display-only; NOT selectable for
+    //     install/remove (those operations guard on m_pkg and return false);
+    //     version() yields "—"; is_installed() remains valid via local-DB
+    //     name lookup.
+
  public:
     constexpr Kernel() = default;
     explicit Kernel(alpm_handle_t* handle, alpm_pkg_t* pkg, alpm_pkg_t* headers) : m_name(alpm_pkg_get_name(pkg)), m_pkg(pkg), m_headers(headers), m_handle(handle) { }
@@ -98,6 +109,8 @@ class Kernel {
     /* clang-format off */
     constexpr bool is_update_available() const noexcept
     { return m_update; }
+
+    constexpr bool has_pkg() const noexcept { return m_pkg != nullptr; }
 
     inline const char* get_raw() const noexcept
     { return m_raw.c_str(); }
