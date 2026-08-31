@@ -81,6 +81,16 @@
         <string>Category</string>
        </property>
       </column>
+      <column>
+       <property name="text">
+        <string>Install</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Immutable</string>
+       </property>
+      </column>
      </widget>
     </item>
     <item>
