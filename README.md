@@ -9,13 +9,13 @@ kernel-manager is a Qt6 GUI for managing Linux kernels on Arch Linux and Arch-ba
 
 ## Features
 
-- **Browse 21 maintained kernel variants** — official Arch, CachyOS, and community kernels (XanMod, TKG, Liquorix, Clear, mainline) — each with a description tooltip and an install-availability indicator (✓/—).
+- **Browse 21 maintained kernel variants** — official Arch, CachyOS, and community kernels (XanMod, TKG, Liquorix, Clear, mainline) — each with a description tooltip. The list is complete: kernels whose repository is not enabled appear as clearly-marked, non-selectable info-rows with the reason, and an **Installed** column truthfully reports which kernels are installed on the system (✓/—).
 - **Install pre-compiled kernels with one action** — from `[core]`/`[extra]`, the CachyOS repositories, `chaotic-aur`, or the AUR (via `paru`). kernel-manager handles the package install, initramfs regeneration (`mkinitcpio`), and bootloader refresh for you.
-- **Build custom kernels from source** — pick a known package in the source dropdown (or enter any git URL), tweak compile options and patches, and compile with `makepkg`.
+- **Build custom kernels from source** — pick a known package in the source dropdown (or enter any git URL), tweak compile options and patches, and compile with `makepkg`. Build options are data-driven per kernel family: the full 17-option CachyOS suite for `linux-cachyos` and its 6 sibling flavors, CPU-optimization + modprobed-db for the 4 XanMod flavors, and modprobed-db for Liquorix — shown only where the selected source's PKGBUILD actually consumes them, so official Arch, mainline, Clear, and TKG intentionally show none.
 - **Bootloader-aware boot instructions** — the app detects which boot loader is in use (Unified Kernel Image, systemd-boot, GRUB, or unknown) and shows numbered steps for selecting the new kernel at next boot, including how to make it the default.
-- **Right-click context menu on every kernel** — *Install pre-compiled*, *Build custom*, or *Show boot instructions*.
+- **Right-click context menu on every kernel** — *Install pre-compiled* (enabled only when the kernel is actually installable from its repository), *Build custom*, or *Show boot instructions*.
 - **Unified privilege escalation via polkit** — a single `auth_admin` action (no `sudo` required).
-- **Polished desktop integration** — a dedicated app icon for the window and taskbar, plus translation support.
+- **Polished desktop integration** — a dedicated app icon, reliably shown on both the window titlebar and the system taskbar (the Wayland "W" placeholder is gone), plus translation support.
 
 ## Supported kernels
 
@@ -61,7 +61,7 @@ kernel-manager tracks 21 maintained Arch kernel variants, each mapped to its own
 
 kernel-manager offers two complementary paths:
 
-- **Install pre-compiled** — one action installs the kernel package from your configured pacman repositories (or the AUR, via `paru`), regenerates the initramfs with `mkinitcpio`, and refreshes the bootloader. Kernels whose pre-compiled package is not available on your system are clearly marked with `—`.
+- **Install pre-compiled** — one action installs the kernel package from your configured pacman repositories (or the AUR, via `paru`), regenerates the initramfs with `mkinitcpio`, and refreshes the bootloader. The kernel list is complete: kernels whose repository is not enabled appear as clearly-marked, non-selectable info-rows with the reason (repository not enabled vs. package not in the repository), the **Installed** column truthfully reports which kernels are installed on this system (pacman local DB, ✓/—), and the context menu's *Install pre-compiled* action reflects real availability.
 - **Build custom** — the configure flow clones the selected source (an AUR package or any git URL), lets you adjust compile options and patches, and compiles the kernel with `makepkg`.
 
 After a kernel is installed or built, kernel-manager detects your boot loader (in priority order: Unified Kernel Image → systemd-boot → GRUB → unknown) and shows numbered steps for selecting the new kernel at your next boot — including the mandatory `/boot/vmlinuz-<pkg>` / `mkinitcpio` note — and for making it the default entry.
@@ -126,6 +126,12 @@ Run the built binary:
 
 ```sh
 ./build/kernel-manager
+```
+
+Optionally install it for your user (no `sudo` required):
+
+```sh
+cmake --install build --prefix ~/.local
 ```
 
 `configure.sh` is an alternative entry point: it wraps the CMake invocation and generates `build.sh`, which drives `cmake --build` (if you intend to install it globally, you might also want `--prefix=/usr`):
