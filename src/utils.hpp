@@ -62,10 +62,21 @@ int runCmdTerminal(QString cmd, bool escalate) noexcept;
 int run_process(std::string_view program, const std::vector<std::string>& args) noexcept;
 void prepare_git_repo(const std::filesystem::path& parent_dir, const std::filesystem::path& repo_path, std::string_view clone_url) noexcept;
 
-// Canonical location of the cloned kernel source repo used for custom builds
-// (single source of truth shared by prepare_build_environment() and flavor
-// discovery).
-const std::filesystem::path& build_repo_path() noexcept;
+// The user-selectable build directory (QSettings key "buildDir", org/app
+// ArchLinux/KernelManager), defaulting to
+// ~/.cache/kernel-manager/pkgbuilds. Single source of truth shared by
+// prepare_build_environment() and flavor discovery; re-read on demand (no
+// cache) so a mid-session set_build_dir() applies immediately.
+[[nodiscard]] std::filesystem::path build_repo_path() noexcept;
+
+// Persist the user-selected build directory: trimmed, `~`-expanded, and
+// written to the QSettings "buildDir" key; an empty value is a no-op
+// (the current directory is kept).
+void set_build_dir(std::string dir) noexcept;
+
+// The clone parent directory: the parent of build_repo_path() (defaults to
+// ~/.cache/kernel-manager).
+[[nodiscard]] std::filesystem::path build_app_path() noexcept;
 
 // User-selectable custom-build source: an AUR package name or a git URL.
 // A single accessor shared by prepare_build_environment() and the Configure

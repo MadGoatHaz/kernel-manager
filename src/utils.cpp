@@ -46,6 +46,7 @@
 #include <glib.h>
 
 #include <QProcess>
+#include <QSettings>
 
 #if defined(__clang__)
 #pragma clang diagnostic pop
@@ -260,9 +261,51 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
     }
 }
 
-const fs::path& build_repo_path() noexcept {
-    static const fs::path pkgbuilds_path = utils::fix_path("~/.cache/kernel-manager/pkgbuilds");
-    return pkgbuilds_path;
+// D4: the QSettings backing store for the user-selectable build directory.
+// Explicit org/app (the main.cpp:126-129 identity) so the same file resolves
+// in the app and in test harnesses, which redirect it deterministically via
+// XDG_CONFIG_HOME. No cache: the accessors re-read on demand, so a
+// mid-session set_build_dir() is visible immediately.
+namespace {
+
+QSettings& app_settings() {
+    static QSettings settings{"ArchLinux", "KernelManager"};
+    return settings;
+}
+
+}  // namespace
+
+// The user-selectable build directory (QSettings "buildDir"), defaulting to
+// the historical ~/.cache/kernel-manager/pkgbuilds location.
+fs::path build_repo_path() noexcept {
+    // toString().toStdString(): this Qt build's QVariant lacks toStdString()
+    // (the QString side has it) — identical semantics.
+    std::string dir = app_settings().value("buildDir").toString().toStdString();
+    if (dir.empty()) {
+        return utils::fix_path("~/.cache/kernel-manager/pkgbuilds");
+    }
+    return utils::fix_path(std::move(dir));
+}
+
+// The clone parent directory: the parent of build_repo_path().
+fs::path build_app_path() noexcept {
+    return build_repo_path().parent_path();
+}
+
+// Persist the user-selected build directory; trimmed, `~`-expanded, empty
+// ⇒ no-op (the set_build_source_repo pattern).
+void set_build_dir(std::string dir) noexcept {
+    // trim surrounding whitespace
+    while (!dir.empty() && (dir.front() == ' ' || dir.front() == '\t' || dir.front() == '\n' || dir.front() == '\r')) {
+        dir.erase(dir.begin());
+    }
+    while (!dir.empty() && (dir.back() == ' ' || dir.back() == '\t' || dir.back() == '\n' || dir.back() == '\r')) {
+        dir.pop_back();
+    }
+    if (dir.empty()) {
+        return;  // keep the current value
+    }
+    app_settings().setValue("buildDir", QString::fromStdString(utils::fix_path(std::move(dir))));
 }
 
 // Default build source: an AUR package name (resolves to the AUR git URL at
@@ -291,8 +334,8 @@ void set_build_source_repo(std::string source) noexcept {
 }
 
 void prepare_build_environment() noexcept {
-    static const fs::path app_path = utils::fix_path("~/.cache/kernel-manager");
-    utils::prepare_git_repo(app_path, build_repo_path(), build_source_clone_url(build_source_repo()));
+    const auto app_path = utils::build_app_path();
+    utils::prepare_git_repo(app_path, utils::build_repo_path(), build_source_clone_url(build_source_repo()));
 }
 
 void restore_clean_environment(std::vector<std::string>& previously_set_options, std::string_view all_set_values) noexcept {
