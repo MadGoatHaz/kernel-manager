@@ -575,7 +575,13 @@ void ConfWindow::finished_proc(int exit_code, QProcess::ExitStatus) noexcept {
             fmt::print("pressed yes\n");
 
             auto pkg_glob_list = get_package_names_glob_from_pkgbuild(m_build_conf_path);
-            auto pkg_globs     = pkg_glob_list | std::ranges::views::join_with(' ') | std::ranges::to<std::string>();
+            // Absolute paths: the pkexec'd root shell (escalate=true) starts in $HOME, so a
+            // bare glob would expand against the wrong directory and match nothing.
+            auto pkg_globs = pkg_glob_list
+                             | std::ranges::views::transform(
+                                   [d = m_build_conf_path](const auto& g) { return d + "/" + g; })
+                             | std::ranges::views::join_with(' ')
+                             | std::ranges::to<std::string>();
             auto pacman_cmd = fmt::format(FMT_COMPILE("pacman -U {}"), pkg_globs);
 
             fmt::print("pacman_cmd := {}\n", pacman_cmd);
