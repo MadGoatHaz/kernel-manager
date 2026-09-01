@@ -77,21 +77,43 @@ fi
 # $arch/$repo are PACMAN variables: they must stay literal in the conf, so the
 # bash strings below escape them (\$) — they are expanded only by pacman at
 # sync time, never by this script.
+#
+# REPO_KEY = the full 40-hex fingerprint of the repo's signing key, imported +
+# trusted PROACTIVELY before the first `pacman -Sy` (run_pacman_sy) so a
+# first-time repo enable does not fail on the unknown-key / unknown-trust GPG
+# errors (see the libalpm message strings cited in run_pacman_sy). Verified
+# 2026-08-31 against each repo's live signatures (evidence in the C6 entry of
+# Work/DEV_LOG.md, extended for the key IDs):
+#   cachyos     key "882DCFE4…8DB35A47" — the exact ID pacman names in its
+#               `key "…" is unknown` error; the live cachyos.db.tar.zst.sig
+#               is signed with keyid F3B607488DB35A47 (its 16-hex suffix)
+#   chaotic-aur primary "67BF8CA6…37365605" (TNE <tne@garudalinux.org>,
+#               the garuda/chaotic keyring key); packages are signed by its
+#               [S] subkey 349BC7808577C592 — trusting the PRIMARY covers
+#               the subkey (verified: after a master-key lsign of the
+#               primary, the subkey-signed package verifies [full])
+#   liquorix    primary "C5ADB4F3…33F8024D" (Steven Barrett
+#               <steven@liquorix.net>, [SC]); matches the 9AE4078033F8024D
+#               key that the official install-liquorix.sh imports
 SERVERS=()
+REPO_KEY=""
 case "$REPO" in
     cachyos)
+        REPO_KEY="882DCFE48E2051D48E2562ABF3B607488DB35A47"
         SERVERS=(
             "https://cdn77.cachyos.org/repo/\$arch/\$repo"
             "https://us.cachyos.org/repo/\$arch/\$repo"
         )
         ;;
     chaotic-aur)
+        REPO_KEY="67BF8CA6DA181643C9723B4ED6C9442437365605"
         SERVERS=(
             "https://geo-mirror.chaotic.cx/\$repo/\$arch"
             "https://us-mi-mirror.chaotic.cx/\$repo/\$arch"
         )
         ;;
     liquorix)
+        REPO_KEY="C5ADB4F3FEBBCE27A3E54D7D9AE4078033F8024D"
         SERVERS=(
             "https://liquorix.net/archlinux/\$repo/\$arch"
         )
@@ -111,16 +133,39 @@ for s in "${SERVERS[@]}"; do
     SECTION+=$line
 done
 
-# --- pacman -Sy with automatic GPG key import ------------------------------
-# The refresh can fail when the repo's signing key is not yet in the keyring
-# (the live case: `error: cachyos: key "882DCFE4…" is unknown`). In that one
-# situation the key is fetched + trusted and the refresh retried; any other
-# failure (network, mirror, DB error, a second failure after the retry)
-# surfaces the pacman output and the script exits non-zero. The pacman call
-# sits in a conditional context so `set -e` does not abort mid-function.
-# --dry-run never reaches here (it exits before the refresh); both real
-# paths (fresh append + already-enabled re-run) do.
+# --- pacman -Sy: proactive key trust + automatic GPG-error repair ----------
+# The refresh can fail on GPG in TWO ways, both repaired here:
+#   case 1 — the signing key is absent from the keyring. libalpm names the
+#      key: `error: <repo>: key "<40-hex>" is unknown`. The key is fetched +
+#      trusted and the refresh retried.
+#   case 2 — the key is present but untrusted. libalpm names the SIGNER,
+#      not the key: `error: <repo>: signature from "<uid>" is unknown trust`
+#      (marginal trust likewise). Case 1's key-ID parse cannot see this, so
+#      the key is looked up by that uid in the pacman keyring, trusted, and
+#      the refresh retried.
+# Before the first attempt, REPO_KEY (set in the allowlist) is imported +
+# trusted PROACTIVELY, so a known repo's first enable rarely reaches either
+# reactive case. Any other failure (network, mirror, DB error, an
+# unrepairable GPG error, a second failure after the retry) surfaces the
+# pacman output and the script exits non-zero. Every pacman call sits in a
+# conditional context (and every pacman-key call is `|| true`- or
+# `&&`-guarded) so `set -e` does not abort mid-function. --dry-run never
+# reaches here (it exits before the refresh); both real paths (fresh append
+# + already-enabled re-run) do.
 run_pacman_sy() {
+    # Proactive: import + trust this repo's GPG key before the first
+    # refresh. Best-effort by design — the key may already be in the
+    # keyring (recv is a no-op), the keyserver may be unreachable (a
+    # pre-existing trusted key still lets the refresh proceed), or the key
+    # may already be trusted (lsign is a no-op); none of that may abort
+    # the refresh. Stderr is hidden: if it matters, the reactive cases
+    # below re-report it with the real error.
+    if [[ -n "$REPO_KEY" ]]; then
+        echo "Importing GPG key $REPO_KEY…"
+        pacman-key --recv-keys "$REPO_KEY" 2>/dev/null || true
+        pacman-key --lsign-key "$REPO_KEY" 2>/dev/null || true
+    fi
+
     local output
     if output=$(pacman -Sy 2>&1); then
         echo "$output"
@@ -128,10 +173,10 @@ run_pacman_sy() {
     fi
     echo "$output"
 
-    # Extract the unknown key ID (pattern: key "<40-hex>" …). `|| true`
-    # guards set -e when the pattern is absent — a non-GPG failure must
-    # reach the final return 1 with its text already printed, not abort
-    # at this assignment.
+    # Case 1: key absent — extract the unknown key ID (pattern:
+    # key "<40-hex>" …). `|| true` guards set -e when the pattern is
+    # absent — a non-GPG failure must reach the final return 1 with its
+    # text already printed, not abort at this assignment.
     local key_id
     key_id=$(echo "$output" | grep -oP 'key "\K[0-9A-F]{40}' | head -1 || true)
     if [[ -n "$key_id" ]]; then
@@ -141,6 +186,30 @@ run_pacman_sy() {
             echo "Retrying pacman -Sy…"
             if pacman -Sy; then
                 return 0
+            fi
+        fi
+    fi
+
+    # Case 2: key present but untrusted — the error names the signer's uid
+    # ("signature from \"<uid>\" is unknown trust"), never the key ID, so
+    # case 1's parse finds nothing. Look the key up by uid in the pacman
+    # keyring (gpg matches the uid string; the first 16-hex ID line of the
+    # listed block is the primary key, and trusting it covers any subkey
+    # that signed the package) and lsign it.
+    if echo "$output" | grep -qE 'is (unknown|marginal) trust'; then
+        local signer trust_id
+        signer=$(echo "$output" | grep -oP 'signature from "\K[^"]+' | head -1 || true)
+        if [[ -n "$signer" ]]; then
+            trust_id=$(pacman-key --list-keys "$signer" 2>/dev/null | grep -oE '[0-9A-F]{16}' | head -1 || true)
+            if [[ -n "$trust_id" ]]; then
+                echo ""
+                echo "Signing untrusted key $trust_id ($signer)…"
+                if pacman-key --lsign-key "$trust_id"; then
+                    echo "Retrying pacman -Sy…"
+                    if pacman -Sy; then
+                        return 0
+                    fi
+                fi
             fi
         fi
     fi
