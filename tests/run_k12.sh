@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # k12: offscreen render harness for the kernel tree's Choose cell (D3 lock
-# glyph) + Version cell (D4 "— (repo not enabled)" annotation) — see
+# glyph), Version cell (D4 "— (repo not enabled)" annotation), and the
+# "Install from directory…" pseudo-row (C3, plan v1.24.0: the 25th row —
+# folder-glyph QLabel, no checkbox, the D1 tooltips — plus the menu
+# probes: the directory row's one-action menu, never clicked, and a
+# data-row no-regression shape check) — see
 # tests/test_k12_tree_render.cpp (no CTest infra in this project; follows
 # the tests/run_chunk2_ui.sh + run_k11.sh recipes: compiles the REAL
 # MainWindow source closure with the project's GCC warning set, links fmt +
 # the cxxbridge Rust libs + glib + Qt6 + libalpm, drives the real window
 # offscreen, never writes — alpm opened read-only, no root, no terminal,
-# /etc/pacman.conf untouched).
+# menu actions never clicked, /etc/pacman.conf untouched).
 #
 # Gates:
 #   1. the harness exits 0 with all assertions passing (both runs)
