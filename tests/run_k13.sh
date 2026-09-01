@@ -15,15 +15,21 @@
 #
 #   Part B (bash): exercises the real src/repo_add.sh without root, every
 #   write redirected via `--conf <temp file>` into an mktemp sandbox, with a
-#   `pacman` stub on PATH that records its calls. Verifies: (i) a fresh conf
-#   gets exactly one [cachyos] section with literal $arch/$repo Server lines
-#   appended after a single .bak-<epoch> backup, and pacman is called once
-#   with -Sy; (ii) a second run is idempotent (conf byte-identical, no new
-#   backup, "already enabled", pacman re-run); (iii) --dry-run prints the
-#   section + the would-run plan, leaves the conf untouched, creates no
-#   backup, and never calls pacman; (iv) rejections (no args / unknown repo /
-#   metacharacter repo / --conf missing value) exit non-zero and leave the
-#   conf untouched.
+#   `pacman` stub (and a `pacman-key` stub) on PATH that record their calls.
+#   Verifies: (i) a fresh conf gets exactly one [cachyos] section with
+#   literal $arch/$repo Server lines appended after a single .bak-<epoch>
+#   backup, and pacman is called once with -Sy; (ii) a second run is
+#   idempotent (conf byte-identical, no new backup, "already enabled",
+#   pacman re-run); (iii) --dry-run prints the section + the would-run plan,
+#   leaves the conf untouched, creates no backup, and never calls pacman;
+#   (iv) rejections (no args / unknown repo / metacharacter repo / --conf
+#   missing value) exit non-zero and leave the conf untouched; (v) a
+#   one-shot GPG failure (first `pacman -Sy` exits with the real-world
+#   unknown-key error) makes the script auto-import the key (pacman-key
+#   --recv-keys + --lsign-key with the extracted 40-hex ID) and retry, on
+#   BOTH the fresh and the already-enabled paths (exit 0 when the retry
+#   succeeds); (vi) the same failure with a failing key import exits
+#   non-zero without a retry (the no-repair error surfaces as-is).
 #
 # Safety: the live /etc/pacman.conf is NEVER modified by this harness — every
 # non-dry run uses `--conf <temp file>`, so all writes land in the sandbox;
@@ -140,18 +146,44 @@ trap 'rm -rf "$KB"' EXIT
 # Belt and braces: prove the live conf is untouched by the whole run.
 ETC_MD5_BEFORE="$(md5sum /etc/pacman.conf 2>/dev/null | awk '{print $1}' || true)"
 
-# The `pacman` stub: records every invocation (args joined) to $PACMAN_LOG
-# and exits 0 — it never touches the system.
+# The `pacman` stub: records every invocation (args joined) to $PACMAN_LOG.
+# By default it exits 0. If PACMAN_FAIL_GPG points at a not-yet-existing
+# file, the FIRST `pacman -Sy` (only -Sy; any other subcommand is
+# unaffected) fails with the real-world unknown-GPG-key error and creates
+# the file as a one-shot tripwire — the B6/B8 auto-import cases. It never
+# touches the system.
 mkdir -p "$KB/bin"
 PACMAN_LOG="$KB/pacman.log"
+PACMAN_KEY_LOG="$KB/pacman-key.log"
 : > "$PACMAN_LOG"
+: > "$PACMAN_KEY_LOG"
 cat > "$KB/bin/pacman" <<'EOF'
 #!/bin/bash
 echo "pacman $*" >> "$PACMAN_LOG"
+if [[ -n "${PACMAN_FAIL_GPG:-}" && "$1" == "-Sy" && ! -e "$PACMAN_FAIL_GPG" ]]; then
+    touch "$PACMAN_FAIL_GPG"
+    echo "error: cachyos: key \"882DCFE48E2051D48E2562ABF3B607488DB35A47\" is unknown" >&2
+    exit 1
+fi
 exit 0
 EOF
 chmod +x "$KB/bin/pacman"
-export PACMAN_LOG
+# The `pacman-key` stub: records every invocation to $PACMAN_KEY_LOG and
+# exits 0, except when PACMAN_KEY_FAIL points at a not-yet-existing file,
+# in which case the FIRST call fails (one-shot tripwire — the B8
+# import-fails case) and the rest succeed.
+cat > "$KB/bin/pacman-key" <<'EOF'
+#!/bin/bash
+echo "pacman-key $*" >> "$PACMAN_KEY_LOG"
+if [[ -n "${PACMAN_KEY_FAIL:-}" && ! -e "$PACMAN_KEY_FAIL" ]]; then
+    touch "$PACMAN_KEY_FAIL"
+    echo "error: gpg: no key found" >&2
+    exit 1
+fi
+exit 0
+EOF
+chmod +x "$KB/bin/pacman-key"
+export PACMAN_LOG PACMAN_KEY_LOG
 PATH="$KB/bin:$PATH"
 
 FAILURES=0
@@ -281,6 +313,91 @@ N_BACKUPS="$(backup_count "$CONF3")"
 if [[ "$N_BACKUPS" -eq 0 ]]; then pass "B4: no backups created by the rejections"; else fail "B4: rejections created backups"; fi
 N_SY="$(pacman_sy_count)"
 if [[ "$N_SY" -eq 2 ]]; then pass "B4: pacman stub never called by the rejections (still 2)"; else fail "B4: expected 2 pacman -Sy calls, got $N_SY"; fi
+
+# (v) GPG auto-import on the FRESH path: the one-shot GPG failure makes the
+# first `pacman -Sy` exit non-zero ⇒ the script must extract the key ID,
+# call pacman-key --recv-keys + --lsign-key with it, retry `pacman -Sy`,
+# and exit 0 when the retry succeeds.
+GPG_ID="882DCFE48E2051D48E2562ABF3B607488DB35A47"
+CONF4="$KB/conf4"
+fresh_conf "$CONF4"
+cp "$CONF4" "$KB/conf4.orig"
+SY_BEFORE="$(pacman_sy_count)"
+KEY_BEFORE="$(grep -c 'pacman-key' "$PACMAN_KEY_LOG" || true)"
+export PACMAN_FAIL_GPG="$KB/gpg1"
+run_repo_add cachyos --conf "$CONF4"
+unset PACMAN_FAIL_GPG
+if [[ "$SCRIPT_RC" -eq 0 ]]; then pass "B6: GPG-failure fresh run exits 0 (the retry succeeded)"; else fail "B6: GPG-failure fresh run rc=$SCRIPT_RC: $SCRIPT_OUT"; fi
+case "$SCRIPT_OUT" in
+    *"Importing GPG key $GPG_ID"*) pass "B6: 'Importing GPG key <id>' announced";;
+    *) fail "B6: no GPG-key import announcement: $SCRIPT_OUT";;
+esac
+case "$SCRIPT_OUT" in
+    *"Retrying pacman -Sy"*) pass "B6: 'Retrying pacman -Sy…' announced";;
+    *) fail "B6: no retry announcement: $SCRIPT_OUT";;
+esac
+if grep -qx "pacman-key --recv-keys $GPG_ID" "$PACMAN_KEY_LOG"; then pass "B6: pacman-key --recv-keys called with the extracted key ID"; else fail "B6: pacman-key --recv-keys <id> missing"; fi
+if grep -qx "pacman-key --lsign-key $GPG_ID" "$PACMAN_KEY_LOG"; then pass "B6: pacman-key --lsign-key called with the extracted key ID"; else fail "B6: pacman-key --lsign-key <id> missing"; fi
+N_SY="$(pacman_sy_count)"
+if [[ "$N_SY" -eq $((SY_BEFORE + 2)) ]]; then pass "B6: pacman -Sy called twice (initial + retry)"; else fail "B6: expected 2 new pacman -Sy calls, got $((N_SY - SY_BEFORE))"; fi
+N_BACKUPS="$(backup_count "$CONF4")"
+if [[ "$N_BACKUPS" -eq 1 ]]; then pass "B6: exactly one .bak-<epoch> (the append still happened before the failed refresh)"; else fail "B6: expected 1 backup, got $N_BACKUPS"; fi
+N_SECTIONS="$(grep -c '^\[cachyos\]$' "$CONF4" || true)"
+if [[ "$N_SECTIONS" -eq 1 ]]; then pass "B6: one [cachyos] section appended"; else fail "B6: expected 1 [cachyos] header line, got $N_SECTIONS"; fi
+
+# (v cont.) GPG auto-import on the ALREADY-ENABLED path: the same one-shot
+# GPG failure on a re-run (no append, no new backup — only the refresh).
+cp "$CONF4" "$KB/conf4.after6"
+SY_BEFORE="$(pacman_sy_count)"
+KEY_BEFORE="$(grep -c 'pacman-key' "$PACMAN_KEY_LOG" || true)"
+export PACMAN_FAIL_GPG="$KB/gpg2"
+run_repo_add cachyos --conf "$CONF4"
+unset PACMAN_FAIL_GPG
+if [[ "$SCRIPT_RC" -eq 0 ]]; then pass "B7: GPG-failure already-enabled run exits 0"; else fail "B7: GPG-failure already-enabled run rc=$SCRIPT_RC: $SCRIPT_OUT"; fi
+case "$SCRIPT_OUT" in
+    *"already enabled"*) pass "B7: 'already enabled' printed";;
+    *) fail "B7: no 'already enabled' in output: $SCRIPT_OUT";;
+esac
+case "$SCRIPT_OUT" in
+    *"Importing GPG key $GPG_ID"*) pass "B7: GPG key import announced on the re-run path too";;
+    *) fail "B7: no GPG-key import announcement on the re-run: $SCRIPT_OUT";;
+esac
+N_SY="$(pacman_sy_count)"
+if [[ "$N_SY" -eq $((SY_BEFORE + 2)) ]]; then pass "B7: pacman -Sy called twice (initial + retry) on the re-run"; else fail "B7: expected 2 new pacman -Sy calls, got $((N_SY - SY_BEFORE))"; fi
+KEY_TOTAL="$(grep -c 'pacman-key' "$PACMAN_KEY_LOG" || true)"
+if [[ "$KEY_TOTAL" -eq $((KEY_BEFORE + 2)) ]]; then pass "B7: two more pacman-key calls (--recv-keys + --lsign-key)"; else fail "B7: expected 2 new pacman-key calls, got $((KEY_TOTAL - KEY_BEFORE))"; fi
+if cmp -s "$CONF4" "$KB/conf4.after6"; then pass "B7: conf byte-identical (no append on the re-run)"; else fail "B7: conf changed on the already-enabled re-run"; fi
+N_BACKUPS="$(backup_count "$CONF4")"
+if [[ "$N_BACKUPS" -eq 1 ]]; then pass "B7: no new backup (still one)"; else fail "B7: expected 1 backup after the re-run, got $N_BACKUPS"; fi
+
+# (vi) GPG failure with a FAILING key import: recv fails ⇒ no lsign, no
+# retry, non-zero exit — the unrepaired error surfaces as-is.
+CONF5="$KB/conf5"
+fresh_conf "$CONF5"
+SY_BEFORE="$(pacman_sy_count)"
+KEY_BEFORE="$(grep -c 'pacman-key' "$PACMAN_KEY_LOG" || true)"
+export PACMAN_FAIL_GPG="$KB/gpg3" PACMAN_KEY_FAIL="$KB/keyfail3"
+run_repo_add cachyos --conf "$CONF5"
+unset PACMAN_FAIL_GPG PACMAN_KEY_FAIL
+if [[ "$SCRIPT_RC" -ne 0 ]]; then pass "B8: import-failure run exits non-zero"; else fail "B8: import-failure run exited 0: $SCRIPT_OUT"; fi
+case "$SCRIPT_OUT" in
+    *"Importing GPG key $GPG_ID"*) pass "B8: key import was attempted (announced)";;
+    *) fail "B8: no key-import attempt announced: $SCRIPT_OUT";;
+esac
+case "$SCRIPT_OUT" in
+    *"Retrying pacman -Sy"*) fail "B8: a retry happened although the import failed";;
+    *) pass "B8: no retry after the failed import";;
+esac
+N_SY="$(pacman_sy_count)"
+if [[ "$N_SY" -eq $((SY_BEFORE + 1)) ]]; then pass "B8: pacman -Sy called once (no retry)"; else fail "B8: expected 1 new pacman -Sy call, got $((N_SY - SY_BEFORE))"; fi
+KEY_TOTAL="$(grep -c 'pacman-key' "$PACMAN_KEY_LOG" || true)"
+if [[ "$KEY_TOTAL" -eq $((KEY_BEFORE + 1)) ]]; then pass "B8: exactly one pacman-key call"; else fail "B8: expected 1 new pacman-key call, got $((KEY_TOTAL - KEY_BEFORE))"; fi
+# The log is shared across cases (B6/B7 already appended --lsign-key lines),
+# so the per-case pattern is checked on the SOLE new line (the last one):
+# it must be the --recv-keys call, proving --lsign-key was short-circuited.
+if [[ "$(tail -n1 "$PACMAN_KEY_LOG")" == "pacman-key --recv-keys $GPG_ID" ]]; then pass "B8: the sole new call is --recv-keys <id> (--lsign-key short-circuited)"; else fail "B8: unexpected new pacman-key call: $(tail -n1 "$PACMAN_KEY_LOG")"; fi
+N_BACKUPS="$(backup_count "$CONF5")"
+if [[ "$N_BACKUPS" -eq 1 ]]; then pass "B8: backup + append still happened before the failed refresh"; else fail "B8: expected 1 backup, got $N_BACKUPS"; fi
 
 # The live /etc/pacman.conf must be byte-identical to the pre-run state.
 ETC_MD5_AFTER="$(md5sum /etc/pacman.conf 2>/dev/null | awk '{print $1}' || true)"

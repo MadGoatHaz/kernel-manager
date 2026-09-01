@@ -25,8 +25,10 @@
 //   - is_repo_enabled on temp confs: an active [section] ⇒ true; an absent
 //     section ⇒ false; a commented-out "# [section]" ⇒ false; an
 //     options-only file ⇒ false (the mINI comment-skip semantics)
-//   - is_repo_enabled live-conf spot-checks (gated like k7): core ⇒ true,
-//     cachyos ⇒ false on this machine
+//   - is_repo_enabled live-conf spot-checks (gated like k7): each known
+//     repo's state must agree with a mINI-mirroring line scan of the real
+//     /etc/pacman.conf (environment-tolerant — no fixed expectations, so
+//     enabling e.g. [cachyos] on this machine never breaks the harness)
 //   - add_repo_to_pacman_conf with a fake recording runner: the launch
 //     contract ("cachyos" ⇒ exactly one call, cmd == the
 //     <KM_HELPER_DIR>/repo_add.sh 'cachyos' shape, escalate == true, rc 0)
@@ -117,10 +119,60 @@ int main() {
     // ------------------------------------------------------------------
     // 2. is_repo_enabled live-conf spot-checks (gated like k7: this
     //    machine's /etc/pacman.conf — read-only, never modified).
+    //    Environment-tolerant: the C7-era hard-coding ("core → true,
+    //    cachyos → false") went stale when the user's live repo-add
+    //    enabled [cachyos] on this machine — the very test that surfaced
+    //    the missing-GPG-key bug the fix-gpg work addresses. Instead of
+    //    fixed expectations, each known repo's expected state is computed
+    //    with a plain line scan mirroring mINI's section semantics
+    //    (trim " \t\n\r\f\v"; skip #-/;-leading lines; a [line] drops
+    //    everything from the first ';' and takes the text to the LAST
+    //    ']'), and is_repo_enabled must agree with it.
     // ------------------------------------------------------------------
     if (std::filesystem::exists("/etc/pacman.conf")) {
-        check(utils::is_repo_enabled("core"), "is_repo_enabled (live /etc/pacman.conf): core → true");
-        check(!utils::is_repo_enabled("cachyos"), "is_repo_enabled (live /etc/pacman.conf): cachyos → false");
+        const std::vector<const char*> live_names{"core", "cachyos", "chaotic-aur", "liquorix"};
+        const auto mini_trim = [](std::string& s) {
+            const char ws[] = " \t\n\r\f\v";
+            s.erase(s.find_last_not_of(ws) + 1);
+            s.erase(0, s.find_first_not_of(ws));
+        };
+        std::vector<std::string> lines;
+        std::ifstream live("/etc/pacman.conf");
+        std::string raw;
+        while (std::getline(live, raw)) {
+            lines.push_back(raw);
+        }
+        for (const char* name : live_names) {
+            bool expected = false;
+            for (const std::string& line0 : lines) {
+                std::string line = line0;
+                mini_trim(line);
+                if (line.empty() || line.front() == '#' || line.front() == ';') {
+                    continue;
+                }
+                if (line.front() != '[') {
+                    continue;
+                }
+                const std::string::size_type commentAt = line.find_first_of(';');
+                if (commentAt != std::string::npos) {
+                    line = line.substr(0, commentAt);
+                }
+                const std::string::size_type closingAt = line.find_last_of(']');
+                if (closingAt == std::string::npos) {
+                    continue;
+                }
+                std::string section = line.substr(1, closingAt - 1);
+                mini_trim(section);
+                if (section == name) {
+                    expected = true;
+                }
+            }
+            const bool actual = utils::is_repo_enabled(name);
+            check(actual == expected,
+                  (std::string{"is_repo_enabled (live /etc/pacman.conf): "} + name +
+                   (expected ? " → active (section present)" : " → absent (no active section)"))
+                      .c_str());
+        }
     } else {
         std::printf("SKIP: live /etc/pacman.conf absent (non-Arch machine) — spot-checks not run\n");
     }
