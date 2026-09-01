@@ -37,6 +37,7 @@
 
 #include <QCoreApplication>
 #include <QDialog>
+#include <QFileDialog>
 #include <QFutureWatcher>
 #include <QIcon>
 #include <QLabel>
@@ -54,6 +55,16 @@
 namespace fs = std::filesystem;
 
 namespace {
+// D1 (plan v1.24.0): the single identity constant for the "Install from
+// directory…" pseudo-row — file-scope (visible to init_kernels_tree_widget
+// and MainWindow::on_kernel_context_menu alike). It is a UTF-8 string
+// literal (NOT QStringLiteral): tr() takes const char*, so the row text and
+// both recognition comparisons tr() the SAME constant, keeping the row and
+// its menu/locale handling consistent in a translated build (the spec's
+// QStringLiteral form is not tr()-able; the constant's value is identical).
+// The k12 harness mirrors this literal.
+const auto kDirectoryRowRaw = "Install from directory…";
+
 bool install_packages(alpm_handle_t* handle, const std::span<Kernel>& kernels, const std::span<std::string>& selected_list) {
     for (const auto& selected : selected_list) {
         const auto& kernel = std::ranges::find_if(kernels, [selected](auto&& el) { return el.get_raw() == selected; });
@@ -231,6 +242,50 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
             widget_item->setCheckState(TreeCol::Check, Qt::Checked);
         }
     }
+
+    // D1 (plan v1.24.0): the "Install from directory…" pseudo-row — appended
+    // AFTER the kernel loop so BOTH rebuild paths render it (the ctor's
+    // deferred init above and the init_kernels() slot re-run this function),
+    // and it survives every list refresh. It is non-interactive on purpose:
+    // the worker thread cannot open a QFileDialog (cross-thread GUI = UB)
+    // and only sees m_kernels + the change-list strings, so a checkbox-driven
+    // row would need worker special cases; without ItemIsUserCheckable there
+    // is no checkbox, no itemChanged/build_change_list signal path, and the
+    // row is invisible to the worker. Right-click is the only entry point
+    // (the dedicated one-action branch in on_kernel_context_menu).
+    auto* dir_item = new KernelTreeWidgetItem(tree_kernels);
+    dir_item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);  // no ItemIsUserCheckable (D1)
+    // QObject::tr (public static — this is a free function, not a
+    // MainWindow member): the single identity constant, locale-consistent
+    // with the on_kernel_context_menu comparison below.
+    dir_item->setText(TreeCol::PkgName, QObject::tr(kDirectoryRowRaw));
+    dir_item->setText(TreeCol::Version, QStringLiteral("—"));
+    dir_item->setText(TreeCol::Category, QStringLiteral("Local"));
+    dir_item->setText(TreeCol::Install, QStringLiteral("—"));
+    // One shared tooltip text (the D1 string, QStringLiteral per the
+    // deferred-lupdate precedent) on both the PkgName cell and the Check
+    // cell: what the row is + the right-click remediation.
+    const auto dir_tooltip = QStringLiteral(
+        "Install a locally built kernel package from a folder: right-click to choose the folder containing the built *.pkg.tar.zst package(s).");
+    dir_item->setToolTip(TreeCol::PkgName, dir_tooltip);
+    // The Check cell: the D3 lock-label recipe with the glyph swapped —
+    // a non-interactive QLabel showing a folder-open icon (theme
+    // "folder-open" → "folder" → centered "📁" text fallback, 16x16 when a
+    // theme icon resolves; offscreen has no icon theme, so the emoji is the
+    // common case there).
+    auto* dir_check = new QLabel(tree_kernels);
+    auto dir_icon = QIcon::fromTheme(QStringLiteral("folder-open"));
+    if (dir_icon.isNull()) {
+        dir_icon = QIcon::fromTheme(QStringLiteral("folder"));
+    }
+    if (dir_icon.isNull()) {
+        dir_check->setText(QStringLiteral("📁"));
+        dir_check->setAlignment(Qt::AlignCenter);
+    } else {
+        dir_check->setPixmap(dir_icon.pixmap(16, 16));
+    }
+    dir_check->setToolTip(dir_tooltip);
+    tree_kernels->setItemWidget(dir_item, TreeCol::Check, dir_check);
 }
 
 // Show the ordered boot-selection steps (boot_instructions_for output) in a
@@ -518,6 +573,15 @@ void MainWindow::on_configure() noexcept {
     // (data-driven kernel -> source mapping); a repeat for the same kernel
     // is a no-op, so a manual source choice is preserved.
     if (auto* current = m_ui->treeKernels->currentItem()) {
+        // D1 (plan v1.24.0): the "Install from directory…" pseudo-row has
+        // no build source — configure is a no-op for it. The progress
+        // dialog was already shown above, so hide it first (no leftover
+        // spinner), then return before apply_source_for_kernel would
+        // prefill a nonsense source from the row text.
+        if (current->text(TreeCol::PkgName) == tr(kDirectoryRowRaw)) {
+            m_conf_progress_dialog->hide();
+            return;
+        }
         m_conf_window->apply_source_for_kernel(current->text(TreeCol::PkgName).toStdString());
     }
 
@@ -554,6 +618,19 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
         return;
     }
     tree_kernels->setCurrentItem(item);
+
+    // D1 (plan v1.24.0): the "Install from directory…" pseudo-row gets a
+    // dedicated one-action menu — the generic action build below never runs
+    // for it (no km::find_kernel("…") fallback oddities). Selecting the
+    // action opens the folder picker + install flow (the slot below).
+    if (item->text(TreeCol::PkgName) == tr(kDirectoryRowRaw)) {
+        QMenu dmenu(this);
+        auto* dir_action = dmenu.addAction(tr("Install from directory…"));
+        if (dmenu.exec(tree_kernels->viewport()->mapToGlobal(pos)) == dir_action) {
+            on_install_from_directory();
+        }
+        return;
+    }
 
     // The tree PkgName is "repo/name"; the table and the install lookups
     // key on the bare kernel name (prefix stripped by the shared helper —
@@ -682,6 +759,41 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
     if (chosen == boot_action) {
         show_boot_instructions(this, boot_instructions_for(name));
     }
+}
+
+// D1 (plan v1.24.0): the "Install from directory…" flow — a folder picker
+// (the current build directory is the natural default start point, that's
+// where locally built packages live), the C2 install_from_directory()
+// with the REAL runner (the escalated pkexec terminal — the whole install
+// is visible to the user, the synchronous pattern of the pre-compiled
+// install above), then the boot-selection dialog and a same-thread list
+// refresh so the just-installed kernel's row appears immediately.
+void MainWindow::on_install_from_directory() noexcept {
+    const QString dir = QFileDialog::getExistingDirectory(this, tr("Choose build directory…"), QString::fromStdString(utils::build_repo_path().string()));
+    if (dir.isEmpty()) {
+        return;  // cancel = silent (no dialog, no refresh — D6-style)
+    }
+
+    // The real runner: an empty CommandRunner selects run_real_command
+    // (utils::runCmdTerminal, escalated).
+    const DirInstallResult r = install_from_directory(dir.toStdString());
+    if (!r.ok) {
+        QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to install from '%1':\n%2").arg(dir, QString::fromStdString(r.error)));
+        return;
+    }
+
+    // Success: the boot-selection message in the exact shape of the
+    // pre-compiled install flow above (name + version come from the
+    // installed package's .PKGINFO), then the same-thread refresh (the C5
+    // Add-repo pattern): the kernel's row — local/… (C1) or its repo row —
+    // appears with the Installed ✓.
+    QString message = tr("Installed '%1 (%2)'. Select it at the next boot:").arg(QString::fromStdString(r.name), QString::fromStdString(r.version));
+    for (std::size_t i = 0; i < r.boot_instructions.size(); ++i) {
+        message += QLatin1Char('\n');
+        message += QStringLiteral("%1. %2").arg(static_cast<int>(i + 1)).arg(QString::fromStdString(r.boot_instructions[i]));
+    }
+    QMessageBox::information(this, tr("Kernel Manager"), message);
+    init_kernels();
 }
 
 void MainWindow::on_cancel() noexcept {

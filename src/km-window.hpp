@@ -118,6 +118,12 @@ class MainWindow final : public QMainWindow {
     void on_execute() noexcept;
     void on_schedext_config() noexcept;
     void on_configure() noexcept;
+    // D1 (plan v1.24.0): the "Install from directory…" pseudo-row flow —
+    // folder picker (QFileDialog) -> install_kernel::install_from_directory
+    // (the C2 planner, real escalated runner) -> boot-instructions dialog
+    // -> same-thread init_kernels() refresh. Reached only from the
+    // dedicated one-action context-menu branch of on_kernel_context_menu.
+    void on_install_from_directory() noexcept;
     void on_kernel_context_menu(const QPoint& pos) noexcept;
 
     void check_uncheck_item() noexcept;
