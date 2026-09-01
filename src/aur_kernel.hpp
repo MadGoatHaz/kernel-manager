@@ -19,11 +19,20 @@
 #ifndef AUR_KERNEL_HPP
 #define AUR_KERNEL_HPP
 
+#include <filesystem>
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace detail {
 void install_aur_kernels(std::span<std::string> kernel_list) noexcept;
+
+// D5: the AUR build tree lives under the user-selectable build directory
+// (utils::build_repo_path(), QSettings "buildDir", default
+// ~/.cache/kernel-manager/pkgbuilds): <buildDir>/aur_pkgbuilds, or
+// <buildDir>/aur_pkgbuilds/<package_name> when a non-empty package name is
+// given.
+[[nodiscard]] std::filesystem::path aur_pkgbuilds_path(std::string_view package_name = {}) noexcept;
 }  // namespace detail
 
 #endif  // AUR_KERNEL_HPP
