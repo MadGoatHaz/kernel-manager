@@ -35,10 +35,12 @@ int run_real_command(const std::string& cmd, bool escalate) noexcept {
     return utils::runCmdTerminal(QString::fromStdString(cmd), escalate);
 }
 
-// A step that installs a package (pacman/paru/makepkg), as opposed to
-// the post-install tail (mkinitcpio / grub-mkconfig).
+// A step that installs a package (pacman/paru/makepkg — the custom
+// build runs makepkg through build_helper.sh), as opposed to the
+// post-install tail (mkinitcpio / grub-mkconfig).
 [[gnu::pure]] bool is_package_install_step(const std::string& cmd) {
-    return cmd.starts_with("pacman ") || cmd.starts_with("paru ") || cmd.starts_with("makepkg ");
+    return cmd.starts_with("pacman ") || cmd.starts_with("paru ") || cmd.starts_with("makepkg ")
+           || cmd.starts_with(KM_HELPER_DIR "/build_helper.sh");
 }
 
 // The post-install tail every precompiled install gets: the initramfs
@@ -78,8 +80,10 @@ std::vector<InstallStep> plan_steps(const KnownKernel& kernel, Bootloader bl) {
         // No precompiled package: the custom build path — the same
         // makepkg command the app already runs for AUR kernels (the
         // source repo is prepared by the existing build environment,
-        // see detail::install_aur_kernels / the Configure flow).
-        steps.push_back({"makepkg -sicf --cleanbuild", false});
+        // see detail::install_aur_kernels / the Configure flow), wrapped
+        // in build_helper.sh (auto-imports a missing GPG key on
+        // "unknown public key" and retries).
+        steps.push_back({KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild", false});
     }
     return steps;
 }
