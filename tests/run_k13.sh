@@ -25,11 +25,18 @@
 #   (iv) rejections (no args / unknown repo / metacharacter repo / --conf
 #   missing value) exit non-zero and leave the conf untouched; (v) a
 #   one-shot GPG failure (first `pacman -Sy` exits with the real-world
-#   unknown-key error) makes the script auto-import the key (pacman-key
-#   --recv-keys + --lsign-key with the extracted 40-hex ID) and retry, on
-#   BOTH the fresh and the already-enabled paths (exit 0 when the retry
-#   succeeds); (vi) the same failure with a failing key import exits
-#   non-zero without a retry (the no-repair error surfaces as-is).
+#   unknown-key error) on top of the PROACTIVE import+trust pair (pacman-key
+#   --recv-keys + --lsign-key with the allowlist's 40-hex REPO_KEY, run
+#   before every real `pacman -Sy`) makes the reactive case auto-import the
+#   key (same pair with the extracted 40-hex ID) and retry, on BOTH the
+#   fresh and the already-enabled paths (exit 0 when the retry succeeds);
+#   (vi) the same failure with EVERY pacman-key call failing exits non-zero
+#   without a retry (the unrepaired error surfaces as-is, the reactive
+#   --lsign-key short-circuited by &&); (vii) a one-shot unknown-TRUST
+#   failure (the -Sy error names the signer's uid, NOT a key ID — the case
+#   the key-ID parse cannot see) makes reactive case-2 look the key up via
+#   `pacman-key --list-keys <uid>`, lsign the found 16-hex primary ID,
+#   retry, and exit 0.
 #
 # Safety: the live /etc/pacman.conf is NEVER modified by this harness — every
 # non-dry run uses `--conf <temp file>`, so all writes land in the sandbox;
@@ -147,11 +154,14 @@ trap 'rm -rf "$KB"' EXIT
 ETC_MD5_BEFORE="$(md5sum /etc/pacman.conf 2>/dev/null | awk '{print $1}' || true)"
 
 # The `pacman` stub: records every invocation (args joined) to $PACMAN_LOG.
-# By default it exits 0. If PACMAN_FAIL_GPG points at a not-yet-existing
-# file, the FIRST `pacman -Sy` (only -Sy; any other subcommand is
-# unaffected) fails with the real-world unknown-GPG-key error and creates
-# the file as a one-shot tripwire — the B6/B8 auto-import cases. It never
-# touches the system.
+# By default it exits 0. Two one-shot tripwires (each points at a
+# not-yet-existing file; only -Sy is affected; the file is created on the
+# first trip = consumed, so a retry exits 0):
+#   PACMAN_FAIL_GPG   — the real-world unknown-KEY error (names the 40-hex
+#                       ID) — the B6/B7/B8 reactive case-1 auto-import
+#   PACMAN_FAIL_TRUST — the real-world unknown-TRUST error (names the
+#                       signer's uid, NO key ID) — the B9 reactive case-2
+#                       lookup+sign. It never touches the system.
 mkdir -p "$KB/bin"
 PACMAN_LOG="$KB/pacman.log"
 PACMAN_KEY_LOG="$KB/pacman-key.log"
@@ -165,20 +175,31 @@ if [[ -n "${PACMAN_FAIL_GPG:-}" && "$1" == "-Sy" && ! -e "$PACMAN_FAIL_GPG" ]]; 
     echo "error: cachyos: key \"882DCFE48E2051D48E2562ABF3B607488DB35A47\" is unknown" >&2
     exit 1
 fi
+if [[ -n "${PACMAN_FAIL_TRUST:-}" && "$1" == "-Sy" && ! -e "$PACMAN_FAIL_TRUST" ]]; then
+    touch "$PACMAN_FAIL_TRUST"
+    echo "error: cachyos: signature from \"CachyOS <repo@cachyos.org>\" is unknown trust" >&2
+    exit 1
+fi
 exit 0
 EOF
 chmod +x "$KB/bin/pacman"
 # The `pacman-key` stub: records every invocation to $PACMAN_KEY_LOG and
-# exits 0, except when PACMAN_KEY_FAIL points at a not-yet-existing file,
-# in which case the FIRST call fails (one-shot tripwire — the B8
-# import-fails case) and the rest succeed.
+# exits 0, except when PACMAN_KEY_FAIL is set, in which case EVERY call
+# fails (the B8 unrepaired-import case; the flag file is just the trigger).
+# A `--list-keys` call (reactive case-2, B9) additionally prints a fake
+# keyring block in gpg's human format — first 16-hex line = the primary
+# key ID, followed by the signer uid — so the script's uid→ID lookup
+# resolves deterministically.
 cat > "$KB/bin/pacman-key" <<'EOF'
 #!/bin/bash
 echo "pacman-key $*" >> "$PACMAN_KEY_LOG"
-if [[ -n "${PACMAN_KEY_FAIL:-}" && ! -e "$PACMAN_KEY_FAIL" ]]; then
+if [[ -n "${PACMAN_KEY_FAIL:-}" ]]; then
     touch "$PACMAN_KEY_FAIL"
     echo "error: gpg: no key found" >&2
     exit 1
+fi
+if [[ "$1" == "--list-keys" ]]; then
+    printf 'pub   rsa4096 2022-05-23 [SC]\n      D6C9442437365605\nuid           [ unknown] TNE <tne@garudalinux.org>\n'
 fi
 exit 0
 EOF
@@ -365,13 +386,16 @@ esac
 N_SY="$(pacman_sy_count)"
 if [[ "$N_SY" -eq $((SY_BEFORE + 2)) ]]; then pass "B7: pacman -Sy called twice (initial + retry) on the re-run"; else fail "B7: expected 2 new pacman -Sy calls, got $((N_SY - SY_BEFORE))"; fi
 KEY_TOTAL="$(grep -c 'pacman-key' "$PACMAN_KEY_LOG" || true)"
-if [[ "$KEY_TOTAL" -eq $((KEY_BEFORE + 2)) ]]; then pass "B7: two more pacman-key calls (--recv-keys + --lsign-key)"; else fail "B7: expected 2 new pacman-key calls, got $((KEY_TOTAL - KEY_BEFORE))"; fi
+if [[ "$KEY_TOTAL" -eq $((KEY_BEFORE + 4)) ]]; then pass "B7: four more pacman-key calls (proactive recv+lsign, then reactive recv+lsign)"; else fail "B7: expected 4 new pacman-key calls, got $((KEY_TOTAL - KEY_BEFORE))"; fi
 if cmp -s "$CONF4" "$KB/conf4.after6"; then pass "B7: conf byte-identical (no append on the re-run)"; else fail "B7: conf changed on the already-enabled re-run"; fi
 N_BACKUPS="$(backup_count "$CONF4")"
 if [[ "$N_BACKUPS" -eq 1 ]]; then pass "B7: no new backup (still one)"; else fail "B7: expected 1 backup after the re-run, got $N_BACKUPS"; fi
 
-# (vi) GPG failure with a FAILING key import: recv fails ⇒ no lsign, no
-# retry, non-zero exit — the unrepaired error surfaces as-is.
+# (vi) GPG failure with an UNREPAIRABLE key import: every pacman-key call
+# fails (the key never lands in the keyring) ⇒ the proactive pair fails
+# silently, the reactive --recv-keys fails, its --lsign-key is
+# short-circuited by &&, no retry, non-zero exit — the unrepaired error
+# surfaces as-is.
 CONF5="$KB/conf5"
 fresh_conf "$CONF5"
 SY_BEFORE="$(pacman_sy_count)"
@@ -379,25 +403,66 @@ KEY_BEFORE="$(grep -c 'pacman-key' "$PACMAN_KEY_LOG" || true)"
 export PACMAN_FAIL_GPG="$KB/gpg3" PACMAN_KEY_FAIL="$KB/keyfail3"
 run_repo_add cachyos --conf "$CONF5"
 unset PACMAN_FAIL_GPG PACMAN_KEY_FAIL
-if [[ "$SCRIPT_RC" -ne 0 ]]; then pass "B8: import-failure run exits non-zero"; else fail "B8: import-failure run exited 0: $SCRIPT_OUT"; fi
+if [[ "$SCRIPT_RC" -ne 0 ]]; then pass "B8: unrepaired-import run exits non-zero"; else fail "B8: unrepaired-import run exited 0: $SCRIPT_OUT"; fi
 case "$SCRIPT_OUT" in
-    *"Importing GPG key $GPG_ID"*) pass "B8: key import was attempted (announced)";;
-    *) fail "B8: no key-import attempt announced: $SCRIPT_OUT";;
+    *"Importing GPG key $GPG_ID"*) pass "B8: the (failing) import was announced";;
+    *) fail "B8: no import announcement: $SCRIPT_OUT";;
 esac
 case "$SCRIPT_OUT" in
-    *"Retrying pacman -Sy"*) fail "B8: a retry happened although the import failed";;
-    *) pass "B8: no retry after the failed import";;
+    *"Retrying pacman -Sy"*) fail "B8: a retry happened although every import failed";;
+    *) pass "B8: no retry after the failed imports";;
 esac
 N_SY="$(pacman_sy_count)"
 if [[ "$N_SY" -eq $((SY_BEFORE + 1)) ]]; then pass "B8: pacman -Sy called once (no retry)"; else fail "B8: expected 1 new pacman -Sy call, got $((N_SY - SY_BEFORE))"; fi
 KEY_TOTAL="$(grep -c 'pacman-key' "$PACMAN_KEY_LOG" || true)"
-if [[ "$KEY_TOTAL" -eq $((KEY_BEFORE + 1)) ]]; then pass "B8: exactly one pacman-key call"; else fail "B8: expected 1 new pacman-key call, got $((KEY_TOTAL - KEY_BEFORE))"; fi
-# The log is shared across cases (B6/B7 already appended --lsign-key lines),
-# so the per-case pattern is checked on the SOLE new line (the last one):
-# it must be the --recv-keys call, proving --lsign-key was short-circuited.
-if [[ "$(tail -n1 "$PACMAN_KEY_LOG")" == "pacman-key --recv-keys $GPG_ID" ]]; then pass "B8: the sole new call is --recv-keys <id> (--lsign-key short-circuited)"; else fail "B8: unexpected new pacman-key call: $(tail -n1 "$PACMAN_KEY_LOG")"; fi
+if [[ "$KEY_TOTAL" -eq $((KEY_BEFORE + 3)) ]]; then pass "B8: three pacman-key calls (proactive recv+lsign, reactive recv; reactive lsign short-circuited)"; else fail "B8: expected 3 new pacman-key calls, got $((KEY_TOTAL - KEY_BEFORE))"; fi
+# The log is shared across cases (B6/B7 already appended lines; B9 runs
+# after this check), so the per-case pattern is checked on the LAST line:
+# it must be the reactive --recv-keys call, proving its --lsign-key was
+# short-circuited by &&.
+if [[ "$(tail -n1 "$PACMAN_KEY_LOG")" == "pacman-key --recv-keys $GPG_ID" ]]; then pass "B8: the last call is the reactive --recv-keys <id> (--lsign-key short-circuited)"; else fail "B8: unexpected last pacman-key call: $(tail -n1 "$PACMAN_KEY_LOG")"; fi
 N_BACKUPS="$(backup_count "$CONF5")"
 if [[ "$N_BACKUPS" -eq 1 ]]; then pass "B8: backup + append still happened before the failed refresh"; else fail "B8: expected 1 backup, got $N_BACKUPS"; fi
+N_SECTIONS="$(grep -c '^\[cachyos\]$' "$CONF5" || true)"
+if [[ "$N_SECTIONS" -eq 1 ]]; then pass "B8: one [cachyos] section appended"; else fail "B8: expected 1 [cachyos] header line, got $N_SECTIONS"; fi
+
+# (vii) UNKNOWN-TRUST repair (the case the user hit live): the key is in
+# the keyring but untrusted, so the -Sy error names the signer's uid,
+# never a key ID — case 1's parse finds nothing. The script must look the
+# key up via `pacman-key --list-keys <uid>`, lsign the found 16-hex
+# primary ID, retry, and exit 0.
+SIGNER="CachyOS <repo@cachyos.org>"
+TRUST_ID="D6C9442437365605"
+CONF6="$KB/conf6"
+fresh_conf "$CONF6"
+SY_BEFORE="$(pacman_sy_count)"
+KEY_BEFORE="$(grep -c 'pacman-key' "$PACMAN_KEY_LOG" || true)"
+export PACMAN_FAIL_TRUST="$KB/trust1"
+run_repo_add cachyos --conf "$CONF6"
+unset PACMAN_FAIL_TRUST
+if [[ "$SCRIPT_RC" -eq 0 ]]; then pass "B9: unknown-trust run exits 0 (case-2 repair + retry succeeded)"; else fail "B9: unknown-trust run rc=$SCRIPT_RC: $SCRIPT_OUT"; fi
+case "$SCRIPT_OUT" in
+    *"is unknown trust"*) pass "B9: the unknown-trust error surfaced (then was repaired)";;
+    *) fail "B9: no unknown-trust error in output: $SCRIPT_OUT";;
+esac
+case "$SCRIPT_OUT" in
+    *"Signing untrusted key $TRUST_ID"*) pass "B9: the looked-up key ID was signed (announced)";;
+    *) fail "B9: no key-sign announcement: $SCRIPT_OUT";;
+esac
+if grep -qx "pacman-key --list-keys $SIGNER" "$PACMAN_KEY_LOG"; then pass "B9: the key was looked up by the signer's uid"; else fail "B9: pacman-key --list-keys <signer> missing"; fi
+if grep -qx "pacman-key --lsign-key $TRUST_ID" "$PACMAN_KEY_LOG"; then pass "B9: the looked-up 16-hex ID was locally signed"; else fail "B9: pacman-key --lsign-key <id> missing"; fi
+case "$SCRIPT_OUT" in
+    *"Retrying pacman -Sy"*) pass "B9: the retry was announced";;
+    *) fail "B9: no retry announcement: $SCRIPT_OUT";;
+esac
+N_SY="$(pacman_sy_count)"
+if [[ "$N_SY" -eq $((SY_BEFORE + 2)) ]]; then pass "B9: pacman -Sy called twice (initial + retry)"; else fail "B9: expected 2 new pacman -Sy calls, got $((N_SY - SY_BEFORE))"; fi
+KEY_TOTAL="$(grep -c 'pacman-key' "$PACMAN_KEY_LOG" || true)"
+if [[ "$KEY_TOTAL" -eq $((KEY_BEFORE + 4)) ]]; then pass "B9: four pacman-key calls (proactive recv+lsign, then case-2 list-keys+lsign)"; else fail "B9: expected 4 new pacman-key calls, got $((KEY_TOTAL - KEY_BEFORE))"; fi
+N_BACKUPS="$(backup_count "$CONF6")"
+if [[ "$N_BACKUPS" -eq 1 ]]; then pass "B9: backup + append still happened before the failed refresh"; else fail "B9: expected 1 backup, got $N_BACKUPS"; fi
+N_SECTIONS="$(grep -c '^\[cachyos\]$' "$CONF6" || true)"
+if [[ "$N_SECTIONS" -eq 1 ]]; then pass "B9: one [cachyos] section appended"; else fail "B9: expected 1 [cachyos] header line, got $N_SECTIONS"; fi
 
 # The live /etc/pacman.conf must be byte-identical to the pre-run state.
 ETC_MD5_AFTER="$(md5sum /etc/pacman.conf 2>/dev/null | awk '{print $1}' || true)"
