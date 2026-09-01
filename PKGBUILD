@@ -8,16 +8,17 @@
 #
 # --------------------------------------------------------------------------
 # VERSIONING
-#   pkgver mirrors the version of the pinned source tree: the v1.22.0 tag
-#   (the fork's first tag after the distro-agnostic rename to
+#   pkgver mirrors the version of the pinned source tree: the v1.23.0 tag
+#   (the fork's second tag after the distro-agnostic rename to
 #   `kernel-manager`). The pre-rebrand tags (incl. v1.19.0) package the
 #   WRONG (CachyOS-branded) content and are not used.
 #
-#   The stable source below is pinned to the v1.22.0 tag's commit aad790e
-#   (= main HEAD at the v1.22.0 cut — the QA-passed tree), so the package
-#   source is exactly the tag contents. When the next release tag (e.g.
-#   v1.23.0) is cut on the fork, bump pkgver and re-pin `_commit` to that
-#   tag's commit (+ refresh `sha256sums`).
+#   The stable source below is pinned to the v1.23.0 tag's commit 0c918d4
+#   (= the tag commit itself — the full post-RC state: the v1.23.0 RC
+#   f8536cc + the 5 post-RC hardening fixes), so the package source is
+#   exactly the tag contents. When the next release tag (e.g. v1.24.0) is
+#   cut on the fork, bump pkgver and re-pin `_commit` to that tag's commit
+#   (+ refresh `sha256sums`).
 #
 # --------------------------------------------------------------------------
 # DEPENDENCIES  (verified against `ldd` on the built binary + the CMake build)
@@ -65,7 +66,7 @@
 #   conflict + provide make it drop-in replace the CachyOS package cleanly.
 
 pkgname=kernel-manager
-pkgver=1.22.0
+pkgver=1.23.0
 pkgrel=1
 pkgdesc="Qt6 GUI for kernel configuration, compilation, and sched-ext (BPF) scheduler management"
 arch=(x86_64)
@@ -82,11 +83,11 @@ makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polki
 # Defensive polkit reload so the shipped policy is picked up on (re)install.
 install=kernel-manager.install
 
-# Pinned v1.22.0 tag commit (main HEAD at the v1.22.0 cut). See the
+# Pinned v1.23.0 tag commit (the tag's commit itself). See the
 # VERSIONING note above.
-_commit=aad790ebb1b8d0b4a7e46c51a0e2a6eb21bbe4f4
+_commit=0c918d4f9c015ab140b7d9c3dbe37c87e1df888b
 source=("https://github.com/MadGoatHaz/kernel-manager/archive/${_commit}.tar.gz")
-sha256sums=("ffe275c1d38827d9c38dba87bdacb6287816ef6873fc67972f7c797dbe391d88")
+sha256sums=("26e9dde3e12ef3746cf30ce7298e8c962062f7110c1b85871bb9394c5587edcc")
 
 # GitHub archive top dir for a commit is `<repo>-<full-sha>`.
 _srcdir="kernel-manager-${_commit}"
