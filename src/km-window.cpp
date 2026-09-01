@@ -634,8 +634,8 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
         // utils::add_repo_to_pacman_conf runs
         // "$KM_HELPER_DIR/repo_add.sh '<repo>'" as an administrator
         // (backup + append + `pacman -Sy`, C4+C6); the synchronous
-        // terminal blocks until the user presses enter, so the exit code
-        // is known before we report back.
+        // terminal blocks until the user presses enter, so the operation
+        // is complete before we report back.
         const QString repo = QString::fromStdString(repo_to_add);
         QMessageBox confirm(this);
         confirm.setText(tr("Enable the '%1' pacman repository?").arg(repo));
@@ -646,14 +646,28 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
             return;
         }
         const int rc = utils::add_repo_to_pacman_conf(repo_to_add);
-        if (rc != 0) {
-            QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to enable repository '%1' (exit code %2). Check the terminal output.").arg(repo).arg(rc));
-            return;
+        // C5: the terminal-helper/pkexec chain's exit code is unreliable
+        // (it can be non-zero even when the script succeeded), so the
+        // outcome is judged by the ACTUAL STATE — whether the repo
+        // section is now enabled in /etc/pacman.conf — not by rc. rc is
+        // kept only for the failure message as a diagnostic.
+        const bool repo_now_enabled = utils::is_repo_enabled(repo_to_add);
+        if (repo_now_enabled) {
+            // Success — the repo is enabled regardless of the terminal
+            // exit code.
+            QMessageBox::information(this, tr("Repository enabled"),
+                tr("Repository '%1' enabled — refreshing the kernel list…").arg(repo));
+            // Same-thread slot: re-parse the alpm handle + re-fetch +
+            // rebuild so the just-enabled repo's rows go live immediately
+            // (D2).
+            init_kernels();
+        } else {
+            // Genuine failure — the repo is NOT enabled in
+            // /etc/pacman.conf.
+            QMessageBox::critical(this, tr("Failed"),
+                tr("Failed to enable repository '%1' (exit code %2). Check the terminal output.")
+                    .arg(repo).arg(rc));
         }
-        QMessageBox::information(this, tr("Kernel Manager"), tr("Repository '%1' enabled — refreshing the kernel list…").arg(repo));
-        // Same-thread slot: re-parse the alpm handle + re-fetch + rebuild
-        // so the just-enabled repo's rows go live immediately (D2).
-        init_kernels();
         return;
     }
 
