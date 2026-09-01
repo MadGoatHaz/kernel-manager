@@ -20,12 +20,18 @@
 
 #include "aur_kernel.hpp"        // for detail::install_aur_kernels (the AUR build path)
 #include "boot_instructions.hpp" // for instructions_for
-#include "utils.hpp"             // for runCmdTerminal (default runner), exec (paru probe)
+#include "utils.hpp"             // for runCmdTerminal (default runner), exec (paru probe + .PKGINFO)
 
-#include <string>      // for string, to_string
-#include <string_view> // for string_view
-#include <utility>     // for move
-#include <vector>      // for vector
+#include <algorithm>    // for ranges::sort
+#include <filesystem>   // for directory_iterator, path, absolute
+#include <string>       // for string, to_string
+#include <string_view>  // for string_view
+#include <system_error> // for error_code
+#include <utility>      // for move
+#include <vector>       // for vector
+
+#include <fmt/compile.h>
+#include <fmt/core.h>
 
 namespace {
 
@@ -52,6 +58,47 @@ void append_postinstall_tail(std::vector<InstallStep>& steps, Bootloader bl) {
     if (bl == Bootloader::GRUB) {
         steps.push_back({"grub-mkconfig -o /boot/grub/grub.cfg", true});
     }
+}
+
+// The built-package suffix (D2: the literal .pkg.tar.zst per the user
+// request; a PKGEXT-from-/etc/makepkg.conf generalization, after
+// conf-window.cpp's get_pkgext_value_from_makepkgconf, is documented
+// future work, not this cycle). NOTE: std::filesystem::path::extension()
+// returns only the trailing ".zst" component, so the suffix is matched
+// whole — never via extension().
+inline constexpr std::string_view kPkgSuffix = ".pkg.tar.zst";
+
+// Trim surrounding whitespace and one pair of surrounding quotes from a
+// .PKGINFO value (the file-local copy of utils.cpp's
+// strip_pkgbuild_value — that one is not exported; D2 note).
+std::string strip_pkginfo_value(std::string_view value) {
+    const auto left  = value.find_first_not_of(" \t");
+    const auto right = value.find_last_not_of(" \t");
+    if (left == std::string_view::npos) {
+        return std::string{};
+    }
+    value = value.substr(left, right - left + 1);
+    if (value.size() >= 2) {
+        const auto first = value.front();
+        if ((first == '"' || first == '\'') && value.back() == first) {
+            value = value.substr(1, value.size() - 2);
+        }
+    }
+    return std::string{value};
+}
+
+// The first .PKGINFO `key = value` field of the extracted content (""
+// when the key is absent): the fields are read independently, so a
+// missing pkgrel degrades to a bare pkgver version (the lenient parse
+// k14 asserts).
+std::string pkginfo_field(std::string_view content, std::string_view key) {
+    const auto prefix = std::string{key} + " = ";
+    for (const auto line : utils::make_multiline_view(content)) {
+        if (line.starts_with(prefix)) {
+            return strip_pkginfo_value(line.substr(prefix.size()));
+        }
+    }
+    return std::string{};
 }
 
 }  // namespace
@@ -204,4 +251,123 @@ bool execute_plan(const InstallPlan& plan, std::string& error_out, CommandRunner
 
 std::vector<std::string> boot_instructions_for(std::string_view kernel_name) {
     return instructions_for(detect_bootloader(), std::string{km::kernel_name_from_raw(kernel_name)});
+}
+
+std::vector<std::filesystem::path> list_local_packages(std::string_view dir) {
+    std::vector<std::filesystem::path> pkgs{};
+    std::error_code ec{};
+    const auto begin = std::filesystem::directory_iterator(dir, ec);
+    if (ec) {
+        return pkgs;  // a missing/unreadable dir holds nothing; the caller reports
+    }
+    // Non-recursive: a makepkg build dir holds the packages at its root
+    // (the post-build flow's layout; nested per-source trees belong to
+    // the Configure flow, not this one).
+    for (auto it = begin; it != std::filesystem::directory_iterator{}; ++it) {
+        if (it->path().filename().string().ends_with(kPkgSuffix)) {
+            pkgs.push_back(it->path());
+        }
+    }
+    // Sorted by filename: deterministic command strings + install order.
+    std::ranges::sort(pkgs, [](const auto& a, const auto& b) { return a.filename() < b.filename(); });
+    return pkgs;
+}
+
+bool read_pkginfo(const std::filesystem::path& pkg, std::string& name_out, std::string& version_out) {
+    // Extract the .PKGINFO straight from the archive (no temp file, the
+    // build artifact stays untouched; the tar + zstd tools are verified
+    // present, D2). popen failure ⇒ exec returns its "-1" sentinel and a
+    // non-archive ⇒ tar fails behind 2>/dev/null: both leave no pkgname
+    // below, so any failure degrades to false.
+    const auto content = utils::exec(
+        fmt::format(FMT_COMPILE("tar --zstd -xOf '{}' .PKGINFO 2>/dev/null"), pkg.string()));
+
+    const auto name = pkginfo_field(content, "pkgname");
+    if (name.empty()) {
+        return false;
+    }
+    const auto pkgver = pkginfo_field(content, "pkgver");
+    const auto pkgrel = pkginfo_field(content, "pkgrel");  // optional in the format: a missing one degrades to the bare pkgver
+    name_out = name;
+    version_out = pkgver + (pkgrel.empty() ? "" : "-" + pkgrel);
+    return true;
+}
+
+DirInstallResult install_from_directory(std::string_view dir, CommandRunner runner, Bootloader bl) {
+    DirInstallResult result{};
+
+    // The D2 guard: no built packages in the dir ⇒ nothing to install,
+    // and the runner is never called (zero commands, no terminal).
+    const auto pkgs = list_local_packages(dir);
+    if (pkgs.empty()) {
+        result.ok = false;
+        result.error = "no *.pkg.tar.zst packages found in '" + std::string{dir} + "'";
+        return result;  // boot_instructions stays empty: there is no kernel to point at
+    }
+
+    // The installed kernel's identity: the first package whose .PKGINFO
+    // parses to a non-headers name (a dir may hold the kernel + its
+    // headers pair; the boot instructions need the kernel base), else
+    // the first filename — the best-effort fallback strips only the
+    // .pkg.tar.zst suffix, so it keeps the -<version>-<arch> tail,
+    // which the display text tolerates; the install itself never
+    // depends on this parse (D2).
+    std::string name{};
+    std::string version{};
+    for (const auto& pkg : pkgs) {
+        std::string pkg_name{};
+        std::string pkg_version{};
+        if (read_pkginfo(pkg, pkg_name, pkg_version) && !pkg_name.ends_with("-headers")) {
+            name = pkg_name;
+            version = pkg_version;
+            break;
+        }
+    }
+    if (name.empty()) {
+        const auto filename = pkgs.front().filename().string();
+        name = filename.substr(0, filename.size() - kPkgSuffix.size());
+    }
+
+    // The boot-selection steps describe the detected bootloader + the
+    // kernel, not the install outcome: they are filled before execution
+    // (the install_kernel pattern) so the caller can show them even
+    // after a failure.
+    result.boot_instructions = instructions_for(bl, name);
+    result.name = name;
+    result.version = version;
+
+    if (!runner) {
+        runner = run_real_command;  // the shared pkexec terminal path
+    }
+
+    // The plan: one escalated pacman -U of the explicit single-quoted
+    // ABSOLUTE paths — no shell glob (D2: the 0c918d4 pkexec-CWD-reset
+    // rationale, the root shell starts in $HOME so relative paths
+    // break; quoting keeps a spaced name one word instead of
+    // word-splitting an expanded glob) — then the standard post-install
+    // tail (reused verbatim).
+    std::vector<InstallStep> steps{};
+    std::string pacman_cmd = "pacman -U";
+    for (const auto& pkg : pkgs) {
+        // fs::absolute before quoting: list_local_packages hands out
+        // the paths as found under `dir`, which may itself be relative.
+        pacman_cmd += " '" + std::filesystem::absolute(pkg).string() + "'";
+    }
+    steps.push_back({pacman_cmd, true});
+    append_postinstall_tail(steps, bl);
+
+    // The execution loop (identical to install_kernel): first failing
+    // step ⇒ ok = false, error names the command + its exit code, the
+    // remaining steps are skipped — graceful, never a crash.
+    for (const auto& step : steps) {
+        const int rc = runner(step.cmd, step.escalate);
+        if (rc != 0) {
+            result.ok = false;
+            result.error = "Command failed (exit code " + std::to_string(rc) + "): " + step.cmd;
+            return result;
+        }
+    }
+
+    result.ok = true;
+    return result;
 }

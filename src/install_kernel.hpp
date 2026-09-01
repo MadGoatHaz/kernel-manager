@@ -22,8 +22,10 @@
 #include "bootloader.hpp"      // for Bootloader, detect_bootloader
 #include "known_kernels.hpp"   // for KnownKernel
 
+#include <filesystem>  // for path
 #include <functional>  // for function
-#include <string>      // for string, string_view
+#include <string>      // for string
+#include <string_view> // for string_view
 #include <vector>      // for vector
 
 // The "install pre-compiled kernel" capability (plan chunk K8): plan the
@@ -140,5 +142,75 @@ struct InstallPlan {
 // package base — the thin K5+K6 combination the "show boot
 // instructions" action displays.
 [[nodiscard]] std::vector<std::string> boot_instructions_for(std::string_view kernel_name);
+
+// ── Install from a directory (Feature A, D2) ─────────────────────────
+//
+// The "Install from directory…" action's backend: the locally built
+// package(s) found in a user-picked directory are installed with one
+// escalated `pacman -U` of explicit absolute paths + the standard
+// post-install tail — the same CommandRunner contract and graceful-stop
+// execution as install_kernel() above, but driven by the directory
+// contents instead of the curated table (the file set is unknown at
+// plan time, so there is no plan_steps analog: the plan is built at
+// execution time from list_local_packages).
+
+// List the built packages in a directory (non-recursive: a makepkg
+// build dir holds them at its root, the post-build flow's layout): the
+// *.pkg.tar.zst files, sorted by filename for a deterministic order.
+// The literal .pkg.tar.zst suffix is the current contract (user
+// request); a PKGEXT-from-/etc/makepkg.conf generalization (the
+// get_pkgext_value_from_makepkgconf precedent) is documented future
+// work, not this cycle.
+[[nodiscard]] std::vector<std::filesystem::path> list_local_packages(std::string_view dir);
+
+// Read the package identity out of a built package's .PKGINFO
+// (extracted in place with `tar --zstd -xOf` — the archive is never
+// modified): `name` = the pkgname field, `version` =
+// "<pkgver>-<pkgrel>" (a missing pkgrel degrades to the bare pkgver).
+// False on any failure (non-archive, missing or unreadable .PKGINFO,
+// absent pkgname) — the caller falls back to the filename; the install
+// itself never depends on this parse.
+[[nodiscard]] bool read_pkginfo(const std::filesystem::path& pkg,
+                                std::string& name_out,
+                                std::string& version_out);
+
+// Result of one install_from_directory() run: the outcome flag + error
+// text, the installed kernel's name + version (for the boot-instructions
+// display and the list refresh), and the post-install boot-selection
+// steps. The instructions are filled on every run (they describe the
+// detected bootloader and the kernel, not the outcome), so the caller
+// can show them even after a failure — except when the directory holds
+// no packages at all (zero commands, no kernel to point at).
+struct DirInstallResult {
+    bool ok = false;
+    std::string error;
+    std::string name;
+    std::string version;
+    std::vector<std::string> boot_instructions;
+};
+
+// Install the built packages found in `dir` (list_local_packages): one
+// escalated `pacman -U` of the explicit single-quoted ABSOLUTE paths
+// (no shell glob — the 0c918d4 pkexec-CWD-reset rationale: the root
+// shell starts in $HOME, so relative paths break, and quoting keeps a
+// spaced name one word instead of word-splitting an expanded glob)
+// followed by the standard post-install tail (mkinitcpio -P + the
+// GRUB-only config regeneration), each step through `runner`:
+//   - an empty runner selects the real one (utils::runCmdTerminal, the
+//     shared pkexec terminal path; resolved in the .cpp so this header
+//     stays Qt-free)
+//   - a directory with no *.pkg.tar.zst packages fails with the
+//     "no *.pkg.tar.zst packages found in '<dir>'" error and runs zero
+//     commands (the D2 guard)
+//   - the first failing step lands in `error` (the command + its exit
+//     code), the remaining steps are skipped — graceful, never a crash
+// `name`/`version` come from the first package whose .PKGINFO parses
+// to a non-headers kernel name (read_pkginfo), else the first filename
+// (best-effort: the .pkg.tar.zst suffix stripped); `bl` is the
+// bootloader the post-install tail targets (default: the live
+// detection, detect_bootloader()).
+[[nodiscard]] DirInstallResult install_from_directory(std::string_view dir,
+                                                      CommandRunner runner = CommandRunner{},
+                                                      Bootloader bl = detect_bootloader());
 
 #endif  // INSTALL_KERNEL_HPP
