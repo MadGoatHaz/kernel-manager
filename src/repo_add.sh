@@ -111,6 +111,42 @@ for s in "${SERVERS[@]}"; do
     SECTION+=$line
 done
 
+# --- pacman -Sy with automatic GPG key import ------------------------------
+# The refresh can fail when the repo's signing key is not yet in the keyring
+# (the live case: `error: cachyos: key "882DCFE4…" is unknown`). In that one
+# situation the key is fetched + trusted and the refresh retried; any other
+# failure (network, mirror, DB error, a second failure after the retry)
+# surfaces the pacman output and the script exits non-zero. The pacman call
+# sits in a conditional context so `set -e` does not abort mid-function.
+# --dry-run never reaches here (it exits before the refresh); both real
+# paths (fresh append + already-enabled re-run) do.
+run_pacman_sy() {
+    local output
+    if output=$(pacman -Sy 2>&1); then
+        echo "$output"
+        return 0
+    fi
+    echo "$output"
+
+    # Extract the unknown key ID (pattern: key "<40-hex>" …). `|| true`
+    # guards set -e when the pattern is absent — a non-GPG failure must
+    # reach the final return 1 with its text already printed, not abort
+    # at this assignment.
+    local key_id
+    key_id=$(echo "$output" | grep -oP 'key "\K[0-9A-F]{40}' | head -1 || true)
+    if [[ -n "$key_id" ]]; then
+        echo ""
+        echo "Importing GPG key $key_id…"
+        if pacman-key --recv-keys "$key_id" && pacman-key --lsign-key "$key_id"; then
+            echo "Retrying pacman -Sy…"
+            if pacman -Sy; then
+                return 0
+            fi
+        fi
+    fi
+    return 1
+}
+
 # --- idempotency: an active [section] already present ⇒ no append, no backup ---
 if [[ -f "$CONF" ]] && grep -qE "^[[:space:]]*\[$REPO\]" "$CONF"; then
     echo "Repo '$REPO' already enabled in $CONF — skipping append (no backup)."
@@ -119,7 +155,7 @@ if [[ -f "$CONF" ]] && grep -qE "^[[:space:]]*\[$REPO\]" "$CONF"; then
         exit 0
     fi
     echo "Running pacman -Sy…"
-    pacman -Sy
+    run_pacman_sy
     exit 0
 fi
 
@@ -146,4 +182,4 @@ printf '%s' "$SECTION" >> "$CONF"
 echo "Appended [$REPO] to $CONF"
 
 echo "Running pacman -Sy…"
-pacman -Sy
+run_pacman_sy
