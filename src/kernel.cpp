@@ -272,8 +272,8 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
     static constexpr std::string_view replace_part = "-headers";
     std::vector<Kernel> kernels{};
 
-    auto* dbs                       = alpm_get_syncdbs(handle);
-    [[maybe_unused]] auto* local_db = alpm_get_localdb(handle);
+    auto* dbs      = alpm_get_syncdbs(handle);
+    auto* local_db = alpm_get_localdb(handle);
     for (alpm_list_t* i = dbs; i != nullptr; i = i->next) {
         static constexpr auto needle = "linux[^ ]*-headers";
         alpm_list_t* needles         = nullptr;
@@ -383,6 +383,65 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
         kernel_obj.m_name   = e.name;
         kernel_obj.m_raw    = fmt::format(FMT_COMPILE("{}/{}"), e.install_repo, e.name);
         kernels.emplace_back(std::move(kernel_obj));
+    }
+
+    // D3 (Feature A): 4th pass — locally installed kernels absent from every
+    // enabled sync DB. A kernel installed from local files, another distro,
+    // or a since-disabled repo lives in the local DB but is listed nowhere
+    // else; this surfaces it as a "local/<name>" row. The row carries a
+    // non-null m_pkg (the 5-arg ctor), so version() returns the real local
+    // version, is_installed() is valid as usual, and remove() flows through
+    // the existing pacman -Rsn path (uncheck + Execute = uninstall, no new
+    // code). Dedup keeps real repo/AUR rows (m_pkg non-null) authoritative;
+    // a display placeholder (curated info-row, m_pkg == nullptr — version
+    // "—", not removable) is REPLACED by the local row, because a masked
+    // install is neither visible nor uninstallable from the list (the D3
+    // acceptance probe: KM_IGNORE_REPO=core ⇒ "local/linux" must appear with
+    // the real local version — a plain-skip dedup would let the info-row win).
+    // On a stock machine the pass is usually vacuous (every local kernel is
+    // also in an enabled sync DB).
+    {
+        static constexpr auto needle = "linux[^ ]*-headers";
+        alpm_list_t* needles         = nullptr;
+        alpm_list_t* ret_list        = nullptr;
+
+        // NOLINTNEXTLINE
+        needles = alpm_list_add(needles, const_cast<void*>(reinterpret_cast<const void*>(needle)));
+        alpm_db_search(local_db, needles, &ret_list);
+
+        for (alpm_list_t* j = ret_list; j != nullptr; j = j->next) {
+            auto* pkg         = reinterpret_cast<alpm_pkg_t*>(j->data);
+            std::string name  = alpm_pkg_get_name(pkg);
+            const auto& found = std::ranges::search(name, ignored_pkg);
+            if (!found.empty()) {
+                continue;  // linux-api-headers is not a kernel header
+            }
+
+            std::string base{name};
+            utils::remove_all(base, replace_part);
+
+            auto* local_pkg = alpm_db_get_pkg(local_db, base.c_str());
+            if (local_pkg == nullptr) {
+                continue;  // orphaned headers: the kernel package is not installed
+            }
+
+            // Dedup by name: a real repo/AUR row wins (skip); a display
+            // placeholder (info-row, m_pkg == nullptr) is replaced by the
+            // local row — the list stays duplicate-free either way.
+            auto existing = std::ranges::find_if(kernels, [&](const auto& kernel) { return kernel.m_name == base; });
+            if (existing != kernels.end()) {
+                if (existing->has_pkg()) {
+                    continue;
+                }
+                kernels.erase(existing);
+            }
+
+            auto* local_headers = alpm_db_get_pkg(local_db, name.c_str());
+            kernels.emplace_back(Kernel{handle, local_pkg, local_headers, "local", fmt::format("local/{}", base)});
+        }
+
+        alpm_list_free(needles);
+        alpm_list_free(ret_list);
     }
 
     return kernels;
