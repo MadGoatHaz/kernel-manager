@@ -1,16 +1,17 @@
 # Changelog
 
-### v1.23.0 (2026-08-31) — release candidate
+### v1.23.0 (2026-08-31)
 
-[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/aad790e...f8536cc)
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/aad790e...0c918d4)
 
 - 🖼️ **Custom project icon:** an amber gauge mark (scx-manager geometry, `#F57F17`) replaces the inherited CachyOS green artwork — all 10 hicolor sizes + the root 390×390 regenerated, with the qrc/CMake/.desktop wiring unchanged (name-based inheritance)
 - 🔥 **Repo-add action:** new right-click "Add repo '<repo>'" for kernels whose pacman repo isn't enabled — `pkexec` `auth_admin` escalation, idempotent append to `/etc/pacman.conf` with a timestamped backup written first, then a `pacman -Sy` refresh; the kernel list auto-refreshes and the row goes live
 - ⚡ **Lock-glyph indicator:** a non-interactive lock icon replaces the confusing disabled checkbox on non-installable kernel rows, with a per-case tooltip (repo disabled vs. package missing from the DB)
 - ℹ️ **Version annotation:** the version column now shows "— (repo not enabled)" for info-rows whose repo is disabled, distinct from a genuinely-missing version (bare "—")
 - 📦 **Release:** the `v1.22.0` tag is cut at `aad790e` and the PKGBUILD re-pinned to it (`pkgver` 1.22.0)
+- 🔧 **Post-RC hardening (included in this tag):** GPG key auto-import + trust in the repo-add flow (proactive import before every `pacman -Sy`, reactive key-ID and unknown-trust repair), the same auto-import in the makepkg build flow, Add-repo success judged by the actual repo state (not the terminal exit code), and post-build `pacman -U` with absolute paths (pkexec CWD reset)
 
-> Note: release candidate only — 989/989 unit assertions green across all 10 harnesses (incl. the new k12 tree-render + k13 repo-add harnesses), clean build with 1 pre-existing baseline warning, 0 defects. An optional `lupdate` resync of the locale catalogs for the new `tr()` strings ("Add repo '%1'" + the confirm/refresh texts) is deferred. The v1.23.0 tag + `pkgver` bump happen at the next release cut. The official-kernel build-options UI remains deferred (all 6 official PKGBUILDs consume zero user build variables — toggles would be silent no-ops).
+> Note: released — the `v1.23.0` tag is cut at `0c918d4` (the full post-RC state: the v1.23.0 RC `f8536cc` + the 5 post-RC hardening fixes) and the PKGBUILD is pinned to it (`pkgver` 1.23.0, `sha256sums` refreshed). 989/989 unit assertions green across all 10 harnesses (incl. the new k12 tree-render + k13 repo-add harnesses), clean build with 1 pre-existing baseline warning, 0 defects. An optional `lupdate` resync of the locale catalogs for the new `tr()` strings ("Add repo '%1'" + the confirm/refresh texts) is deferred. The official-kernel build-options UI remains deferred (all 6 official PKGBUILDs consume zero user build variables — toggles would be silent no-ops).
 
 ### v1.22.0 (2026-08-31)
 
