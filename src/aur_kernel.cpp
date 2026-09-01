@@ -29,15 +29,29 @@ namespace fs = std::filesystem;
 
 namespace {
 
+// D5: the AUR build tree derives from the user-selectable build directory
+// (utils::build_repo_path()); the base is already `~`-expanded there, so
+// the old fix_path() calls are gone.
 void prepare_build_environment(const std::string_view& package_name) noexcept {
-    static const fs::path pkgbuilds_path = utils::fix_path("~/.cache/kernel-manager/aur_pkgbuilds");
-    const fs::path package_path          = utils::fix_path(fmt::format("~/.cache/kernel-manager/aur_pkgbuilds/{}", package_name));
-    utils::prepare_git_repo(pkgbuilds_path, package_path, fmt::format("https://aur.archlinux.org/{}.git", package_name));
+    const fs::path base = detail::aur_pkgbuilds_path();
+    utils::prepare_git_repo(base, detail::aur_pkgbuilds_path(package_name), fmt::format("https://aur.archlinux.org/{}.git", package_name));
 }
 
 }  // namespace
 
 namespace detail {
+
+// D5: the single derivation point for the AUR build tree:
+// <buildDir>/aur_pkgbuilds, or <buildDir>/aur_pkgbuilds/<package_name> when
+// a non-empty package name is given (build_repo_path() already expands `~`,
+// so no fix_path here — D5-rejected-b).
+fs::path aur_pkgbuilds_path(std::string_view package_name) noexcept {
+    fs::path path = utils::build_repo_path() / "aur_pkgbuilds";
+    if (!package_name.empty()) {
+        path /= package_name;
+    }
+    return path;
+}
 
 void install_aur_kernels(std::span<std::string> kernel_list) noexcept {
     using namespace std::literals;
