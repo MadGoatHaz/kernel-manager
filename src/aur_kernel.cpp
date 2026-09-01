@@ -55,7 +55,9 @@ void install_aur_kernels(std::span<std::string> kernel_list) noexcept {
         // if an AUR package's source URL changed but the checksums array in
         // its PKGBUILD no longer matches, the build fails by design — the
         // AUR package must be updated before it can be built again.
-        utils::runCmdTerminal("makepkg -sicf --cleanbuild", false);
+        // build_helper.sh wraps makepkg: on "unknown public key" it
+        // imports the key (user gpg keyring) and retries automatically.
+        utils::runCmdTerminal(KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild", false);
     }
 }
 

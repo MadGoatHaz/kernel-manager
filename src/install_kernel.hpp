@@ -65,10 +65,11 @@ using CommandRunner = std::function<int(const std::string& cmd, bool escalate)>;
 //       `paru -S --needed <package>` (not escalated — an AUR build runs
 //       as the user) -> the same post-install tail
 //   buildable only (no precompiled package):
-//       `makepkg -sicf --cleanbuild` (not escalated; the source repo is
-//       prepared by the existing build environment — see
-//       detail::install_aur_kernels in aur_kernel.cpp and the
-//       Build-custom (Configure) flow)
+//       `KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild"` (not
+//       escalated — the makepkg wrapper auto-imports a missing GPG key
+//       on "unknown public key" and retries; the source repo is prepared
+//       by the existing build environment — see detail::install_aur_kernels
+//       in aur_kernel.cpp and the Build-custom (Configure) flow)
 //   neither: an empty plan.
 [[gnu::pure]] [[nodiscard]] std::vector<InstallStep> plan_steps(const KnownKernel& kernel, Bootloader bl);
 

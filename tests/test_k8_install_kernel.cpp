@@ -25,7 +25,8 @@
 //     (exact 3-step sequence, escalation flags), systemd-boot/UKI/
 //     UNKNOWN (2 steps, no GRUB refresh), the AUR branch (non-escalated
 //     `paru -S --needed` + tail), buildable-only (single non-escalated
-//     makepkg step, mirroring aur_kernel.cpp), synthetic entries
+//     build-helper step — makepkg with auto GPG import —, mirroring
+//     aur_kernel.cpp), synthetic entries
 //     (environment-independent)
 //   - the real-table cases (linux always; linux-xanmod + linux-tkg
 //     gated on the K3 community rows so the harness passes on a
@@ -192,8 +193,8 @@ int main() {
         const std::vector<InstallStep> steps = plan_steps(tkg, Bootloader::UNKNOWN);
         check(steps.size() == 1, "build-only: exactly 1 step");
         if (steps.size() == 1) {
-            check(steps[0].cmd == "makepkg -sicf --cleanbuild" && !steps[0].escalate,
-                  "build-only[0]: non-escalated `makepkg -sicf --cleanbuild`");
+            check(steps[0].cmd == KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild" && !steps[0].escalate,
+                  "build-only[0]: non-escalated build helper (makepkg + auto GPG import)");
         }
     }
 
@@ -221,8 +222,8 @@ int main() {
         const KnownKernel* const tkg = *found;
         check(!tkg->precompiled_available && tkg->install_package.empty(), "tkg: build-only, no precompiled package");
         const std::vector<InstallStep> steps = plan_steps(*tkg, Bootloader::UNKNOWN);
-        check(steps.size() == 1 && steps[0].cmd == "makepkg -sicf --cleanbuild" && !steps[0].escalate,
-              "tkg: the makepkg build path, non-escalated");
+        check(steps.size() == 1 && steps[0].cmd == KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild" && !steps[0].escalate,
+              "tkg: the build-helper makepkg path, non-escalated");
     } else {
         std::printf("INFO: linux-tkg not curated on this table (pre-K3 main) - build-only branch covered by the synthetic entry\n");
     }

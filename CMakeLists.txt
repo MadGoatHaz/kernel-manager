@@ -149,7 +149,7 @@ qt_add_executable(${PROJECT_NAME}
 ##
 ## Polkit privilege layer (WU-2)
 ##
-# Single install prefix for the pkexec helpers (terminal-helper, rootshell.sh).
+# Single install prefix for the pkexec helpers (terminal-helper, rootshell.sh, repo_add.sh, build_helper.sh).
 # Exposed to C++ as KM_HELPER_DIR so no hard-coded path literals remain in src/.
 # Keep in sync with the exec.path annotation in org.archlinux.kernel-manager.pkexec.policy.
 set(KM_HELPER_DIR "/usr/lib/kernel-manager")
@@ -212,6 +212,11 @@ install(
 
 install(
     PROGRAMS ${CMAKE_SOURCE_DIR}/src/repo_add.sh
+    DESTINATION ${KM_HELPER_DIR}
+)
+
+install(
+    PROGRAMS ${CMAKE_SOURCE_DIR}/src/build_helper.sh
     DESTINATION ${KM_HELPER_DIR}
 )
 

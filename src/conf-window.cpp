@@ -1090,8 +1090,10 @@ void ConfWindow::on_execute() noexcept {
     //
     // Source checksums are validated by default (no --skipchecksums): a
     // stale/mismatched source in the build repo fails the build until the
-    // source is refreshed or the AUR package is updated.
-    run_cmd_async("makepkg -scf --cleanbuild && touch .done-status", build_working_path);
+    // source is refreshed or the AUR package is updated. build_helper.sh
+    // wraps makepkg: on "unknown public key" it imports the key (user
+    // gpg keyring) and retries automatically.
+    run_cmd_async(KM_HELPER_DIR "/build_helper.sh -scf --cleanbuild && touch .done-status", build_working_path);
 }
 
 void ConfWindow::on_save() noexcept {
