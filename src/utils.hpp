@@ -97,8 +97,13 @@ struct PkgbuildRenameResult {
 // Generic PKGBUILD custom-name handling (no vendor-specific anchors):
 // detects the top-level pkgver= / pkgbase= assignments and rewrites the
 // first pkgbase= line with the requested name (expanding a "$pkgbase"
-// placeholder with the file's original pkgbase value). A PKGBUILD lacking
-// the expected structure fails cleanly (ok = false, file left untouched).
+// placeholder with the file's original pkgbase value). The rewrite is
+// idempotent: if the pkgbase value already carries a previous
+// application of the same name (the git reset before the rebuild failed
+// and the earlier rewrite survived), the placeholder expands against the
+// recovered pre-rename base, so repeat runs never accumulate suffixes
+// (…-custom stays …-custom). A PKGBUILD lacking the expected structure
+// fails cleanly (ok = false, file left untouched).
 PkgbuildRenameResult apply_pkgbuild_custom_name(std::string content, std::string_view custom_name) noexcept;
 void restore_clean_environment(std::vector<std::string>& previously_set_options, std::string_view all_set_values) noexcept;
 

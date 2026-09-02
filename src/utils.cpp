@@ -439,11 +439,97 @@ auto has_top_level_pkgver(const std::vector<std::string>& lines) noexcept -> boo
     return false;
 }
 
+// Split a custom name into the literal segments surrounding each
+// "$pkgbase" / "${pkgbase}" placeholder: segments.size() == 1 + the
+// placeholder count, and the name reassembles as
+// seg0 + PH + seg1 + PH + ... + segN. The two needle forms are
+// independent (the "${" of the braced form never matches "$pkgbase").
+auto split_on_pkgbase_placeholder(std::string_view name) noexcept -> std::vector<std::string_view> {
+    std::vector<std::string_view> segments{};
+    std::size_t pos = 0;
+    for (;;) {
+        const auto braced = name.find("${pkgbase}", pos);
+        const auto bare   = name.find("$pkgbase", pos);
+        if (braced == std::string_view::npos && bare == std::string_view::npos) {
+            segments.push_back(name.substr(pos));
+            return segments;
+        }
+        const bool take_braced = (braced != std::string_view::npos) && (bare == std::string_view::npos || braced < bare);
+        const auto hit_pos     = take_braced ? braced : bare;
+        const auto hit_len     = take_braced ? std::size_t{10} : std::size_t{8};
+        segments.push_back(name.substr(pos, hit_pos - pos));
+        pos = hit_pos + hit_len;
+    }
+}
+
+// The inverse of the placeholder expansion: peel the wrapper layers off
+// `current`. Each previous run wrapped the then-current value as
+// seg0 + X + seg1 + X + ... + X + segN; if `current` matches, the inner X
+// is recovered and peeling continues (the user's …-custom-custom state is
+// two layers deep). Peeling stops at the first layer that does not match —
+// that value is the pre-rename base to expand against. With zero matching
+// layers, `current` is returned unchanged (a first-time application).
+// The rewrite therefore never grows the value: it lands on the same value
+// it started from, once every layer is peeled back.
+//
+// Termination is structural: a matching peel strictly shrinks the value
+// (the recovered X is a strict sub-part of it — its length is
+// (size − literal) / placeholder_count, which is < size whenever the
+// name carries any literal), so the loop cannot run more than
+// size / min(1, placeholder_count) peels. The only non-shrinking shape
+// is a name made of pure placeholder(s) (literal == 0 and a single
+// placeholder, e.g. the braced form "${pkgbase}"): there X == the whole
+// value and the peel is the identity, so the guard below breaks out and
+// `current` is returned unchanged — without it the loop would spin
+// forever (the pre-fix main-thread hang).
+auto unapply_pkgbuild_custom_name(std::string_view current, const std::vector<std::string_view>& segments) noexcept -> std::string {
+    const std::size_t placeholder_count = segments.size() - 1;
+    if (placeholder_count == 0) {
+        return std::string{current};  // no placeholder: the rewrite is a pure line replacement, already idempotent
+    }
+    std::size_t literal = 0;
+    for (const auto& segment : segments) {
+        literal += segment.size();
+    }
+
+    std::string value{current};
+    for (;;) {
+        if (value.size() < literal || (value.size() - literal) % placeholder_count != 0) {
+            break;
+        }
+        // The layout is fixed: the first X sits right after segments[0].
+        const std::size_t x_len = (value.size() - literal) / placeholder_count;
+        const std::string_view x = std::string_view{value}.substr(segments[0].size(), x_len);
+        if (x.size() >= value.size()) {
+            break;  // pure-placeholder name: the peel is the identity and cannot
+                    // shrink the value — stop, or the loop would spin forever
+        }
+        std::string candidate{};
+        for (std::size_t i = 0; i < segments.size(); ++i) {
+            candidate.append(segments[i]);
+            if (i + 1 < segments.size()) {
+                candidate.append(x);
+            }
+        }
+        if (candidate != value) {
+            break;  // not a previous application of this name
+        }
+        value = std::string{x};
+        if (x.empty()) {
+            break;  // peeled down to nothing: the empty-value guard below flags it
+        }
+    }
+    return value;
+}
+
 }  // namespace
 
 auto apply_pkgbuild_custom_name(std::string content, std::string_view custom_name) noexcept -> PkgbuildRenameResult {
-    // No rename requested: leave the content untouched.
-    if (custom_name.empty() || custom_name == "$pkgbase") {
+    // No rename requested: leave the content untouched. Both placeholder
+    // forms of the bare identity name count as "no rename" — the braced
+    // form alone used to slip past this guard and spin the peel loop in
+    // unapply_pkgbuild_custom_name forever.
+    if (custom_name.empty() || custom_name == "$pkgbase" || custom_name == "${pkgbase}") {
         return PkgbuildRenameResult{.ok = true, .new_content = std::move(content)};
     }
 
@@ -477,9 +563,17 @@ auto apply_pkgbuild_custom_name(std::string content, std::string_view custom_nam
     const auto rhs      = std::string_view{lines[pkgbase_index]}.substr(pkgbase_prefix.size() + 8);  // "pkgbase="
     const auto original = strip_pkgbuild_value(rhs);
 
+    // Idempotency: the file's pkgbase may already carry a previous
+    // application of this name (prepare_git_repo's checkout/clean failed
+    // and the earlier rewrite survived). Expanding the placeholder
+    // against that already-renamed value would re-wrap it (…-custom →
+    // …-custom-custom); un-applying the wrapper recovers the pre-rename
+    // base, so a repeat run lands on the same value instead of growing.
+    const auto base = unapply_pkgbuild_custom_name(original, split_on_pkgbase_placeholder(custom_name));
+
     std::string new_value{custom_name};
-    utils::replace_all(new_value, "${pkgbase}", original);
-    utils::replace_all(new_value, "$pkgbase", original);
+    utils::replace_all(new_value, "${pkgbase}", base);
+    utils::replace_all(new_value, "$pkgbase", base);
     if (new_value.empty()) {
         return PkgbuildRenameResult{.ok = false, .error = "custom package name expands to an empty value"};
     }
