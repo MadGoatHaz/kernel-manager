@@ -99,9 +99,20 @@ bool write_to_file(std::string_view filepath, std::string_view data) noexcept {
 // https://github.com/arun11299/cpp-subprocess/blob/master/subprocess.hpp#L1218
 // https://stackoverflow.com/questions/11342868/c-interface-for-interactive-bash
 // https://github.com/hniksic/rust-subprocess
+// The popen pipe's RAII deleter (a struct — `decltype(&pclose)` as a
+// template argument trips GCC's -Wignored-attributes on the function
+// type's attributes; the struct form is the warning-free equivalent,
+// behavior-identical: pclose runs iff the pointer is non-null).
+struct pipe_deleter {
+    void operator()(FILE* f) const noexcept {
+        if (f != nullptr) {
+            pclose(f);
+        }
+    }
+};
+
 std::string exec(std::string_view command) noexcept {
-    // NOLINTNEXTLINE
-    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(command.data(), "r"), pclose);
+    std::unique_ptr<FILE, pipe_deleter> pipe(popen(command.data(), "r"));
     if (!pipe) {
         fmt::print(stderr, "popen failed! '{}'\n", command);
         return "-1";
