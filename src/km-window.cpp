@@ -461,6 +461,13 @@ MainWindow::MainWindow(QWidget* parent)
         connect(m_ui->schedext, &QPushButton::clicked, this, &MainWindow::on_schedext_config);
     }
 #endif
+    // D6 (plan v1.24.0): the "Browse…" button — a folder picker over the
+    // current build directory whose accepted choice is persisted via
+    // utils::set_build_dir (no cache) and immediately reflected in the path
+    // label below. The label is refreshed once here (after setupUi, so it
+    // never shows empty at runtime) and after each accepted browse.
+    connect(m_ui->browse, &QPushButton::clicked, this, &MainWindow::on_browse_build_dir);
+    update_build_dir_label();
 
     // Connect worker thread signals
     connect(m_worker_th, &QThread::finished, m_worker, &QObject::deleteLater);
@@ -794,6 +801,37 @@ void MainWindow::on_install_from_directory() noexcept {
     }
     QMessageBox::information(this, tr("Kernel Manager"), message);
     init_kernels();
+}
+
+// D6 (plan v1.24.0): the "Browse…" flow — a folder picker whose default
+// start point is the current build directory (that's where the clones and
+// locally built packages live). An accepted choice is persisted via
+// utils::set_build_dir (the QSettings `buildDir` key — no cache, so
+// build_repo_path()/build_app_path()/aur_pkgbuilds_path() all reflect it
+// immediately) and the path label is refreshed below. Cancel is a silent
+// no-op: the label updating IS the feedback, and QSettings sync is
+// best-effort, so there is nothing to confirm or error about.
+void MainWindow::on_browse_build_dir() noexcept {
+    // QString::fromStdString wraps the accessor result: Qt6's QString has
+    // no implicit constructor from std::string (the QAnyStringView route
+    // needs three user-defined conversions — ill-formed).
+    const QString dir = QFileDialog::getExistingDirectory(this, tr("Choose build directory"), QString::fromStdString(utils::build_repo_path().string()));
+    if (dir.isEmpty()) {
+        return;
+    }
+    utils::set_build_dir(dir.toStdString());
+    update_build_dir_label();
+}
+
+// D6 (plan v1.24.0): refresh the bottom-left path label from the current
+// build directory — the text AND the tooltip carry the full path (the
+// tooltip is the guaranteed-full view for long user-picked paths). Called
+// from the constructor (the label never shows empty at runtime) and after
+// each accepted browse.
+void MainWindow::update_build_dir_label() noexcept {
+    const auto path = utils::build_repo_path().string();
+    m_ui->buildDirLabel->setText(QString::fromStdString(path));
+    m_ui->buildDirLabel->setToolTip(QString::fromStdString(path));
 }
 
 void MainWindow::on_cancel() noexcept {
