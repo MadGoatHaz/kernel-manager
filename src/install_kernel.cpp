@@ -23,7 +23,9 @@
 #include "utils.hpp"             // for runCmdTerminal (default runner), exec (paru probe + .PKGINFO)
 
 #include <algorithm>    // for ranges::sort
+#include <ctime>        // for time, localtime_r, strftime (install log timestamps)
 #include <filesystem>   // for directory_iterator, path, absolute
+#include <fstream>      // for ofstream (install log appends)
 #include <string>       // for string, to_string
 #include <string_view>  // for string_view
 #include <system_error> // for error_code
@@ -125,6 +127,92 @@ std::string pkginfo_field(std::string_view content, std::string_view key) {
         }
     }
     return std::string{};
+}
+
+// ── Install logging (the real-runner path; see install_from_directory) ──
+
+// Shell-quote a string for embedding in the terminal command line: wrap
+// it in single quotes and escape every embedded single quote as '\''
+// (the run_cmd_async CWD-safe quoting precedent, utils.cpp). The value
+// arrives at the receiving script as one intact word.
+std::string shell_quote(std::string_view s) {
+    std::string quoted{"'"};
+    for (const char c : s) {
+        if (c == '\'') {
+            quoted += "'\\''";
+        } else {
+            quoted += c;
+        }
+    }
+    quoted += "'";
+    return quoted;
+}
+
+// The step's short label for the log: the first two whitespace-separated
+// words of the command ("pacman -U", "dkms autoinstall", "dracut -f") —
+// enough to identify the step without the long, quote-laden package
+// paths.
+std::string short_label(std::string_view cmd) {
+    int words = 0;
+    for (std::size_t i = 0; i < cmd.size(); ++i) {
+        if (cmd[i] == ' ' && ++words == 2) {
+            return std::string{cmd.substr(0, i)};
+        }
+    }
+    return std::string{cmd};
+}
+
+// The install log's two timestamp forms for one epoch-seconds value,
+// both in local time: the file-name form (the log's
+// "install-YYYYMMDD-HHMMSS" name) and the human form (the header's
+// "Date: YYYY-MM-DD HH:MM:SS" line). The strftime formats are literals
+// at the call (a non-literal format trips -Wformat-nonliteral).
+struct LogTimestamps {
+    std::string file;
+    std::string human;
+};
+LogTimestamps format_log_times(std::time_t t) {
+    LogTimestamps ts{};
+    std::tm tm{};
+    localtime_r(&t, &tm);
+    char buf[64]{};
+    const std::size_t n_file = std::strftime(buf, sizeof buf, "%Y%m%d-%H%M%S", &tm);
+    ts.file = {buf, n_file};
+    const std::size_t n_human = std::strftime(buf, sizeof buf, "%Y-%m-%d %H:%M:%S", &tm);
+    ts.human = {buf, n_human};
+    return ts;
+}
+
+// A package file's identity for the log header: the filename minus the
+// .pkg.tar.zst suffix and minus the trailing -<arch> (best effort —
+// "linux-cachyos-custom-7.2.2-1-x86_64.pkg.tar.zst" ⇒
+// "linux-cachyos-custom-7.2.2-1").
+std::string package_identity(const std::filesystem::path& pkg) {
+    std::string base = pkg.filename().string();
+    if (base.size() > kPkgSuffix.size() && base.ends_with(kPkgSuffix)) {
+        base.erase(base.size() - kPkgSuffix.size());
+    }
+    static constexpr std::string_view kKnownArchs[] = {"-x86_64", "-i686", "-aarch64", "-loongarch64", "-riscv64"};
+    for (const auto& arch : kKnownArchs) {
+        if (base.size() > arch.size() && base.ends_with(arch)) {
+            base.erase(base.size() - arch.size());
+            break;
+        }
+    }
+    return base;
+}
+
+// Append text to the install log (a trailing newline is added if it
+// lacks one). A failed append is a no-op: the log is best-effort and the
+// install itself never depends on it.
+void append_log(const std::string& log_path, std::string_view text) {
+    std::ofstream out(log_path, std::ios::app);
+    if (out) {
+        out << text;
+        if (!text.empty() && text.back() != '\n') {
+            out << '\n';
+        }
+    }
 }
 
 }  // namespace
@@ -362,6 +450,7 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
     result.name = name;
     result.version = version;
 
+    const bool use_default_runner = !runner;
     if (!runner) {
         runner = run_real_command;  // the shared pkexec terminal path
     }
@@ -382,18 +471,89 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
     steps.push_back({pacman_cmd, true});
     append_postinstall_tail(steps, bl);
 
-    // The execution loop (identical to install_kernel): first failing
-    // step ⇒ ok = false, error names the command + its exit code, the
-    // remaining steps are skipped — graceful, never a crash.
-    for (const auto& step : steps) {
-        const int rc = runner(step.cmd, step.escalate);
+    // The install log (the real runner only — an injected test runner
+    // records the raw commands and never touches the filesystem, so it
+    // gets no log file: zero side effects, the k14 contract). Created
+    // BEFORE the first step so the header (what is about to be
+    // installed: source dir, package identities, bootloader) exists even
+    // when the install fails. The known location:
+    //   ~/.cache/kernel-manager/install-<YYYYMMDD-HHMMSS>.log
+    std::string log_path{};
+    if (use_default_runner) {
+        const auto log_dir = utils::fix_path("~/.cache/kernel-manager");
+        std::error_code ec{};
+        std::filesystem::create_directories(log_dir, ec);
+        const auto ts = format_log_times(std::time(nullptr));
+        log_path = (std::filesystem::path{log_dir} / ("install-" + ts.file + ".log")).string();
+        std::string header = "=== Kernel Manager Install Log ===\n"
+                             "Date: " + ts.human + "\n"
+                             "Source: " + std::string{dir} + "\n"
+                             "Packages: " + package_identity(pkgs.front()) + "\n";
+        for (std::size_t i = 1; i < pkgs.size(); ++i) {
+            header += ", " + package_identity(pkgs[i]);
+        }
+        header += "\nBootloader: " + bootloader_name(bl) + "\n";
+        utils::write_to_file(log_path, header);
+        result.log_path = log_path;
+    }
+
+    // The execution loop (identical to install_kernel, with the logging
+    // wrapper for the real runner): first failing step ⇒ ok = false,
+    // error names the command + its exit code, the remaining steps are
+    // skipped — graceful, never a crash.
+    for (std::size_t i = 0; i < steps.size(); ++i) {
+        const auto& step = steps[i];
+        // Real runner: run the step through the installed
+        // install_logger.sh — its output streams to the terminal in
+        // real time AND is appended to the log (the command, the start
+        // time, the command's REAL exit code, the full output). The
+        // command stays a single quoted word: the tail steps carry shell
+        // syntax (`||` fallbacks, `2>/dev/null` guards, quoted paths)
+        // that the script re-parses with `bash -c`, and runCmdTerminal's
+        // appended `; read -p …` prompt lands AFTER the wrapper on the
+        // terminal's command line.
+        std::string cmd = step.cmd;
+        if (use_default_runner) {
+            const std::string label = "Step " + std::to_string(i + 1) + "/" + std::to_string(steps.size()) + ": " + short_label(cmd);
+            cmd = KM_HELPER_DIR "/install_logger.sh " + shell_quote(log_path) + " " + shell_quote(label) + " " + shell_quote(cmd);
+        }
+        const int rc = runner(cmd, step.escalate);
         if (rc != 0) {
             result.ok = false;
             result.error = "Command failed (exit code " + std::to_string(rc) + "): " + step.cmd;
+            if (use_default_runner) {
+                append_log(log_path, "=== Result: FAILED (step " + std::to_string(i + 1) + ": " + short_label(step.cmd)
+                                 + ", exit code " + std::to_string(rc) + ") ===");
+            }
             return result;
         }
     }
 
     result.ok = true;
+
+    // Post-install verification (the real runner only): one read-only
+    // compound command whose full output lands in the log —
+    //   1. dkms status       (were the modules built for the new kernel?)
+    //   2. boot entries      (bootctl list for systemd-boot; ls /boot otherwise)
+    //   3. NVIDIA modules    (what /lib/modules holds — what the initramfs packages)
+    // The tail steps' `|| true` guards and the final `; true` keep every
+    // section from ever failing the verification: the install steps
+    // above already succeeded, this is diagnosis, not part of the
+    // install — and each missing tool's own "command not found" line is
+    // exactly the diagnostic data the log exists to keep.
+    if (use_default_runner) {
+        std::string verify = "echo '=== Post-Install Verification ==='";
+        verify += "; echo; echo 'DKMS Status:'; dkms status 2>&1 || true";
+        verify += (bl == Bootloader::SYSTEMD_BOOT)
+                      ? "; echo; echo 'Boot Entries:'; bootctl list 2>&1 || ls -l /boot 2>&1 || true"
+                      : "; echo; echo 'Boot Entries:'; ls -l /boot 2>&1 || true";
+        verify += "; echo; echo 'NVIDIA kernel modules:'; ls /lib/modules/*/kernel/drivers/video/nvidia* 2>/dev/null || true";
+        verify += "; true";
+        const std::string label = "Post-Install Verification";
+        const std::string vcmd = KM_HELPER_DIR "/install_logger.sh " + shell_quote(log_path) + " " + shell_quote(label) + " " + shell_quote(verify);
+        (void) runner(vcmd, false);  // read-only; the rc is logged, never judged
+        append_log(log_path, "=== Result: SUCCESS ===");
+    }
+
     return result;
 }
