@@ -22,10 +22,15 @@
 // Qt, no external deps), so this compiles it with the project's
 // warning set and asserts, for each of the four bootloaders:
 //   - a non-empty, ordered step list with the bootloader's key
-//     strings (grub-mkconfig line, loader-entries / bootctl
+//     strings (grub-mkconfig line, bootctl list / bootctl
 //     set-default lines, UKI auto-detect line, unknown fallback line)
-//   - the mandatory /boot/vmlinuz-<pkg> + mkinitcpio note, present
-//     and LAST for all four
+//   - the mandatory closing note (installed + ready to boot; select
+//     from the bootloader menu at next reboot), present and LAST for
+//     all four
+//   - no hardcoded /boot/vmlinuz-, /boot/initramfs-,
+//     /boot/loader/entries/ path and no mkinitcpio mention in any
+//     step (the ALPM hooks create the initramfs + boot entry; the
+//     loader may live in /boot or on an ESP at /efi)
 //   - no un-substituted placeholder token in any step
 //   - a live smoke: instructions_for(detect_bootloader(), "linux")
 
@@ -65,22 +70,34 @@ size_t index_of(const std::vector<std::string>& steps, const std::string& needle
     return sentinel;
 }
 
-// The mandatory closing note, parameterised by the kernel package base.
-std::string expected_note(const std::string& pkg) {
-    return "The kernel binary is at `/boot/vmlinuz-" +
-           pkg + "`; the initramfs is regenerated automatically on install (ALPM hook) or via `sudo mkinitcpio -P`";
-}
+// The mandatory closing note: one constant for every bootloader (the
+// kernel is installed and ready to boot; select it from the
+// bootloader menu at next reboot — no tool command, no /boot/ or
+// /efi/ loader path is named).
+constexpr const char* expected_note =
+    "The kernel is installed and ready to boot. Select it from your bootloader menu at next reboot.";
 
-// Invariants every bootloader's list must satisfy: non-empty, ends
-// with the note (which names /boot/vmlinuz-<pkg>), no placeholders.
+// Invariants every bootloader's list must satisfy: non-empty, a step
+// names the kernel, no hardcoded /boot kernel/initramfs/loader-entry
+// path or mkinitcpio mention anywhere, ends with the note, no
+// un-substituted placeholders.
 void check_common_invariants(const char* label, const std::vector<std::string>& steps, const std::string& pkg) {
     const std::string l{label};
     check(!steps.empty(), (l + ": non-empty").c_str());
     if (steps.empty()) {
         return;
     }
-    check(steps.back() == expected_note(pkg), (l + ": last step is the vmlinuz/mkinitcpio note").c_str());
-    check(contains(steps.back(), "/boot/vmlinuz-" + pkg), (l + ": note names /boot/vmlinuz-<pkg>").c_str());
+    constexpr size_t no_step = static_cast<size_t>(-1);
+    check(index_of(steps, "'" + pkg + "'") != no_step, (l + ": a step names '" + pkg + "'").c_str());
+    bool no_hardcoded = true;
+    for (const std::string& step : steps) {
+        if (contains(step, "mkinitcpio") || contains(step, "/boot/vmlinuz-")
+            || contains(step, "/boot/initramfs-") || contains(step, "/boot/loader/entries/")) {
+            no_hardcoded = false;
+        }
+    }
+    check(no_hardcoded, (l + ": no hardcoded /boot kernel/initramfs/entry paths, no mkinitcpio").c_str());
+    check(steps.back() == expected_note, (l + ": last step is the ready-to-boot note").c_str());
     bool no_placeholder = true;
     for (const std::string& step : steps) {
         if (contains(step, "<P>") || contains(step, "<kernel>")) {
@@ -113,20 +130,19 @@ int main() {
     }
 
     // ------------------------------------------------------------------
-    // 2. SYSTEMD_BOOT: 5 steps + note (UKI shortcut, loader entry,
-    //    verify, select, set-default).
+    // 2. SYSTEMD_BOOT: 3 steps + note (select from the menu — the BLS
+    //    entry is auto-detected, created by the ALPM hook; verify with
+    //    bootctl list if missing; set-default).
     // ------------------------------------------------------------------
     {
         const std::vector<std::string> steps = instructions_for(Bootloader::SYSTEMD_BOOT, pkg);
         check_common_invariants("systemd-boot", steps, pkg);
-        check(steps.size() == 6, "systemd-boot: exactly 5 steps + note");
-        if (steps.size() == 6) {
-            check(contains(steps[1], "/boot/loader/entries/" + pkg + ".conf"), "systemd-boot[1]: loader entry file");
-            check(contains(steps[1], "linux /boot/vmlinuz-" + pkg), "systemd-boot[1]: `linux` line");
-            check(contains(steps[1], "initrd /boot/initramfs-" + pkg + ".img"), "systemd-boot[1]: `initrd` line");
-            check(contains(steps[2], "bootctl"), "systemd-boot[2]: verify with bootctl");
-            check(contains(steps[4], "bootctl set-default " + pkg), "systemd-boot[4]: set default via bootctl");
-            check(index_of(steps, "loader/entries") < index_of(steps, "bootctl"), "systemd-boot: ordered (entry before verify)");
+        check(steps.size() == 4, "systemd-boot: exactly 3 steps + note");
+        if (steps.size() == 4) {
+            check(contains(steps[0], "Reboot and select"), "systemd-boot[0]: select from the boot menu");
+            check(contains(steps[1], "bootctl list"), "systemd-boot[1]: verify with `bootctl list` if missing");
+            check(contains(steps[2], "bootctl set-default " + pkg), "systemd-boot[2]: set default via bootctl");
+            check(index_of(steps, "bootctl list") < index_of(steps, "set-default"), "systemd-boot: ordered (verify before set-default)");
         }
     }
 
@@ -165,7 +181,7 @@ int main() {
         const Bootloader real = detect_bootloader();
         const std::vector<std::string> steps = instructions_for(real, "linux");
         check(!steps.empty(), "live: non-empty for the detected bootloader");
-        check(steps.back() == expected_note("linux"), "live: ends with the note");
+        check(steps.back() == expected_note, "live: ends with the ready-to-boot note");
         std::printf("INFO: live detection -> %s (%zu steps)\n", bootloader_name(real).c_str(), steps.size());
     }
 

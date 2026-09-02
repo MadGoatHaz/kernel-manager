@@ -24,14 +24,15 @@
 
 namespace {
 
-// Mandatory closing note appended to every bootloader's step list:
-// where the kernel binary lives, and how the initramfs comes back
-// after an install (the `-P` there is the literal mkinitcpio flag,
-// not a placeholder).
-std::string final_note(const std::string& pkgbase) {
-    return "The kernel binary is at `/boot/vmlinuz-" + pkgbase +
-           "`; the initramfs is regenerated automatically on install (ALPM hook) or via `sudo mkinitcpio -P`";
-}
+// Mandatory closing note appended to every bootloader's step list: the
+// kernel is installed and ready to boot — the user only has to select
+// it from the bootloader menu at the next reboot. The ALPM hooks
+// (dracut/mkinitcpio + the loader entry hook) already regenerated the
+// initramfs and created any boot entry, so no tool-specific command is
+// named here, and no /boot/ or /efi/ path either (the loader's
+// location is machine-specific and the note must stay generic).
+constexpr const char* final_note =
+    "The kernel is installed and ready to boot. Select it from your bootloader menu at next reboot.";
 
 }  // namespace
 
@@ -48,15 +49,14 @@ std::vector<std::string> instructions_for(Bootloader bl, const std::string& kern
             steps.push_back("To make it the default: set `GRUB_DEFAULT` in `/etc/default/grub`, then re-run `grub-mkconfig`");
             break;
         case Bootloader::SYSTEMD_BOOT:
-            // A UKI needs nothing; otherwise hand-write the loader entry
-            // (title + linux + initrd lines), verify with bootctl, pick
-            // it at boot, and optionally set it as the default.
-            steps.push_back("If a UKI is enabled for this kernel, its `.efi` in `/boot/EFI/Linux/` is auto-detected — just reboot and select it");
-            steps.push_back("Otherwise create `/boot/loader/entries/" + pkg +
-                            ".conf` with: title, `linux /boot/vmlinuz-" + pkg +
-                            "`, `initrd /boot/initramfs-" + pkg + ".img`");
-            steps.push_back("Verify with `bootctl`");
-            steps.push_back("Reboot and select '" + pkg + "'");
+            // The ALPM loader hook already created the BLS entry, and
+            // systemd-boot auto-detects it wherever the loader lives
+            // (/boot or an ESP at /efi — so no path is hand-written
+            // here): the user only selects the kernel from the boot
+            // menu; `bootctl list` verifies if it is missing, and the
+            // default is optionally pinned.
+            steps.push_back("Reboot and select '" + pkg + "' from the systemd-boot menu");
+            steps.push_back("If it does not appear, verify the loader entry with `bootctl list`");
             steps.push_back("To set the default: `sudo bootctl set-default " + pkg + "`");
             break;
         case Bootloader::UKI:
@@ -72,6 +72,6 @@ std::vector<std::string> instructions_for(Bootloader bl, const std::string& kern
     }
 
     // Invariant: every bootloader's list ends with the same note.
-    steps.push_back(final_note(pkg));
+    steps.push_back(final_note);
     return steps;
 }

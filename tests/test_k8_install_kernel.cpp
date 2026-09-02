@@ -48,7 +48,7 @@
 //     false + error + one command attempted; ok injected runner => true
 //     + exactly the planned commands
 //   - boot_instructions_for: non-empty, ends with the mandatory
-//     /boot/vmlinuz note, prefix tolerant, live bootloader detection
+//     ready-to-boot note, prefix tolerant, live bootloader detection
 //
 // No real terminal, pkexec, pacman, paru or network is touched: every
 // executed command goes through an injected recording runner.
@@ -86,12 +86,12 @@ bool contains_cmd(const std::vector<std::string>& cmds, const std::string& needl
     return false;
 }
 
-// The mandatory closing note, the same text instructions_for (K6)
-// appends for every bootloader.
-std::string expected_note(const std::string& pkg) {
-    return "The kernel binary is at `/boot/vmlinuz-" +
-           pkg + "`; the initramfs is regenerated automatically on install (ALPM hook) or via `sudo mkinitcpio -P`";
-}
+// The mandatory closing note: one constant text instructions_for (K6)
+// appends for every bootloader (the kernel is installed and ready to
+// boot; select it from the bootloader menu at next reboot — no tool
+// command, no /boot/ or /efi/ loader path is named).
+constexpr const char* expected_note =
+    "The kernel is installed and ready to boot. Select it from your bootloader menu at next reboot.";
 
 // A recording command runner: returns a fixed exit code for every step
 // and records the (cmd, escalate) pairs asked to run, so no real
@@ -290,7 +290,7 @@ int main() {
             check(ok_runner.calls[1].first == "grub-mkconfig -o /boot/grub/grub.cfg" && ok_runner.calls[1].second,
                   "install_kernel[1]: escalated grub-mkconfig");
         }
-        check(!ok_result.boot_instructions.empty() && ok_result.boot_instructions.back() == expected_note("linux"),
+        check(!ok_result.boot_instructions.empty() && ok_result.boot_instructions.back() == expected_note,
               "install_kernel: boot instructions filled, ends with the note");
 
         RecordingRunner fail_runner{};
@@ -300,7 +300,7 @@ int main() {
         check(contains(fail_result.error, "pacman") && contains(fail_result.error, "1"),
               "install_kernel: error names the failed command and its exit code");
         check(fail_runner.calls.size() == 1, "install_kernel: post-install tail skipped after the failure");
-        check(!fail_result.boot_instructions.empty() && fail_result.boot_instructions.back() == expected_note("linux"),
+        check(!fail_result.boot_instructions.empty() && fail_result.boot_instructions.back() == expected_note,
               "install_kernel: boot instructions still filled on failure");
     }
 
@@ -345,8 +345,8 @@ int main() {
         check(!result.ok && contains(result.error, "Build-custom"),
               "install_kernel(build-only): graceful Build-custom note");
         check(runner.calls.empty(), "install_kernel(build-only): no command run");
-        check(!result.boot_instructions.empty() && result.boot_instructions.back() == expected_note("linux-tkg"),
-              "install_kernel(build-only): boot instructions filled (note names the pkgbase)");
+        check(!result.boot_instructions.empty() && result.boot_instructions.back() == expected_note,
+              "install_kernel(build-only): boot instructions filled (the constant note)");
     }
 
     // ------------------------------------------------------------------
@@ -391,7 +391,7 @@ int main() {
         const std::vector<std::string> steps = boot_instructions_for("linux");
         check(!steps.empty(), "boot_instructions_for(linux): non-empty");
         if (!steps.empty()) {
-            check(steps.back() == expected_note("linux"), "boot_instructions_for(linux): ends with the vmlinuz/mkinitcpio note");
+            check(steps.back() == expected_note, "boot_instructions_for(linux): ends with the ready-to-boot note");
         }
         check(boot_instructions_for("core/linux") == steps,
               "boot_instructions_for(core/linux): prefix-tolerant, identical to linux");
