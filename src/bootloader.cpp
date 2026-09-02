@@ -98,23 +98,37 @@ Bootloader detect_bootloader(const BootloaderProbe& probe) {
         return Bootloader::UKI;
     }
 
-    // 2. systemd-boot — bootctl plus loader configuration or entries.
+    // 2. Strong GRUB signal, computed once and shared by the systemd-boot
+    //    and GRUB checks below: /boot/grub/grub.cfg exists, or both
+    //    grub-mkconfig and /etc/default/grub exist. Weak leftovers —
+    //    /etc/grub.d (commonly just fwupd's 35_fwupd) and a bare
+    //    grub-editenv — are deliberately NOT signals: they exist on
+    //    non-GRUB systems and caused false positives.
+    const bool strong_grub =
+        ask(probe.path_exists, "/boot/grub/grub.cfg")
+        || (ask(probe.command_exists, "grub-mkconfig") && ask(probe.path_exists, "/etc/default/grub"));
+
+    // 3. systemd-boot — bootctl is systemd-boot specific (GRUB systems
+    //    don't ship it), so its presence plus a visible loader.conf or
+    //    entries directory is conclusive; with the ESP unreadable (e.g.
+    //    mounted at /efi with restrictive permissions, none of the path
+    //    probes fire) bootctl presence without any strong GRUB signal is
+    //    trusted as systemd-boot.
     if (ask(probe.command_exists, "bootctl")
         && (ask(probe.path_exists, "/boot/loader/loader.conf")
             || ask(probe.path_exists, "/efi/loader/loader.conf")
-            || ask(probe.path_exists, "/boot/loader/entries"))) {
+            || ask(probe.path_exists, "/boot/loader/entries")
+            || ask(probe.path_exists, "/efi/loader/entries")
+            || !strong_grub)) {
         return Bootloader::SYSTEMD_BOOT;
     }
 
-    // 3. GRUB — config file, grub.d scripts, or the tooling.
-    if (ask(probe.path_exists, "/boot/grub/grub.cfg")
-        || ask(probe.path_exists, "/etc/grub.d")
-        || ask(probe.command_exists, "grub-mkconfig")
-        || ask(probe.command_exists, "grub-editenv")) {
+    // 4. GRUB — strong signal only.
+    if (strong_grub) {
         return Bootloader::GRUB;
     }
 
-    // 4. No signal.
+    // 5. No signal.
     return Bootloader::UNKNOWN;
 }
 
