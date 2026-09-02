@@ -793,10 +793,20 @@ void MainWindow::on_install_from_directory() noexcept {
     }
 
     // The real runner: an empty CommandRunner selects run_real_command
-    // (utils::runCmdTerminal, escalated).
+    // (utils::runCmdTerminal, escalated). The run is logged (every step's
+    // command, real exit code and full output + the post-install
+    // verification): r.log_path names the file, shown in both dialogs
+    // below so the output of the (transient) terminal windows stays
+    // diagnosable after the fact.
     const DirInstallResult r = install_from_directory(dir.toStdString());
     if (!r.ok) {
-        QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to install from '%1':\n%2").arg(dir, QString::fromStdString(r.error)));
+        QString message = tr("Failed to install from '%1':\n%2").arg(dir, QString::fromStdString(r.error));
+        if (!r.log_path.empty()) {
+            message += QLatin1Char('\n');
+            message += QLatin1Char('\n');
+            message += tr("Log: %1").arg(QString::fromStdString(r.log_path));
+        }
+        QMessageBox::critical(this, tr("Kernel Manager"), message);
         return;
     }
 
@@ -809,6 +819,11 @@ void MainWindow::on_install_from_directory() noexcept {
     for (std::size_t i = 0; i < r.boot_instructions.size(); ++i) {
         message += QLatin1Char('\n');
         message += QStringLiteral("%1. %2").arg(static_cast<int>(i + 1)).arg(QString::fromStdString(r.boot_instructions[i]));
+    }
+    if (!r.log_path.empty()) {
+        message += QLatin1Char('\n');
+        message += QLatin1Char('\n');
+        message += tr("Log: %1").arg(QString::fromStdString(r.log_path));
     }
     QMessageBox::information(this, tr("Kernel Manager"), message);
     init_kernels();

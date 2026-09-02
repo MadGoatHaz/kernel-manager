@@ -182,17 +182,23 @@ struct InstallPlan {
 
 // Result of one install_from_directory() run: the outcome flag + error
 // text, the installed kernel's name + version (for the boot-instructions
-// display and the list refresh), and the post-install boot-selection
-// steps. The instructions are filled on every run (they describe the
-// detected bootloader and the kernel, not the outcome), so the caller
-// can show them even after a failure — except when the directory holds
-// no packages at all (zero commands, no kernel to point at).
+// display and the list refresh), the post-install boot-selection steps,
+// and the install log's path. The instructions are filled on every run
+// (they describe the detected bootloader and the kernel, not the
+// outcome), so the caller can show them even after a failure — except
+// when the directory holds no packages at all (zero commands, no kernel
+// to point at). `log_path` is filled only for the real (default) runner:
+// the log holds every executed step's command, real exit code and full
+// output plus the post-install verification (see install_from_directory
+// below); an injected test runner executes nothing, so it gets an empty
+// `log_path` (zero filesystem side effects).
 struct DirInstallResult {
     bool ok = false;
     std::string error;
     std::string name;
     std::string version;
     std::vector<std::string> boot_instructions;
+    std::string log_path;  // the install log ("" for an injected runner)
 };
 
 // Install the built packages found in `dir` (list_local_packages): one
@@ -216,6 +222,21 @@ struct DirInstallResult {
 // (best-effort: the .pkg.tar.zst suffix stripped); `bl` is the
 // bootloader the post-install tail targets (default: the live
 // detection, detect_bootloader()).
+//
+// Install logging (real runner only — an injected runner records the
+// raw commands and never touches the filesystem): the run writes a log
+// at ~/.cache/kernel-manager/install-<YYYYMMDD-HHMMSS>.log (created
+// before the first step, the path returned in `log_path`): a header
+// (date, source dir, package identities, bootloader) + one section per
+// executed step (the command, start time, the command's REAL exit code
+// and its full stdout+stderr — each step runs through the installed
+// install_logger.sh helper, which streams the output to the terminal in
+// real time AND appends it to the log) + a post-install verification
+// section (dkms status, boot entries, the NVIDIA modules built for the
+// new kernel — one read-only compound command whose rc never fails the
+// install) + a result tail (SUCCESS, or FAILED naming the first failing
+// step). The log is the post-mortem record: the terminal windows are
+// transient and their output is otherwise lost.
 [[nodiscard]] DirInstallResult install_from_directory(std::string_view dir,
                                                       CommandRunner runner = CommandRunner{},
                                                       Bootloader bl = detect_bootloader());
