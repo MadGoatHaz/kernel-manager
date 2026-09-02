@@ -1,5 +1,15 @@
 # Changelog
 
+### v1.24.0 (2026-09-01) — release candidate
+
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/0c918d4...c8ca7c1)
+
+- 🔥 **Install from directory:** a new "Install from directory…" row in the kernel list; right-clicking opens a folder picker, the app finds `*.pkg.tar.zst` packages and installs them via `pacman -U` with the post-install tail; locally-installed kernels absent from the enabled repos appear as `local/<name>` rows (uninstallable via the existing checkbox path)
+- 📁 **Build directory selection:** a bottom-left path label + "Browse…" button; persists via QSettings; `build_repo_path()`/`build_app_path()`/`aur_pkgbuilds_path()` all honor the selection; default unchanged (`~/.cache/kernel-manager/pkgbuilds`)
+- 📦 **Release:** the `v1.23.0` tag is cut at `0c918d4`; the PKGBUILD is re-pinned (`pkgver` 1.23.0)
+
+> Note: release candidate only — 854/854 unit assertions green across all 12 harnesses (incl. the new k14 directory-install + k15 build-dir-persistence), clean build with 1 pre-existing baseline warning (`src/utils.cpp:104`), 0 defects. An optional `lupdate` resync of the locale catalogs for the new `tr()` strings ("Browse…", "Choose build directory", the directory-row tooltip, the boot-selection/critical dialog texts) is deferred. The v1.24.0 tag + `pkgver` bump happen at the next release cut.
+
 ### v1.23.0 (2026-08-31)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/aad790e...0c918d4)
