@@ -339,10 +339,19 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
     }
 
     if (!kernels.empty() && is_paru_installed) {
-        auto&& aur_kernels_headers = utils::make_multiline(utils::exec("paru --aur -Sl | grep ' linux[^ ]*-headers' | awk '{print $2}'"));
+        // Paru --aur -Sl emits "repo name version description" per line;
+        // capture the name ($2) AND the version ($3) so AUR rows show the
+        // real version (raw, unformatted, e.g. "7.2.2-1") instead of a
+        // placeholder.
+        auto&& aur_kernels_headers = utils::make_multiline(utils::exec("paru --aur -Sl | grep ' linux[^ ]*-headers' | awk '{print $2, $3}'"));
 
         for (auto&& aur_kernel_header : aur_kernels_headers) {
-            auto&& aur_kernel = std::string{aur_kernel_header};
+            // Each line is "name version"; a version-less line degrades to
+            // "name " ⇒ empty version ⇒ the unknown-version fallback below.
+            const auto space_pos = aur_kernel_header.find(' ');
+            auto&& aur_kernel    = std::string{space_pos == std::string::npos ? aur_kernel_header : aur_kernel_header.substr(0, space_pos)};
+            auto&& aur_version   = std::string{space_pos == std::string::npos ? "" : aur_kernel_header.substr(space_pos + 1)};
+            const auto aur_kernel_headers = std::string{aur_kernel};  // name, pre-strip (m_name_headers semantics kept)
             utils::replace_all(aur_kernel, "-headers", "");
             if (std::ranges::find_if(kernels, [&](auto& kernel) { return kernel.m_name == aur_kernel; }) != kernels.end()) {
                 continue;
@@ -352,8 +361,10 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
             kernel_obj.m_handle       = handle;
             kernel_obj.m_repo         = "aur";
             kernel_obj.m_name         = aur_kernel;
-            kernel_obj.m_name_headers = aur_kernel_header;
-            kernel_obj.m_version      = "unknown-version";
+            kernel_obj.m_name_headers = aur_kernel_headers;
+            /* clang-format off */
+            kernel_obj.m_version = aur_version.empty() ? "unknown-version" : aur_version;
+            /* clang-format on */
             kernel_obj.m_raw          = fmt::format("aur/{}", aur_kernel);
 
             kernels.emplace_back(std::move(kernel_obj));
