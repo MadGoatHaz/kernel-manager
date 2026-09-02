@@ -535,7 +535,14 @@ inline void list_widget_apply_edit_flag(QListWidget* list_widget) noexcept {
 }  // namespace
 
 // NOTE: we use std::string const ref intentionally to prevent conversion from string_view into QString
-void ConfWindow::run_cmd_async(std::string cmd, const std::string& working_path, bool escalate) noexcept {
+void ConfWindow::run_cmd_async(std::string cmd, const std::string& working_path, bool escalate, bool expect_done) noexcept {
+    // Re-arm the completion context for every launch: a re-launch while the
+    // done-status poll is running (the post-build pacman -U) must not leave
+    // a stale timer aimed at the old build dir.
+    m_done_status_timer.stop();
+    m_expect_done = expect_done;
+    m_last_helper_rc = 0;
+
     using namespace std::string_literals;
     cmd += "; read -p 'Press enter to exit'"s;
 
@@ -559,38 +566,80 @@ void ConfWindow::run_cmd_async(std::string cmd, const std::string& working_path,
 }
 
 void ConfWindow::finished_proc(int exit_code, QProcess::ExitStatus) noexcept {
-    using namespace std::string_view_literals;
-
     m_running = false;
+    m_last_helper_rc = exit_code;
 
-    // handle exit case
+    // The terminal-helper's lifetime equals the launched command's lifetime
+    // (the D2 contract), so this event fires when the command ends. The
+    // .done-status marker (touched by the build command) is the completion
+    // signal for expect_done launches; marker-less launches (the post-build
+    // pacman -U, escalated ops) end normally without one.
+    const auto& check_tmp_path = fmt::format(FMT_COMPILE("{}/.done-status"), m_build_conf_path);
+    if (fs::exists(check_tmp_path) && m_expect_done) {
+        // The success path: the build command ran to completion.
+        handle_build_done();
+    } else if (!m_expect_done) {
+        // A marker-less launch ending is normal, not a failure — the old
+        // code printed a spurious "process failed with exit code: N" here.
+    } else {
+        // Expect a marker but none yet: the transient race where the marker
+        // lands slightly after the helper's liveness loop ended. Bounded
+        // belt-and-braces poll (10 x 3 s) before declaring failure.
+        m_done_polls_left = 10;
+        fmt::print(stderr, "build completion marker not found yet; polling (bounded 30 s)\n");
+        m_done_status_timer.start(3000);
+    }
+}
+
+// The build-completion success path (extracted from finished_proc, cycle-7
+// C3/D3): the .done-status marker was found, so remove it and offer the
+// post-build package install. Reached from finished_proc (the marker hit at
+// command end) and from on_done_status_tick (the bounded poll).
+void ConfWindow::handle_build_done() noexcept {
+    const auto& check_tmp_path = fmt::format(FMT_COMPILE("{}/.done-status"), m_build_conf_path);
+    fs::remove(check_tmp_path);
+
+    fmt::print("success\n");
+
+    auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Do you want to install build packages?"));
+    if (res == QMessageBox::Yes) {
+        fmt::print("pressed yes\n");
+
+        auto pkg_glob_list = get_package_names_glob_from_pkgbuild(m_build_conf_path);
+        // Absolute paths: the pkexec'd root shell (escalate=true) starts in $HOME, so a
+        // bare glob would expand against the wrong directory and match nothing.
+        auto pkg_globs = pkg_glob_list
+                         | std::ranges::views::transform(
+                               [d = m_build_conf_path](const auto& g) { return d + "/" + g; })
+                         | std::ranges::views::join_with(' ')
+                         | std::ranges::to<std::string>();
+        auto pacman_cmd = fmt::format(FMT_COMPILE("pacman -U {}"), pkg_globs);
+
+        fmt::print("pacman_cmd := {}\n", pacman_cmd);
+        m_running = true;
+        run_cmd_async(pacman_cmd, m_build_conf_path, /*escalate=*/true, /*expect_done=*/false);
+    }
+}
+
+// The bounded done-status poll (cycle-7 C3/D3): 10 x 3 s retries of the
+// marker check after a marker-less helper exit. Marker found => the success
+// path; polls exhausted => an honest failure diagnostic (the old code
+// printed a misleading "process failed with exit code: 2" the moment the
+// helper exited).
+void ConfWindow::on_done_status_tick() noexcept {
     const auto& check_tmp_path = fmt::format(FMT_COMPILE("{}/.done-status"), m_build_conf_path);
     if (fs::exists(check_tmp_path)) {
-        fs::remove(check_tmp_path);
-
-        fmt::print("success\n");
-
-        auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Do you want to install build packages?"));
-        if (res == QMessageBox::Yes) {
-            fmt::print("pressed yes\n");
-
-            auto pkg_glob_list = get_package_names_glob_from_pkgbuild(m_build_conf_path);
-            // Absolute paths: the pkexec'd root shell (escalate=true) starts in $HOME, so a
-            // bare glob would expand against the wrong directory and match nothing.
-            auto pkg_globs = pkg_glob_list
-                             | std::ranges::views::transform(
-                                   [d = m_build_conf_path](const auto& g) { return d + "/" + g; })
-                             | std::ranges::views::join_with(' ')
-                             | std::ranges::to<std::string>();
-            auto pacman_cmd = fmt::format(FMT_COMPILE("pacman -U {}"), pkg_globs);
-
-            fmt::print("pacman_cmd := {}\n", pacman_cmd);
-            m_running = true;
-            run_cmd_async(pacman_cmd, m_build_conf_path, /*escalate=*/true);
-        }
-    } else {
-        fmt::print(stderr, "process failed with exit code: {}\n", exit_code);
+        m_done_status_timer.stop();
+        handle_build_done();
+        return;
     }
+    if (m_done_polls_left > 1) {
+        --m_done_polls_left;
+        m_done_status_timer.start(3000);
+        return;
+    }
+    m_done_status_timer.stop();
+    fmt::print(stderr, "build failed: no completion marker after the wait window (terminal exit code: {})\n", m_last_helper_rc);
 }
 
 void ConfWindow::connect_all_checkboxes() noexcept {
@@ -1036,6 +1085,10 @@ ConfWindow::ConfWindow(QWidget* parent)
         patches_page_ui_obj->list_widget->insertItem(current_index + 1, current_item);
         patches_page_ui_obj->list_widget->setCurrentRow(current_index + 1);
     });
+
+    // Build completion polling (cycle-7 C3/D3): the bounded .done-status
+    // retry after a marker-less helper exit (see on_done_status_tick).
+    connect(&m_done_status_timer, &QTimer::timeout, this, &ConfWindow::on_done_status_tick);
 }
 
 void ConfWindow::closeEvent(QCloseEvent* event) {

@@ -47,6 +47,7 @@
 
 #include <QMainWindow>
 #include <QProcess>
+#include <QTimer>
 
 // A kernel build flavor discovered in the kernel source repo:
 // key = flavor name relative to the repo's family prefix, path = the
@@ -96,6 +97,11 @@ class ConfWindow final : public QMainWindow {
     void on_save() noexcept;
     void on_load() noexcept;
     void finished_proc(int exit_code, QProcess::ExitStatus exit_status) noexcept;
+    // Build completion (cycle-7 C3/D3): the success path shared by the
+    // finished_proc marker hit and the bounded done-status poll; the poll
+    // timer's timeout slot.
+    void handle_build_done() noexcept;
+    void on_done_status_tick() noexcept;
 
     auto kernel_path_for_index(std::int32_t index) const noexcept -> std::string;
     void update_option_set() noexcept;
@@ -117,9 +123,23 @@ class ConfWindow final : public QMainWindow {
     // Last kernel name (repo prefix stripped) auto-populated via
     // apply_source_for_kernel; a repeat for the same kernel is a no-op.
     std::string m_last_applied_kernel{};
+
+    // Build completion tracking (cycle-7 C3/D3): the terminal-helper's
+    // lifetime equals the launched command's lifetime (the D2 contract), so
+    // m_cmd's "finished" event fires when the command ends; the .done-status
+    // marker (touched by the build command) is the completion signal for
+    // expect_done launches, marker-less launches (the post-build pacman -U,
+    // escalated ops) end normally without one, and the timer is the bounded
+    // belt-and-braces poll if the marker lands slightly after the helper
+    // exits.
+    QTimer m_done_status_timer{this};
+    bool m_expect_done{true};
+    int m_last_helper_rc{0};
+    std::size_t m_done_polls_left{0};
+
     std::unique_ptr<Ui::ConfWindow> m_ui = std::make_unique<Ui::ConfWindow>();
 
-    void run_cmd_async(std::string cmd, const std::string& working_path, bool escalate = false) noexcept;
+    void run_cmd_async(std::string cmd, const std::string& working_path, bool escalate = false, bool expect_done = true) noexcept;
     auto get_all_set_values() const noexcept -> std::string;
     void clear_patches_data_tab() noexcept;
     void connect_all_checkboxes() noexcept;
