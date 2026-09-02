@@ -28,6 +28,10 @@
 //     (success, clone failure, and re-prepare of an existing repo)
 //   - insert_new_source_array_into_pkgbuild does not write on a missing
 //     or unreadable PKGBUILD
+//   - the PKGBUILD rewrites are idempotent: repeat runs of
+//     insert_new_source_array_into_pkgbuild / set_custom_name_in_pkgbuild
+//     neither stack source arrays nor accumulate pkgbase suffixes
+//     (…-custom stays …-custom)
 //   - run_and_remove_testscript does not exec when the script write failed
 //   - the makepkg.conf PKGEXT testscript is pinned away from the process CWD
 
@@ -93,6 +97,16 @@ const std::string kSyntheticPkgbuild =
 void git_in(const fs::path& dir, const std::string& command) {
     const std::string full = "cd '" + dir.string() + "' && " + command;
     (void)utils::exec(full);
+}
+
+std::size_t count_occurrences(const std::string& haystack, const std::string& needle) {
+    std::size_t count = 0;
+    std::size_t pos   = 0;
+    while ((pos = haystack.find(needle, pos)) != std::string::npos) {
+        ++count;
+        pos += needle.size();
+    }
+    return count;
 }
 
 }  // namespace
@@ -299,6 +313,104 @@ int main(int argc, char** argv) {
         check(globs.size() == 1 && globs.front().starts_with("foo-1.0.0-1-"), "package name glob produced from the PKGBUILD");
         check(!fs::exists(marker / ".testscriptpkgext"), "PKGEXT testscript was NOT written into the process CWD");
         check(!fs::exists(dir / ".testscriptpkgnames"), "pkgnames testscript removed afterwards");
+    }
+
+    // ------------------------------------------------------------------
+    // 15. insert_new_source_array_into_pkgbuild is IDEMPOTENT: a second
+    //     run replaces the block the first run inserted instead of
+    //     stacking another (the pre-fix accumulation: the user's build
+    //     dir ended up with two duplicated source= arrays).
+    // ------------------------------------------------------------------
+    {
+        const auto dir = make_tmp_dir(root, "insert-twice");
+        write_file(dir / "PKGBUILD", kSyntheticPkgbuild);
+        QListWidget list;
+        list.addItem("mylocal.patch");
+        check(insert_new_source_array_into_pkgbuild(dir.string(), &list, {"https://example.com/foo-1.0.0.tar.gz"}), "first source-array insert succeeds");
+        const auto after_first = utils::read_whole_file((dir / "PKGBUILD").string());
+        check(count_occurrences(after_first, "source=(") == 1, "exactly one source= array after the first insert (original replaced in place)");
+        check(after_first.find("https://example.com/foo-1.0.0.tar.gz") != std::string::npos, "original source entry preserved in the rewritten array");
+        QListWidget list2;
+        list2.addItem("mylocal.patch");
+        check(insert_new_source_array_into_pkgbuild(dir.string(), &list2, {"https://example.com/foo-1.0.0.tar.gz"}), "second source-array insert succeeds");
+        const auto after_second = utils::read_whole_file((dir / "PKGBUILD").string());
+        check(count_occurrences(after_second, "source=(") == 1, "still exactly one source= array after the second insert (no stacking)");
+        check(after_second == after_first, "second run is byte-stable against the first (idempotent)");
+    }
+
+    // ------------------------------------------------------------------
+    // 16. set_custom_name_in_pkgbuild is IDEMPOTENT for a "$pkgbase"
+    //     placeholder name: a repeat run must not re-wrap the already
+    //     renamed pkgbase (the pre-fix accumulation: the user's build
+    //     dir ended up with pkgbase="…-custom-custom").
+    // ------------------------------------------------------------------
+    {
+        const auto dir = make_tmp_dir(root, "custom-name-twice");
+        write_file(dir / "PKGBUILD", kSyntheticPkgbuild);
+        check(set_custom_name_in_pkgbuild(dir.string(), "$pkgbase-custom"), "first custom-name run succeeds");
+        auto content = utils::read_whole_file((dir / "PKGBUILD").string());
+        check(content.find("pkgbase=\"foo-custom\"") != std::string::npos, "pkgbase= rewritten to foo-custom");
+        check(set_custom_name_in_pkgbuild(dir.string(), "$pkgbase-custom"), "second custom-name run succeeds");
+        content = utils::read_whole_file((dir / "PKGBUILD").string());
+        check(content.find("pkgbase=\"foo-custom\"") != std::string::npos, "repeat run lands on the same value");
+        check(content.find("custom-custom") == std::string::npos, "no accumulated suffix after the repeat run");
+    }
+
+    // ------------------------------------------------------------------
+    // 17. A pkgbase already carrying a DOUBLED suffix (the user's live
+    //     state: pkgbase="linux-$_pkgsuffix-custom-custom") collapses to a
+    //     single suffix on the next run and stays there (fixed point).
+    // ------------------------------------------------------------------
+    {
+        const auto dir = make_tmp_dir(root, "custom-name-double");
+        std::string pkgbuild = kSyntheticPkgbuild;
+        (void)utils::replace_all(pkgbuild, "pkgbase=foo", "pkgbase=\"linux-$_pkgsuffix-custom-custom\"");
+        write_file(dir / "PKGBUILD", pkgbuild);
+        check(set_custom_name_in_pkgbuild(dir.string(), "$pkgbase-custom"), "run on the already-doubled state succeeds");
+        auto content = utils::read_whole_file((dir / "PKGBUILD").string());
+        check(content.find("pkgbase=\"linux-$_pkgsuffix-custom\"") != std::string::npos, "doubled suffix collapsed to a single one");
+        check(set_custom_name_in_pkgbuild(dir.string(), "$pkgbase-custom"), "follow-up run succeeds");
+        content = utils::read_whole_file((dir / "PKGBUILD").string());
+        check(content.find("custom-custom") == std::string::npos, "the value no longer grows (stable fixed point)");
+    }
+
+    // ------------------------------------------------------------------
+    // 18. AUR layout (the user's real file): the original source= array
+    //     is separated from prepare() by other top-level statements
+    //     (validpgpkeys=) + a blank line — it must stay untouched, while
+    //     the block inserted above prepare() is replaced in place on
+    //     repeat runs.
+    // ------------------------------------------------------------------
+    {
+        const std::string kAurShape =
+            "pkgname=foo\n"
+            "pkgver=1.0.0\n"
+            "pkgbase=foo\n"
+            "source=(\n"
+            "\"https://example.com/foo.tar.gz\"\n"
+            ")\n"
+            "validpgpkeys=(\n"
+            "AB12CD34\n"
+            ")\n"
+            "\n"
+            "prepare() {\n"
+            "\ttrue\n"
+            "}\n";
+        const auto dir = make_tmp_dir(root, "aur-shape");
+        write_file(dir / "PKGBUILD", kAurShape);
+        QListWidget list;
+        list.addItem("p1.patch");
+        check(insert_new_source_array_into_pkgbuild(dir.string(), &list, {"https://example.com/foo.tar.gz"}), "insert into the AUR layout succeeds");
+        auto content = utils::read_whole_file((dir / "PKGBUILD").string());
+        check(count_occurrences(content, "source=(") == 2, "original source= block untouched + exactly one inserted block");
+        check(content.find("validpgpkeys=(") != std::string::npos, "validpgpkeys= section untouched");
+        check(content.find("p1.patch") != std::string::npos, "widget entry present in the inserted block");
+        QListWidget list2;
+        list2.addItem("p1.patch");
+        check(insert_new_source_array_into_pkgbuild(dir.string(), &list2, {"https://example.com/foo.tar.gz"}), "second insert into the AUR layout succeeds");
+        content = utils::read_whole_file((dir / "PKGBUILD").string());
+        check(count_occurrences(content, "source=(") == 2, "second run replaces the inserted block (no stacking)");
+        check(content.find("validpgpkeys=(") != std::string::npos, "validpgpkeys= section still untouched");
     }
 
     // ------------------------------------------------------------------

@@ -463,6 +463,142 @@ auto get_package_names_glob_from_pkgbuild(std::string_view kernel_name_path) noe
     return prepare_func_names(parse_lines, pkgver_str);
 }
 
+// A line that closes a multi-line array: a bare ")" (possibly surrounded
+// by whitespace), or a ")" glued to the last (double-quoted) entry — the
+// shape this app's inserted source arrays have (see new_source_array).
+auto is_source_block_bottom(std::string_view line) noexcept -> bool {
+    std::size_t begin = 0;
+    std::size_t end   = line.size();
+    while (begin < end && (line[begin] == ' ' || line[begin] == '\t')) {
+        ++begin;
+    }
+    while (end > begin && (line[end - 1] == ' ' || line[end - 1] == '\t')) {
+        --end;
+    }
+    if (begin == end) {
+        return false;
+    }
+    const auto trimmed = line.substr(begin, end - begin);
+    if (trimmed == ")") {
+        return true;
+    }
+    if (!trimmed.ends_with(")")) {
+        return false;
+    }
+    const auto inner = trimmed.substr(0, trimmed.size() - 1);
+    return inner.starts_with('"') && inner.ends_with('"');
+}
+
+// A column-0 top-level statement: an identifier followed by '=' (an
+// assignment such as md5sums= / validpgpkeys=) or '(' (a function such as
+// package_foo()). Array entry lines (quoted or bare) are not.
+auto is_top_level_stmt(std::string_view line) noexcept -> bool {
+    if (line.empty()) {
+        return false;
+    }
+    const auto is_ident_char = [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+    };
+    if (!is_ident_char(line.front())) {
+        return false;
+    }
+    for (const char c : line) {
+        if (!is_ident_char(c)) {
+            return c == '=' || c == '(';
+        }
+    }
+    return false;
+}
+
+// Idempotency for the source-array insert: strip every source array that a
+// previous run left directly above prepare() (blank lines in between are
+// tolerated). The app's inserted block has a fixed shape:
+//     source=(
+//     "<entry>"
+//     "<last entry>")
+// — the closing ")" glued to the last quoted entry — so a block is
+// recognized bottom-up: the first non-blank line above prepare() must be a
+// block bottom, and walking up its entry lines must reach a "source=(" top
+// BEFORE any blank line or other top-level statement (an md5sums=( /
+// validpgpkeys=( … boundary, whose closing line belongs to a foreign
+// array). A one-line "source=(…)" directly above is removed whole.
+// Without this, each run stacks another array (bash: the last wins, but
+// the file grows without bound and every re-read of the source array
+// carries the stale duplicates).
+void remove_source_arrays_before_prepare(std::string& src) noexcept {
+    // The start of the line containing position `pos` (a '\n' belongs to
+    // the line above it, so a position right after one resolves to the
+    // following line — never to itself).
+    const auto line_start_of_pos = [&](std::size_t pos) -> std::size_t {
+        if (pos == 0) {
+            return 0;
+        }
+        const auto nl = src.find_last_of('\n', pos - 1);
+        return nl == std::string::npos ? 0 : nl + 1;
+    };
+    // The line directly above the boundary b (b = a line start, b ≥ 1):
+    // the line [ls, b) — its content is [ls, b-1) (the '\n' at b-1 is its
+    // terminator; for a one-char "\n" line the content is empty).
+    const auto line_above = [&](std::size_t b) -> std::pair<std::size_t, std::string_view> {
+        const auto ls = line_start_of_pos(b - 1);
+        return {ls, std::string_view{src}.substr(ls, b - 1 - ls)};
+    };
+    const auto is_blank_line = [](std::string_view line) {
+        return std::ranges::all_of(line, [](char c) { return c == ' ' || c == '\t'; });
+    };
+
+    for (;;) {
+        const auto foundpos = src.find("prepare()");
+        if (foundpos == std::string::npos) {
+            return;
+        }
+
+        // The start of the line holding prepare() is the boundary.
+        std::size_t boundary = line_start_of_pos(foundpos);
+        // Walk up over the blank lines directly above it.
+        while (boundary > 0) {
+            const auto [ls, line] = line_above(boundary);
+            if (!is_blank_line(line)) {
+                break;
+            }
+            boundary = ls;
+        }
+        if (boundary == 0) {
+            return;
+        }
+
+        const auto [ls, line] = line_above(boundary);
+        if (is_source_block_bottom(line)) {
+            // A multi-line array closes directly above: walk up to its top.
+            std::size_t cur = ls;
+            for (;;) {
+                if (cur == 0) {
+                    return;  // file top without a "source=(" — foreign array
+                }
+                const auto [prev_ls, prev] = line_above(cur);
+                if (prev.starts_with("source=(")) {
+                    // The block: [prev_ls, boundary) — from its top line
+                    // through the closing line's terminator '\n' (the blank
+                    // run above prepare() is preserved).
+                    src.erase(prev_ls, boundary - prev_ls);
+                    break;  // a stacked block may now be adjacent: re-scan
+                }
+                if (is_blank_line(prev) || is_top_level_stmt(prev)) {
+                    return;  // the closing line belongs to a foreign array or section
+                }
+                cur = prev_ls;
+            }
+            continue;
+        }
+        if (line.starts_with("source=")) {
+            // A one-line source array directly above: remove the whole line.
+            src.erase(ls, boundary - ls);
+            continue;
+        }
+        return;  // nothing recognizable directly above prepare()
+    }
+}
+
 bool insert_new_source_array_into_pkgbuild(std::string_view kernel_name_path, QListWidget* list_widget, const std::vector<std::string>& orig_source_array) noexcept {
     static constexpr auto functor = [](auto&& rng) {
         auto rng_str = std::string_view(&*rng.begin(), static_cast<size_t>(std::ranges::distance(rng)));
@@ -489,9 +625,18 @@ bool insert_new_source_array_into_pkgbuild(std::string_view kernel_name_path, QL
     }
 
     const auto& new_source_array = fmt::format(FMT_COMPILE("source=(\n{})\n"), array_entries | std::ranges::views::join_with('\n') | std::ranges::to<std::string>());
+    // Idempotency: strip any source array a previous run left directly
+    // above prepare() before inserting this one — otherwise each run
+    // stacks another block (see remove_source_arrays_before_prepare).
+    remove_source_arrays_before_prepare(pkgbuildsrc);
     if (auto foundpos = pkgbuildsrc.find("prepare()"); foundpos != std::string::npos) {
+        // Insert right AFTER the newline that ends the line above
+        // prepare(): the block always starts on its own line and its
+        // trailing newline keeps it separated from whatever follows.
+        // (Inserting at the newline's position would glue the block's
+        // first line to the preceding content.)
         if (auto last_newline_before = pkgbuildsrc.find_last_of('\n', foundpos); last_newline_before != std::string::npos) {
-            pkgbuildsrc.insert(last_newline_before, new_source_array);
+            pkgbuildsrc.insert(last_newline_before + 1, new_source_array);
         }
     }
     return utils::write_to_file(pkgbuild_path, pkgbuildsrc);
@@ -544,6 +689,15 @@ void ConfWindow::run_cmd_async(std::string cmd, const std::string& working_path,
     m_last_helper_rc = 0;
 
     using namespace std::string_literals;
+
+    // CWD safety: a D-Bus-spawned terminal (konsole) runs the command in
+    // its OWN profile's working directory, NOT in this QProcess's — a
+    // stale profile dir makes makepkg miss the PKGBUILD. The command
+    // itself therefore changes into the working directory first (the path
+    // is single-quoted; an embedded single quote is '\''-escaped).
+    std::string quoted_path{working_path};
+    utils::replace_all(quoted_path, "'", "'\\''");
+    cmd = "cd '" + quoted_path + "' && " + cmd;
     cmd += "; read -p 'Press enter to exit'"s;
 
     // remember current build working directory

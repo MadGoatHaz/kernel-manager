@@ -8,6 +8,10 @@
 #
 #     terminal-helper [-s 'pkexec <rootshell>'] '<cmd>; read -p "Press enter to exit"'
 #
+# run_cmd_async additionally prepends "cd '<working_path>' && " to the
+# command (CWD safety: a D-Bus terminal runs in its own profile CWD, not
+# the QProcess CWD); case 6 exercises exactly that shape.
+#
 # Fakes: konsole = D-Bus mimicry (background-spawn the "window", record the
 # child PID, exit 0 immediately — the window's output goes to /dev/null, not
 # back down the launcher's stdout); xterm = blocking (foreground exec, exit
@@ -19,7 +23,12 @@
 # (< 1 s); (4) escalated + konsole => helper exits 0 immediately (< 1 s,
 # fire-and-forget), file self-removed by the "root" shell within 2 s;
 # (5) konsole + `exit 5` => helper rc 0 (launch contract — the command's
-# rc is the terminal's business, not the helper's).
+# rc is the terminal's business, not the helper's); (6) konsole +
+# "cd '<sub>' && touch made-it; sleep 1" => the marker lands in the cd'd
+# subdir (the run_cmd_async CWD-prefix shape works through the temp file;
+# the sleep keeps the PID marker alive past the helper's 0.2 s grace tick
+# — an instant command with EOF stdin would race the grace loop, which the
+# app's real commands never do: they end in an interactive `read`).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -53,7 +62,7 @@ mkdir -p "$BIN" "$ESSENTIAL"
 # Whitelisted coreutils the helper + fakes may use under the sandbox PATH.
 # No host terminal (ptyxis/konsole/xterm/...) is reachable through it, so
 # the helper can only ever pick one of the fakes.
-for tool in bash mktemp sleep cat rm; do
+for tool in bash mktemp sleep cat rm touch; do
     ln -s "$(command -v "$tool")" "$ESSENTIAL/$tool"
 done
 
@@ -203,6 +212,27 @@ check_eq   'case 5: helper rc = 0 (launch contract — the command rc is the ter
 check_lt   "case 5: helper exited promptly after the shell died (elapsed ${MS}ms < 3000ms)" "$MS" 3000
 check_gone 'case 5: temp file removed by the helper safety net (self-cleanup never ran after exit 5)' "$file"
 check_gone 'case 5: pid marker removed by the helper safety net' "$file.pid"
+
+# case 6: konsole + the run_cmd_async CWD prefix — "cd '<dir>' && cmd"
+# must run in the cd'd directory (the D-Bus window's profile CWD is
+# irrelevant), and the marker must land there, not in the helper CWD.
+echo "== case 6: non-blocking (konsole) + cd prefix — marker lands in the cd'd dir =="
+reset_bin; make_fake_konsole
+K17_PIDFILE="$SBX/kc6"; rm -f "$K17_PIDFILE"
+mkdir -p "$SBX/sub"
+# The sleep 1 models a command of finite duration (the app's build command
+# runs for minutes; its trailing `read` blocks on interactive stdin, so the
+# PID marker always outlives the helper's 0.2 s grace tick — an instant
+# EOF-stdin command would race that tick and is not a real-app shape).
+CMD6="cd '$SBX/sub' && touch made-it; sleep 1; read -p 'Press enter to exit'"
+invoke_helper /dev/null "$CMD6"
+file="$(extract_file)"
+check_eq   'case 6: helper rc = 0 (launch contract)' "$RC" 0
+check_ge   "case 6: helper waited for the command (elapsed ${MS}ms >= 1000ms)" "$MS" 1000
+check_gone 'case 6: temp file self-cleaned' "$file"
+check_gone 'case 6: pid marker cleaned' "$file.pid"
+check_eq   "case 6: marker landed in the cd'd subdir" "$([ -f "$SBX/sub/made-it" ] && echo yes || echo no)" yes
+check_eq   'case 6: no marker in the helper launch CWD' "$([ -f "$SBX/made-it" ] && echo yes || echo no)" no
 
 # --- summary -------------------------------------------------------------------
 echo
