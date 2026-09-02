@@ -135,7 +135,15 @@ std::string exec(std::string_view command) noexcept {
 
 int runCmdTerminal(QString cmd, bool escalate) noexcept {
     QProcess proc;
-    cmd += "; read -p 'Press enter to exit'";
+    // Capture the command's exit code in __rc BEFORE the interactive read
+    // prompt and exit the script with it: the trailing `read` is the last
+    // command of the script line, and a script that merely runs `read`
+    // ends with read's rc (0 — the user pressed Enter), masking a failed
+    // command as success. `exit $__rc` terminates the line before the
+    // helper's self-cleanup line (the rm -f safety net collects the temp
+    // files — the k17 mid-script `exit` shape), so a blocking terminal
+    // propagates the real rc back through the helper to this return.
+    cmd += "; __rc=$?; read -p 'Press enter to exit'; exit $__rc";
     auto paramlist = QStringList();
     if (escalate) {
         paramlist << "-s"
