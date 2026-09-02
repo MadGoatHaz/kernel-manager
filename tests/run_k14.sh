@@ -19,10 +19,10 @@
 # before/after + no DB file newer than a run marker).
 #
 # Gates:
-#   1. the test compiles with at most ONE source warning, and it must be
-#      the pre-existing utils.cpp:104 -Wignored-attributes baseline
-#      (run_k15 precedent; the lto-wrapper serial-compilation note is a
-#      toolchain note, not a source diagnostic, so it is excluded)
+#   1. the test compiles with 0 source warnings (cycle-7 C7a eliminated
+#      the -Wignored-attributes baseline; the lto-wrapper
+#      serial-compilation note is a toolchain note, not a source
+#      diagnostic, so it is excluded)
 #   2. the test binary exits 0 (all fixture-build + A–C checks pass;
 #      the binary creates its own mkstemp sandbox and removes it at
 #      the end of main — gate 4 below is belt-and-suspenders)
@@ -111,23 +111,23 @@ LOG="$SANDBOX/build.log"
     -lalpm \
     -o "$SANDBOX/k14" 2> "$LOG"
 
-# Warning gate (run_k15 precedent): at most one SOURCE warning, and it
-# must be the pre-existing utils.cpp:104 -Wignored-attributes baseline
-# (the lto-wrapper "serial compilation of N LTRANS jobs" line is a
-# toolchain note, not a source diagnostic).
+# Warning gate (run_k15 precedent): 0 source warnings (cycle-7 C7a
+# eliminated the -Wignored-attributes baseline; the lto-wrapper "serial
+# compilation of N LTRANS jobs" line is a toolchain note, not a source
+# diagnostic).
 SRC_WARNINGS="$(grep 'warning:' "$LOG" | grep -vc 'lto-wrapper:' || true)"
 BASELINE_WARNINGS="$(grep -c 'utils\.cpp:104.*-Wignored-attributes' "$LOG" || true)"
 if [[ "$SRC_WARNINGS" -gt 1 ]]; then
-    echo "error: $SRC_WARNINGS source warnings (expected at most 1 = the utils.cpp:104 baseline):" >&2
+    echo "error: expected 0 source warnings (cycle-7 C7a eliminated the -Wignored-attributes baseline), got $SRC_WARNINGS:" >&2
     grep 'warning:' "$LOG" | grep -v 'lto-wrapper:' >&2 || true
     exit 1
 fi
 if [[ "$SRC_WARNINGS" -eq 1 && "$BASELINE_WARNINGS" -ne 1 ]]; then
-    echo "error: the single source warning is NOT the utils.cpp:104 baseline:" >&2
+    echo "error: unexpected source warning (expected 0 source warnings; cycle-7 C7a eliminated the -Wignored-attributes baseline):" >&2
     grep 'warning:' "$LOG" | grep -v 'lto-wrapper:' >&2 || true
     exit 1
 fi
-echo "INFO: build clean (source warnings=$SRC_WARNINGS; 1 = the utils.cpp:104 baseline)"
+echo "INFO: build clean (source warnings=$SRC_WARNINGS; expected 0 — cycle-7 C7a eliminated the -Wignored-attributes baseline)"
 
 set +e
 "$SANDBOX/k14" > "$SANDBOX/run.log"

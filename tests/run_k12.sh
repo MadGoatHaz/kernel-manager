@@ -14,8 +14,8 @@
 #
 # Gates:
 #   1. the harness exits 0 with all assertions passing (both runs)
-#   2. at most ONE compiler warning, and it is the pre-existing
-#      utils.cpp:104 -Wignored-attributes baseline (run_k7/k11 precedent)
+#   2. 0 source warnings (cycle-7 C7a eliminated the -Wignored-attributes
+#      baseline)
 #   3. the K12-DUMP row dump is byte-stable across two runs
 #      (deterministic order)
 set -euo pipefail
@@ -124,24 +124,24 @@ LOG="/tmp/km-test-k12-build.log"
     -lalpm \
     -o "$OUT" 2> "$LOG"
 
-# Warning gate: at most one SOURCE warning, and it must be the pre-existing
-# utils.cpp:104 -Wignored-attributes baseline (run_k7/k11 precedent; the
+# Warning gate: 0 source warnings (cycle-7 C7a eliminated the
+# -Wignored-attributes baseline; the
 # lto-wrapper "warning: using serial compilation of N LTRANS jobs" line is
 # a toolchain note — the same diagnostic CMake builds report as "note:" —
 # and is not a source diagnostic, so it is excluded from the count).
 SRC_WARNINGS="$(grep 'warning:' "$LOG" | grep -vc 'lto-wrapper:' || true)"
 BASELINE_WARNINGS="$(grep -c 'utils\.cpp:104.*-Wignored-attributes' "$LOG" || true)"
 if [[ "$SRC_WARNINGS" -gt 1 ]]; then
-    echo "error: $SRC_WARNINGS source warnings (expected at most 1 = the utils.cpp:104 baseline):" >&2
+    echo "error: expected 0 source warnings (cycle-7 C7a eliminated the -Wignored-attributes baseline), got $SRC_WARNINGS:" >&2
     grep 'warning:' "$LOG" | grep -v 'lto-wrapper:' >&2 || true
     exit 1
 fi
 if [[ "$SRC_WARNINGS" -eq 1 && "$BASELINE_WARNINGS" -ne 1 ]]; then
-    echo "error: the single source warning is NOT the utils.cpp:104 baseline:" >&2
+    echo "error: unexpected source warning (expected 0 source warnings; cycle-7 C7a eliminated the -Wignored-attributes baseline):" >&2
     grep 'warning:' "$LOG" | grep -v 'lto-wrapper:' >&2 || true
     exit 1
 fi
-echo "INFO: build clean (source warnings=$SRC_WARNINGS; 1 = the utils.cpp:104 baseline)"
+echo "INFO: build clean (source warnings=$SRC_WARNINGS; expected 0 — cycle-7 C7a eliminated the -Wignored-attributes baseline)"
 
 # Run twice: all assertions green (exit 0 = zero failures) + the K12-DUMP
 # row dump byte-stable across the runs (deterministic order).

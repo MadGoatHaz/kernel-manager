@@ -8,8 +8,8 @@
 # execute / boot-instructions assertions. Every executed command goes
 # through an injected recording CommandRunner, so no real terminal,
 # pkexec, pacman, paru or network is touched (environment-tolerant).
-# The pre-existing utils.cpp:103 -Wignored-attributes warning is
-# expected (run_k7.sh precedent); no other warning may appear.
+# 0 source warnings (cycle-7 C7a eliminated the -Wignored-attributes
+# baseline); no other warning may appear.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
