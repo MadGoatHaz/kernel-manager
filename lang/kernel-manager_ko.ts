@@ -182,12 +182,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.ui" line="40"/>
+        <location filename="../src/conf-window.ui" line="36"/>
         <source>Options</source>
         <translation>옵션</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.ui" line="45"/>
+        <location filename="../src/conf-window.ui" line="41"/>
         <source>Patches</source>
         <translation>패치</translation>
     </message>
@@ -204,66 +204,66 @@
         <translation type="vanished">BMQ (BitMap Queue)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="538"/>
-        <location filename="../src/conf-window.cpp" line="1089"/>
-        <location filename="../src/conf-window.cpp" line="1107"/>
-        <location filename="../src/conf-window.cpp" line="1129"/>
+        <location filename="../src/conf-window.cpp" line="604"/>
+        <location filename="../src/conf-window.cpp" line="1189"/>
+        <location filename="../src/conf-window.cpp" line="1207"/>
+        <location filename="../src/conf-window.cpp" line="1229"/>
         <source>Kernel Manager</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="792"/>
+        <location filename="../src/conf-window.cpp" line="886"/>
         <source>Custom URL…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="926"/>
+        <location filename="../src/conf-window.cpp" line="1020"/>
         <source>Select one or more patch files</source>
         <translation>패치 파일 하나 이상 선택</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="928"/>
+        <location filename="../src/conf-window.cpp" line="1022"/>
         <source>Patch file (*.patch)</source>
         <translation>패치 파일 (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="948"/>
+        <location filename="../src/conf-window.cpp" line="1042"/>
         <source>Enter URL patch</source>
         <translation>URL 패치 입력</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="949"/>
+        <location filename="../src/conf-window.cpp" line="1043"/>
         <source>Patch URL:</source>
         <translation>패치 URL:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1080"/>
+        <location filename="../src/conf-window.cpp" line="1180"/>
         <source>Save file as</source>
         <translation>파일 저장 위치</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1082"/>
-        <location filename="../src/conf-window.cpp" line="1099"/>
+        <location filename="../src/conf-window.cpp" line="1182"/>
+        <location filename="../src/conf-window.cpp" line="1199"/>
         <source>Config file (*.toml)</source>
         <translation>구성 파일 (*.toml)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1089"/>
+        <location filename="../src/conf-window.cpp" line="1189"/>
         <source>Failed to save config options to file: %1</source>
         <translation>구성 옵션을 파일에 저장하지 못함: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1097"/>
+        <location filename="../src/conf-window.cpp" line="1197"/>
         <source>Load from</source>
         <translation>불러오기 위치</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1107"/>
+        <location filename="../src/conf-window.cpp" line="1207"/>
         <source>Failed to load config options from file: %1</source>
         <translation>파일에서 구성 옵션을 불러오지 못함: %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1129"/>
+        <location filename="../src/conf-window.cpp" line="1229"/>
         <source>Config file(%1) is outdated</source>
         <translation>구성 파일(%1)이 오래되었습니다</translation>
     </message>
@@ -272,7 +272,7 @@
         <translation type="vanished">RT - 실시간 커널</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="538"/>
+        <location filename="../src/conf-window.cpp" line="604"/>
         <source>Do you want to install build packages?</source>
         <translation>빌드 패키지를 설치하시겠습니까?</translation>
     </message>
@@ -297,17 +297,22 @@
     </message>
     <message>
         <location filename="../src/km-window.ui" line="17"/>
-        <location filename="../src/km-window.cpp" line="150"/>
-        <location filename="../src/km-window.cpp" line="163"/>
-        <location filename="../src/km-window.cpp" line="220"/>
-        <location filename="../src/km-window.cpp" line="246"/>
-        <location filename="../src/km-window.cpp" line="422"/>
-        <location filename="../src/km-window.cpp" line="429"/>
+        <location filename="../src/km-window.cpp" line="353"/>
+        <location filename="../src/km-window.cpp" line="366"/>
+        <location filename="../src/km-window.cpp" line="423"/>
+        <location filename="../src/km-window.cpp" line="452"/>
+        <location filename="../src/km-window.cpp" line="712"/>
+        <location filename="../src/km-window.cpp" line="722"/>
+        <location filename="../src/km-window.cpp" line="799"/>
+        <location filename="../src/km-window.cpp" line="813"/>
+        <location filename="../src/km-window.cpp" line="876"/>
+        <location filename="../src/km-window.cpp" line="924"/>
+        <location filename="../src/km-window.cpp" line="931"/>
         <source>Kernel Manager</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="27"/>
+        <location filename="../src/km-window.ui" line="24"/>
         <source>&lt;html&gt;
 &lt;body&gt;
 &lt;p&gt;Here you&apos;ll see information about currently installed and available Linux kernels.&lt;/p&gt;
@@ -324,37 +329,57 @@
 &lt;/html&gt;</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="66"/>
+        <location filename="../src/km-window.ui" line="63"/>
         <source>Choose</source>
         <translation>선택하기</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="71"/>
+        <location filename="../src/km-window.ui" line="68"/>
         <source>PkgName</source>
         <translation>패키지이름</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="76"/>
+        <location filename="../src/km-window.ui" line="73"/>
         <source>Version</source>
         <translation>버전</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="81"/>
+        <location filename="../src/km-window.ui" line="78"/>
         <source>Category</source>
         <translation>범주</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="118"/>
+        <location filename="../src/km-window.ui" line="83"/>
+        <source>Installed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="88"/>
+        <source>Immutable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="99"/>
+        <source>Build dir:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="116"/>
+        <source>Browse…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="136"/>
         <source>sched-ext scheduler config</source>
         <translation>sched-ext 스케줄러 구성</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="125"/>
+        <location filename="../src/km-window.ui" line="143"/>
         <source>Configure</source>
         <translation>구성하기</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="132"/>
+        <location filename="../src/km-window.ui" line="150"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
@@ -363,12 +388,12 @@
         <translation type="vanished">취소하기</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="139"/>
+        <location filename="../src/km-window.ui" line="157"/>
         <source>Execute</source>
         <translation>실행하기</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="246"/>
+        <location filename="../src/km-window.cpp" line="452"/>
         <source>No kernels found!
 Please run `pacman -Sy` to update DB!
 This is needed for the app to work properly</source>
@@ -377,15 +402,15 @@ DB를 업데이트하려면 `pacman -Sy`를 실행하세요!
 앱이 제대로 작동하려면 이 작업이 필요합니다</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="220"/>
+        <location filename="../src/km-window.cpp" line="423"/>
         <source>Failed to clone repository!
 Please check your internet connection and try again</source>
         <translation>저장소를 복제하지 못했습니다!
 인터넷 연결을 확인하고 다시 시도해 주세요</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="299"/>
-        <location filename="../src/km-window.cpp" line="363"/>
+        <location filename="../src/km-window.cpp" line="523"/>
+        <location filename="../src/km-window.cpp" line="587"/>
         <source>Please wait...
 We are preparing configuration window for you
 cloning PKGBUILDs..</source>
@@ -393,26 +418,137 @@ cloning PKGBUILDs..</source>
 PKGBUILD 복제를 위한 구성 창을 준비 중입니다..</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="150"/>
+        <location filename="../src/km-window.cpp" line="353"/>
+        <location filename="../src/km-window.cpp" line="876"/>
         <source>Failed to initialize alpm handle (%1)</source>
         <translation>alpm 핸들(%1)을 초기화하지 못했습니다</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="163"/>
+        <location filename="../src/km-window.cpp" line="366"/>
         <source>Failed to release alpm handle (%1)</source>
         <translation>alpm 핸들(%1)을 해제하지 못했습니다</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="395"/>
+        <location filename="../src/km-window.cpp" line="646"/>
+        <source>Install from directory…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="662"/>
+        <source>Install pre-compiled %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="682"/>
+        <source>Add repo &apos;%1&apos;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="686"/>
+        <source>Build custom %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="688"/>
+        <source>Show boot instructions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="697"/>
+        <source>Install the pre-compiled package for &apos;%1&apos;?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="698"/>
+        <source>This installs the package as root (pacman) and refreshes the initramfs.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="712"/>
+        <source>Failed to install &apos;%1&apos;:
+%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="716"/>
+        <source>Installed &apos;%1&apos;. Select it at the next boot:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="736"/>
+        <source>Enable the &apos;%1&apos; pacman repository?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="737"/>
+        <source>This appends the [%1] section to /etc/pacman.conf (a backup is written first) and runs `pacman -Sy` as an administrator.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="753"/>
+        <source>Repository enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="754"/>
+        <source>Repository &apos;%1&apos; enabled — refreshing the kernel list…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="762"/>
+        <source>Failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="763"/>
+        <source>Failed to enable repository &apos;%1&apos; (exit code %2). Check the terminal output.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="790"/>
+        <source>Choose build directory…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="799"/>
+        <source>Failed to install from &apos;%1&apos;:
+%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="808"/>
+        <source>Installed &apos;%1 (%2)&apos;. Select it at the next boot:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="829"/>
+        <source>Choose build directory</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="858"/>
         <source>Please wait...
 Initializing kernels..</source>
         <translation>잠시만 기다려 주세요...
 커널을 초기화하는 중입니다.</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="422"/>
-        <location filename="../src/km-window.cpp" line="429"/>
+        <location filename="../src/km-window.cpp" line="924"/>
+        <location filename="../src/km-window.cpp" line="931"/>
         <source>scx-manager is not installed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>QObject</name>
+    <message>
+        <location filename="../src/km-window.cpp" line="296"/>
+        <source>Boot instructions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="309"/>
+        <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
