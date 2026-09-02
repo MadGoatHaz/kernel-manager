@@ -43,21 +43,24 @@ int run_real_command(const std::string& cmd, bool escalate) noexcept {
 
 // A step that installs a package (pacman/paru/makepkg — the custom
 // build runs makepkg through build_helper.sh), as opposed to the
-// post-install tail (mkinitcpio / grub-mkconfig).
+// post-install tail (the GRUB config regeneration).
 [[gnu::pure]] bool is_package_install_step(const std::string& cmd) {
     return cmd.starts_with("pacman ") || cmd.starts_with("paru ") || cmd.starts_with("makepkg ")
            || cmd.starts_with(KM_HELPER_DIR "/build_helper.sh");
 }
 
-// The post-install tail every precompiled install gets: the initramfs
-// refresh, then the GRUB config regeneration (GRUB only —
-// systemd-boot/UKI auto-detect the new kernel, UNKNOWN needs nothing
-// beyond the initramfs refresh).
+// The post-install tail every precompiled install gets: the GRUB
+// config regeneration, and only for GRUB — the sole manual step.
 void append_postinstall_tail(std::vector<InstallStep>& steps, Bootloader bl) {
-    steps.push_back({"mkinitcpio -P", true});
+    // ALPM hooks (kernel-install: 50-dracut, 90-loaderentry) already
+    // handle initramfs generation (dracut or mkinitcpio) and boot
+    // entry creation (systemd-boot BLS, UKI copy). The only bootloader
+    // requiring manual post-install config is GRUB (grub-mkconfig does
+    // not auto-detect new kernels).
     if (bl == Bootloader::GRUB) {
         steps.push_back({"grub-mkconfig -o /boot/grub/grub.cfg", true});
     }
+    // systemd-boot, UKI, UNKNOWN: no-op (ALPM hooks handle it)
 }
 
 // The built-package suffix (D2: the literal .pkg.tar.zst per the user

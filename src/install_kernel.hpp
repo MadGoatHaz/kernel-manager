@@ -59,10 +59,10 @@ using CommandRunner = std::function<int(const std::string& cmd, bool escalate)>;
 // (known_kernels.hpp):
 //   precompiled + pacman repo (core/extra/cachyos/chaotic-aur/liquorix):
 //       `pacman -S --needed <package>` (escalated)
-//       -> `mkinitcpio -P` (escalated — the initramfs refresh)
-//       -> GRUB only: `grub-mkconfig -o /boot/grub/grub.cfg` (escalated;
-//          systemd-boot/UKI auto-detect the new kernel, UNKNOWN needs
-//          nothing beyond the initramfs refresh)
+//       -> GRUB only: `grub-mkconfig -o /boot/grub/grub.cfg` (escalated —
+//          the sole manual step; the ALPM hooks already handle the
+//          initramfs + boot entry, so systemd-boot/UKI/UNKNOWN add
+//          nothing — the tail is a no-op for them)
 //   precompiled + AUR (install_repo == "aur"):
 //       `paru -S --needed <package>` (not escalated — an AUR build runs
 //       as the user) -> the same post-install tail
@@ -116,7 +116,7 @@ struct InstallPlan {
     std::string repo;    // pacman repo name ("aur" when AUR; "" when unknown)
     bool precompiled = false;
     std::vector<std::string> install_cmds;      // the package install step(s)
-    std::vector<std::string> postinstall_cmds;  // mkinitcpio -P (+ the GRUB refresh)
+    std::vector<std::string> postinstall_cmds;  // the GRUB refresh (GRUB only; empty otherwise — ALPM hooks handle the initramfs + boot entry)
     std::string note;                           // build-only guidance ("" when precompiled)
 };
 
@@ -194,8 +194,9 @@ struct DirInstallResult {
 // (no shell glob — the 0c918d4 pkexec-CWD-reset rationale: the root
 // shell starts in $HOME, so relative paths break, and quoting keeps a
 // spaced name one word instead of word-splitting an expanded glob)
-// followed by the standard post-install tail (mkinitcpio -P + the
-// GRUB-only config regeneration), each step through `runner`:
+// followed by the standard post-install tail (the GRUB-only config
+// regeneration — a no-op for the other bootloaders), each step through
+// `runner`:
 //   - an empty runner selects the real one (utils::runCmdTerminal, the
 //     shared pkexec terminal path; resolved in the .cpp so this header
 //     stays Qt-free)

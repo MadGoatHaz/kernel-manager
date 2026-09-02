@@ -37,14 +37,14 @@
 //   - (C) install_from_directory with a fake recording CommandRunner
 //     (k8 pattern — the real runCmdTerminal is never resolved, no
 //     terminal, pkexec, pacman or network is touched): fixture dir +
-//     GRUB ⇒ exactly 3 calls ([0] the exact `pacman -U '<abs1>'
-//     '<abs2>'`, [1] `mkinitcpio -P`, [2] `grub-mkconfig -o
-//     /boot/grub/grub.cfg`, all escalated) + ok + identity linux-test /
-//     1.2.3-4 + boot instructions filled; UNKNOWN ⇒ 2 calls (no GRUB);
-//     empty dir ⇒ the exact "no packages" error, 0 calls, no
-//     instructions; fake rc = 1 on step 0 ⇒ ok = false, the error
-//     names the pacman step + rc, exactly 1 call, instructions still
-//     filled (graceful stop).
+//     GRUB ⇒ exactly 2 calls ([0] the exact `pacman -U '<abs1>'
+//     '<abs2>'`, [1] `grub-mkconfig -o /boot/grub/grub.cfg`, both
+//     escalated) + ok + identity linux-test / 1.2.3-4 + boot
+//     instructions filled; UNKNOWN ⇒ 1 call (install only — the ALPM
+//     hooks handle the initramfs + boot entry); empty dir ⇒ the exact
+//     "no packages" error, 0 calls, no instructions; fake rc = 1 on
+//     step 0 ⇒ ok = false, the error names the pacman step + rc,
+//     exactly 1 call, instructions still filled (graceful stop).
 
 #include "install_kernel.hpp"
 
@@ -248,37 +248,34 @@ int main() {
     //     runner — nothing real is executed).
     // ------------------------------------------------------------------
     {
-        // Fixture dir + GRUB: the exact 3-call sequence + identity +
+        // Fixture dir + GRUB: the exact 2-call sequence + identity +
         // the filled boot instructions.
         RecordingRunner runner{};
         const DirInstallResult grub = install_from_directory(pkgs_dir, runner.fn, Bootloader::GRUB);
         check(grub.ok && grub.error.empty(), "C: fixture dir + GRUB ⇒ ok, no error");
-        check(runner.calls.size() == 3, "C: GRUB ⇒ exactly 3 calls (pacman -U, mkinitcpio -P, grub-mkconfig)");
-        if (runner.calls.size() == 3) {
+        check(runner.calls.size() == 2, "C: GRUB ⇒ exactly 2 calls (pacman -U, grub-mkconfig)");
+        if (runner.calls.size() == 2) {
             check(runner.calls[0].first == "pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'"
                   && runner.calls[0].second,
                   "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'` (quoted absolutes, no glob)");
-            check(runner.calls[1].first == "mkinitcpio -P" && runner.calls[1].second,
-                  "C[1]: escalated `mkinitcpio -P`");
-            check(runner.calls[2].first == "grub-mkconfig -o /boot/grub/grub.cfg" && runner.calls[2].second,
-                  "C[2]: escalated GRUB config regeneration");
+            check(runner.calls[1].first == "grub-mkconfig -o /boot/grub/grub.cfg" && runner.calls[1].second,
+                  "C[1]: escalated GRUB config regeneration");
         }
         check(grub.name == "linux-test" && grub.version == "1.2.3-4",
               "C: identity = the kernel package (linux-test / 1.2.3-4)");
         check(grub.boot_instructions.size() == 4 && grub.boot_instructions.back() == expected_note("linux-test"),
               "C: GRUB boot instructions filled (3 steps + the note, ends with the note)");
 
-        // Fixture dir + UNKNOWN: 2 calls (no GRUB refresh).
+        // Fixture dir + UNKNOWN: 1 call (no GRUB refresh — the ALPM
+        // hooks handle the initramfs + boot entry).
         RecordingRunner unknown_runner{};
         const DirInstallResult unknown = install_from_directory(pkgs_dir, unknown_runner.fn, Bootloader::UNKNOWN);
         check(unknown.ok, "C: fixture dir + UNKNOWN ⇒ ok");
-        check(unknown_runner.calls.size() == 2, "C: UNKNOWN ⇒ 2 calls (no grub-mkconfig)");
-        if (unknown_runner.calls.size() == 2) {
+        check(unknown_runner.calls.size() == 1, "C: UNKNOWN ⇒ 1 call (install only, no grub-mkconfig)");
+        if (unknown_runner.calls.size() == 1) {
             check(unknown_runner.calls[0].first == "pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'"
                   && unknown_runner.calls[0].second,
                   "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'`");
-            check(unknown_runner.calls[1].first == "mkinitcpio -P" && unknown_runner.calls[1].second,
-                  "C[1]: escalated `mkinitcpio -P`");
         }
         check(unknown.boot_instructions.size() == 3 && unknown.boot_instructions.back() == expected_note("linux-test"),
               "C: UNKNOWN boot instructions filled (2 steps + the note)");
