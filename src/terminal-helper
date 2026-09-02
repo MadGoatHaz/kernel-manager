@@ -37,11 +37,18 @@ done
 shift $(($OPTIND - 1))
 
 file="$(mktemp)"
-echo "$1" > "$file"
+pidfile="$file.pid"
+
+# Escalation: the C++ passes exactly 'pkexec "<KM_HELPER_DIR>/rootshell.sh"'
+# via -s (run_cmd_async / runCmdTerminal) — prefix-match on pkexec.
+case "$LAUNCHER_CMD" in
+    pkexec*) escalated=1 ;;
+    *)       escalated=0 ;;
+esac
+
 cmd="${LAUNCHER_CMD} \"$file\""
 echo $cmd
 
-#declare -a terminals=(x-terminal-emulator mate-terminal gnome-terminal terminator xfce4-terminal urxvt rxvt termit Eterm aterm uxterm xterm roxterm termite lxterminal terminology st qterminal lilyterm tilix terminix konsole kitty guake tilda alacritty)
 terminal=""
 declare -A terminals=(
     ["alacritty"]="alacritty -e $cmd || LIBGL_ALWAYS_SOFTWARE=1 alacritty -e $cmd"
@@ -63,9 +70,6 @@ declare -a term_order=("alacritty" "kitty" "ptyxis" "konsole" "kgx" "gnome-termi
 if [ -z "$terminal" ] || ! command -v "$terminal" &> /dev/null; then
 for entry in ${term_order[@]}; do
     if command -v "$entry" > /dev/null 2>&1; then
-        # gnome-console does not exit on command completion so we need to kill
-        # it manually
-        [[ "$entry" == "kgx" ]] && echo "kill -SIGQUIT \$PPID 2>/dev/null" >> "$file"
         terminal="$entry"
         break;
     fi
@@ -77,5 +81,90 @@ if [ -z "$terminal" ]; then
     exit 1
 fi
 
-eval "${terminals[${terminal}]}" 2>/dev/null || [[ "$terminal" != "kgx" ]] && { rm "$file"; exit 2; }
-rm "$file"
+# Content build — the file the terminal's shell runs:
+#   line 1 (non-escalated only): the shell records its own PID in $pidfile
+#                                (the launch marker the helper waits on)
+#   then:                         the command itself
+#   then (kgx only):              kgx does not exit on command completion,
+#                                so kill the window manually — kept BEFORE
+#                                the self-cleanup, as before
+#   last:                         SELF-CLEANUP — the terminal's own shell
+#                                removes the temp files after the command,
+#                                so no launcher-side `rm` can ever race the
+#                                first read of the file (the old :80 race).
+{
+    if [ "$escalated" -eq 0 ]; then
+        echo "echo \$\$ > '$pidfile'"
+    fi
+    printf '%s\n' "$1"
+    if [ "$terminal" = "kgx" ]; then
+        echo "kill -SIGQUIT \$PPID 2>/dev/null"
+    fi
+    if [ "$escalated" -eq 0 ]; then
+        echo "rm -f '$pidfile' '$file'"
+    else
+        echo "rm -f '$file'"
+    fi
+} > "$file"
+
+# Launch. Contract: helper-lifetime == command-lifetime for every
+# non-escalated launch, so both the synchronous callers (runCmdTerminal —
+# install/repo-add/AUR) and the async caller (finished_proc) see a correct
+# completion event.
+#   non-blocking = konsole|ptyxis (D-Bus clients — they request a window
+#       and exit 0 immediately; a future fire-and-forget terminal joins
+#       this set — the marker-wait is the safe default for it):
+#     - non-escalated: request the window, wait for the PID marker
+#       (bounded launch grace: 120 s, 0.2 s ticks; never appears ⇒ the
+#       terminal failed to launch the command ⇒ clean up + exit 1), then
+#       track the shell (unbounded liveness loop — ends when the command
+#       shell exits, including window close / Ctrl-C, where the
+#       self-cleanup line never ran ⇒ the helper's rm -f safety net
+#       collects both files) ⇒ exit 0. The helper's rc is the LAUNCH
+#       contract (0 = the command ran to completion in the terminal);
+#       the command's own rc is user-visible in the terminal and is the
+#       terminal's business, NOT propagated here.
+#     - escalated: fire-and-forget — the file self-cleans inside the
+#       root shell, and the user's kill -0 on the root PID fails (EPERM)
+#       ⇒ liveness untrackable ⇒ exit 0 immediately.
+#   blocking (everything else, any escalation mode): today's
+#       rc-propagation contract for the synchronous callers.
+case "$terminal" in
+    konsole|ptyxis) blocking=0 ;;
+    *)              blocking=1 ;;
+esac
+
+if [ "$blocking" -eq 0 ] && [ "$escalated" -eq 1 ]; then
+    eval "${terminals[$terminal]}" 2>/dev/null || true
+    exit 0
+fi
+
+if [ "$blocking" -eq 0 ]; then
+    eval "${terminals[$terminal]}" 2>/dev/null || true
+
+    deadline=$(( SECONDS + 120 ))
+    while [ ! -f "$pidfile" ]; do
+        if [ "$SECONDS" -ge "$deadline" ]; then
+            rm -f "$pidfile" "$file"
+            exit 1
+        fi
+        sleep 0.2
+    done
+
+    pid="$(cat "$pidfile" 2>/dev/null)" || pid=""
+    if [ -n "$pid" ]; then
+        while kill -0 "$pid" 2>/dev/null; do
+            sleep 1
+        done
+    fi
+
+    # Safety net: either the self-cleanup ran or the window closed before
+    # it did — rm -f is idempotent either way.
+    rm -f "$pidfile" "$file"
+    exit 0
+fi
+
+rc=0
+eval "${terminals[$terminal]}" 2>/dev/null || rc=$?
+rm -f "$pidfile" "$file"
+exit $rc
