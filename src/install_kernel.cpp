@@ -43,24 +43,47 @@ int run_real_command(const std::string& cmd, bool escalate) noexcept {
 
 // A step that installs a package (pacman/paru/makepkg — the custom
 // build runs makepkg through build_helper.sh), as opposed to the
-// post-install tail (the GRUB config regeneration).
+// post-install tail (the DKMS build + initramfs regeneration + GRUB
+// config).
 [[gnu::pure]] bool is_package_install_step(const std::string& cmd) {
     return cmd.starts_with("pacman ") || cmd.starts_with("paru ") || cmd.starts_with("makepkg ")
            || cmd.starts_with(KM_HELPER_DIR "/build_helper.sh");
 }
 
-// The post-install tail every precompiled install gets: the GRUB
-// config regeneration, and only for GRUB — the sole manual step.
+// The post-install tail every precompiled install gets: build the
+// pending DKMS modules for the new kernel, regenerate the initramfs,
+// and (only for GRUB) refresh the bootloader config.
 void append_postinstall_tail(std::vector<InstallStep>& steps, Bootloader bl) {
-    // ALPM hooks (kernel-install: 50-dracut, 90-loaderentry) already
-    // handle initramfs generation (dracut or mkinitcpio) and boot
-    // entry creation (systemd-boot BLS, UKI copy). The only bootloader
-    // requiring manual post-install config is GRUB (grub-mkconfig does
-    // not auto-detect new kernels).
+    // Boot-safety: the ALPM hooks (kernel-install: 50-dracut,
+    // 90-loaderentry) run DURING the package transaction, which is
+    // BEFORE DKMS has built the modules (nvidia, zfs, r8169, ...) for
+    // the new kernel. If the GPU driver is a DKMS module, the hook's
+    // dracut/mkinitcpio pass produced an initramfs that is missing it,
+    // so the new kernel comes up with no display output and the system
+    // will not boot. Re-running the two steps below — DKMS build first,
+    // initramfs regeneration second — fixes that ordering.
+
+    // 1. Build the pending DKMS modules for the new kernel. Must run
+    //    BEFORE the initramfs regeneration so the drivers are present
+    //    when dracut/mkinitcpio package them. No-op when dkms is not
+    //    installed (the `|| true` guard keeps a missing tool from
+    //    failing the install).
+    steps.push_back({"dkms autoinstall 2>/dev/null || true", true});
+
+    // 2. Regenerate the initramfs with whichever tool the system has:
+    //    dracut (EndeavourOS/Fedora-style) preferred, mkinitcpio
+    //    (plain Arch/Manjaro) as the fallback. The `|| true` guard
+    //    keeps a system with neither tool from failing the install.
+    steps.push_back({"dracut -f 2>/dev/null || mkinitcpio -P 2>/dev/null || true", true});
+
+    // 3. Configure the bootloader: only GRUB needs a manual refresh
+    //    (grub-mkconfig does not auto-detect new kernels).
+    //    systemd-boot / UKI: no-op (BLS entries are auto-detected by
+    //    the kernel-install hook, 90-loaderentry).
     if (bl == Bootloader::GRUB) {
         steps.push_back({"grub-mkconfig -o /boot/grub/grub.cfg", true});
     }
-    // systemd-boot, UKI, UNKNOWN: no-op (ALPM hooks handle it)
+    // systemd-boot, UKI, UNKNOWN: steps 1 + 2 only
 }
 
 // The built-package suffix (D2: the literal .pkg.tar.zst per the user

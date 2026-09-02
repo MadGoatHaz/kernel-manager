@@ -37,14 +37,15 @@
 //   - (C) install_from_directory with a fake recording CommandRunner
 //     (k8 pattern — the real runCmdTerminal is never resolved, no
 //     terminal, pkexec, pacman or network is touched): fixture dir +
-//     GRUB ⇒ exactly 2 calls ([0] the exact `pacman -U '<abs1>'
-//     '<abs2>'`, [1] `grub-mkconfig -o /boot/grub/grub.cfg`, both
-//     escalated) + ok + identity linux-test / 1.2.3-4 + boot
-//     instructions filled; UNKNOWN ⇒ 1 call (install only — the ALPM
-//     hooks handle the initramfs + boot entry); empty dir ⇒ the exact
-//     "no packages" error, 0 calls, no instructions; fake rc = 1 on
-//     step 0 ⇒ ok = false, the error names the pacman step + rc,
-//     exactly 1 call, instructions still filled (graceful stop).
+//     GRUB ⇒ exactly 4 calls ([0] the exact `pacman -U '<abs1>'
+//     '<abs2>'`, [1] DKMS autoinstall, [2] initramfs regeneration
+//     (dracut || mkinitcpio), [3] `grub-mkconfig -o /boot/grub/
+//     grub.cfg`, all escalated) + ok + identity linux-test / 1.2.3-4 +
+//     boot instructions filled; UNKNOWN ⇒ 3 calls (install + DKMS +
+//     initramfs — no GRUB refresh); empty dir ⇒ the exact "no
+//     packages" error, 0 calls, no instructions; fake rc = 1 on step
+//     0 ⇒ ok = false, the error names the pacman step + rc, exactly 1
+//     call, instructions still filled (graceful stop).
 
 #include "install_kernel.hpp"
 
@@ -74,6 +75,17 @@ void check(bool condition, const char* what) {
 // bootloader: one constant text (same text the k8 harness asserts).
 constexpr const char* expected_note =
     "The kernel is installed and ready to boot. Select it from your bootloader menu at next reboot.";
+
+// The post-install tail commands append_postinstall_tail emits (the
+// exact strings the .cpp pushes — same constants the k8 harness uses,
+// kept in lockstep with the implementation):
+//   kDkms      — build the pending DKMS modules for the new kernel
+//   kInitramfs — regenerate the initramfs, dracut preferred,
+//                mkinitcpio fallback
+//   kGrub      — the GRUB-only bootloader refresh
+constexpr const char* kDkms      = "dkms autoinstall 2>/dev/null || true";
+constexpr const char* kInitramfs = "dracut -f 2>/dev/null || mkinitcpio -P 2>/dev/null || true";
+constexpr const char* kGrub      = "grub-mkconfig -o /boot/grub/grub.cfg";
 
 // A recording command runner (k8 pattern): returns a fixed exit code
 // for every step and records the (cmd, escalate) pairs asked to run,
@@ -251,13 +263,17 @@ int main() {
         RecordingRunner runner{};
         const DirInstallResult grub = install_from_directory(pkgs_dir, runner.fn, Bootloader::GRUB);
         check(grub.ok && grub.error.empty(), "C: fixture dir + GRUB ⇒ ok, no error");
-        check(runner.calls.size() == 2, "C: GRUB ⇒ exactly 2 calls (pacman -U, grub-mkconfig)");
-        if (runner.calls.size() == 2) {
+        check(runner.calls.size() == 4, "C: GRUB ⇒ exactly 4 calls (pacman -U, DKMS, initramfs, grub-mkconfig)");
+        if (runner.calls.size() == 4) {
             check(runner.calls[0].first == "pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'"
                   && runner.calls[0].second,
                   "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'` (quoted absolutes, no glob)");
-            check(runner.calls[1].first == "grub-mkconfig -o /boot/grub/grub.cfg" && runner.calls[1].second,
-                  "C[1]: escalated GRUB config regeneration");
+            check(runner.calls[1].first == kDkms && runner.calls[1].second,
+                  "C[1]: escalated DKMS autoinstall");
+            check(runner.calls[2].first == kInitramfs && runner.calls[2].second,
+                  "C[2]: escalated initramfs regeneration");
+            check(runner.calls[3].first == kGrub && runner.calls[3].second,
+                  "C[3]: escalated GRUB config regeneration");
         }
         check(grub.name == "linux-test" && grub.version == "1.2.3-4",
               "C: identity = the kernel package (linux-test / 1.2.3-4)");
@@ -269,11 +285,15 @@ int main() {
         RecordingRunner unknown_runner{};
         const DirInstallResult unknown = install_from_directory(pkgs_dir, unknown_runner.fn, Bootloader::UNKNOWN);
         check(unknown.ok, "C: fixture dir + UNKNOWN ⇒ ok");
-        check(unknown_runner.calls.size() == 1, "C: UNKNOWN ⇒ 1 call (install only, no grub-mkconfig)");
-        if (unknown_runner.calls.size() == 1) {
+        check(unknown_runner.calls.size() == 3, "C: UNKNOWN ⇒ 3 calls (install + DKMS + initramfs, no grub-mkconfig)");
+        if (unknown_runner.calls.size() == 3) {
             check(unknown_runner.calls[0].first == "pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'"
                   && unknown_runner.calls[0].second,
                   "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'`");
+            check(unknown_runner.calls[1].first == kDkms && unknown_runner.calls[1].second,
+                  "C[1]: escalated DKMS autoinstall");
+            check(unknown_runner.calls[2].first == kInitramfs && unknown_runner.calls[2].second,
+                  "C[2]: escalated initramfs regeneration");
         }
         check(unknown.boot_instructions.size() == 3 && unknown.boot_instructions.back() == expected_note,
               "C: UNKNOWN boot instructions filled (2 steps + the note)");
