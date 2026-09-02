@@ -118,6 +118,16 @@ class MainWindow final : public QMainWindow {
     void on_execute() noexcept;
     void on_schedext_config() noexcept;
     void on_configure() noexcept;
+    // D6 (plan v1.24.0): the bottom-left build-dir picker — "Browse…" opens
+    // a folder dialog over the current build directory; an accepted choice
+    // is persisted via utils::set_build_dir (QSettings, no cache) and the
+    // path label is refreshed immediately. The label (buildDirLabel) is the
+    // confirmation — quiet persistence, no second dialog. update_build_dir_label()
+    // mirrors the current utils::build_repo_path() into the label text +
+    // tooltip; it runs once at construction (the label never shows empty at
+    // runtime) and after each accepted browse.
+    void on_browse_build_dir() noexcept;
+    void update_build_dir_label() noexcept;
     // D1 (plan v1.24.0): the "Install from directory…" pseudo-row flow —
     // folder picker (QFileDialog) -> install_kernel::install_from_directory
     // (the C2 planner, real escalated runner) -> boot-instructions dialog
