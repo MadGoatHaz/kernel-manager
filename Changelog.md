@@ -1,14 +1,15 @@
 # Changelog
 
-### v1.24.0 (2026-09-01) — release candidate
+### v1.24.0 (2026-09-01)
 
-[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/0c918d4...c8ca7c1)
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/c8ca7c1...97e505b)
 
 - 🔥 **Install from directory:** a new "Install from directory…" row in the kernel list; right-clicking opens a folder picker, the app finds `*.pkg.tar.zst` packages and installs them via `pacman -U` with the post-install tail; locally-installed kernels absent from the enabled repos appear as `local/<name>` rows (uninstallable via the existing checkbox path)
 - 📁 **Build directory selection:** a bottom-left path label + "Browse…" button; persists via QSettings; `build_repo_path()`/`build_app_path()`/`aur_pkgbuilds_path()` all honor the selection; default unchanged (`~/.cache/kernel-manager/pkgbuilds`)
+- 🐛 **Release fixes:** the Execute button now works on the selected "Install from directory…" pseudo-row, the terminal-helper konsole launch race is eliminated with build-completion tracking in the Configure module, the `build_helper.sh` GPG key extraction handles 3 more failure patterns (the v1.23.0 `build-gpg` behavior kept as the first needle), a "Build dir:" caption is added to the working-directory selector, and the 1 pre-existing source warning is eliminated — the zero-warning baseline
 - 📦 **Release:** the `v1.23.0` tag is cut at `0c918d4`; the PKGBUILD is re-pinned (`pkgver` 1.23.0)
 
-> Note: release candidate only — 854/854 unit assertions green across all 12 harnesses (incl. the new k14 directory-install + k15 build-dir-persistence), clean build with 1 pre-existing baseline warning (`src/utils.cpp:104`), 0 defects. An optional `lupdate` resync of the locale catalogs for the new `tr()` strings ("Browse…", "Choose build directory", the directory-row tooltip, the boot-selection/critical dialog texts) is deferred. The v1.24.0 tag + `pkgver` bump happen at the next release cut.
+> Note: released — the `v1.24.0` tag is cut at `97e505b` (the full post-RC state: the v1.24.0 RC `c8ca7c1` + this cycle's 5 fixes) and the PKGBUILD is re-pinned to it (`pkgver` 1.24.0, `sha256sums` refreshed from the fetched archive). 1163 unit checks green across all 14 harnesses (incl. the new k16 GPG-needle + k17 terminal-helper harnesses), zero-warning build, 0 defects. An optional `lupdate` resync of the locale catalogs for the new `tr()` strings (the RC's "Browse…", "Choose build directory", the directory-row tooltip, the boot-selection/critical dialog texts + the new `Build dir:` caption from the `.ui`) is deferred; the 5 fixes add no further `tr()` strings (the Execute-button change reuses an existing constant, the build-completion messages are `fmt` stderr diagnostics, not `tr()`).
 
 ### v1.23.0 (2026-08-31)
 
