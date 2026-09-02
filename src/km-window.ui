@@ -94,6 +94,13 @@
      <widget class="QWidget" name="widget" native="true">
       <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
+         <widget class="QLabel" name="buildDirCaption">
+          <property name="text">
+           <string>Build dir:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QLabel" name="buildDirLabel">
           <property name="text">
            <string></string>
