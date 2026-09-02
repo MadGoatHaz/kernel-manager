@@ -482,6 +482,17 @@ MainWindow::MainWindow(QWidget* parent)
     connect(tree_kernels, &QTreeWidget::itemDoubleClicked, [tree_kernels](QTreeWidgetItem* item) { tree_kernels->setCurrentItem(item); });
     connect(tree_kernels, &QTreeWidget::itemDoubleClicked, this, &MainWindow::check_uncheck_item);
 
+    // Cycle-7 D1: the directory pseudo-row has no checkbox (v1.24.0 D1 design),
+    // so build_change_list never enables the Execute button for it.
+    // Selecting the row IS the enable signal; the lambda only ever sets true —
+    // build_change_list retains authority to disable on an empty change list.
+    connect(m_ui->treeKernels, &QTreeWidget::currentItemChanged, this,
+        [this](QTreeWidgetItem* current, QTreeWidgetItem*) {
+            if (current != nullptr && current->text(TreeCol::PkgName) == tr(kDirectoryRowRaw)) {
+                m_ui->ok->setEnabled(true);
+            }
+        });
+
     // Wait for async function to finish
     a2.wait();
     tree_kernels->blockSignals(false);
@@ -883,6 +894,21 @@ void MainWindow::init_kernels() noexcept {
 }
 
 void MainWindow::on_execute() noexcept {
+    // Cycle-7 D1: if the selected row is the "Install from directory…" pseudo-row,
+    // run the directory flow directly (the working right-click path) instead of
+    // starting the worker thread (which would see an empty change list and no-op).
+    // A checked kernel + selected pseudo-row ⇒ the directory flow wins (documented);
+    // the checked kernel stays in m_change_list for a later Execute.
+    if (auto* current = m_ui->treeKernels->currentItem()) {
+        if (current->text(TreeCol::PkgName) == tr(kDirectoryRowRaw)) {
+            on_install_from_directory();
+            if (m_change_list.isEmpty()) {
+                m_ui->ok->setEnabled(false);
+            }
+            return;
+        }
+    }
+
     if (m_running.load(std::memory_order_consume)) {
         return;
     }
