@@ -22,8 +22,9 @@
 // modules it reuses (known_kernels, bootloader, boot_instructions,
 // aur_kernel, utils) with the project's GCC warning set and asserts:
 //   - plan_steps (pure, table-driven): core pacman precompiled + GRUB
-//     (exact 3-step sequence, escalation flags), systemd-boot/UKI/
-//     UNKNOWN (2 steps, no GRUB refresh), the AUR branch (non-escalated
+//     (exact 2-step sequence, escalation flags), systemd-boot/UKI/
+//     UNKNOWN (1 step — the install only; the ALPM hooks handle the
+//     initramfs + boot entry), the AUR branch (non-escalated
 //     `paru -S --needed` + tail), buildable-only (single non-escalated
 //     build-helper step — makepkg with auto GPG import —, mirroring
 //     aur_kernel.cpp), synthetic entries
@@ -118,24 +119,23 @@ int main() {
     const KnownKernel* const linux = maybe_linux.has_value() ? *maybe_linux : nullptr;
     if (linux != nullptr) {
         const std::vector<InstallStep> grub = plan_steps(*linux, Bootloader::GRUB);
-        check(grub.size() == 3, "linux+GRUB: exactly 3 steps");
-        if (grub.size() == 3) {
+        check(grub.size() == 2, "linux+GRUB: exactly 2 steps (install + GRUB refresh)");
+        if (grub.size() == 2) {
             check(grub[0].cmd == "pacman -S --needed linux" && grub[0].escalate,
                   "linux+GRUB[0]: escalated `pacman -S --needed linux`");
-            check(grub[1].cmd == "mkinitcpio -P" && grub[1].escalate, "linux+GRUB[1]: escalated `mkinitcpio -P`");
-            check(grub[2].cmd == "grub-mkconfig -o /boot/grub/grub.cfg" && grub[2].escalate,
-                  "linux+GRUB[2]: escalated GRUB config regeneration");
+            check(grub[1].cmd == "grub-mkconfig -o /boot/grub/grub.cfg" && grub[1].escalate,
+                  "linux+GRUB[1]: escalated GRUB config regeneration");
         }
 
         for (const Bootloader bl : {Bootloader::SYSTEMD_BOOT, Bootloader::UKI, Bootloader::UNKNOWN}) {
             const std::string label = bootloader_name(bl);
             const std::vector<InstallStep> steps = plan_steps(*linux, bl);
-            check(steps.size() == 2, (label + ": exactly 2 steps (install + initramfs, no GRUB refresh)").c_str());
-            if (steps.size() == 2) {
+            check(steps.size() == 1,
+                  (label + ": exactly 1 step (install only — the ALPM hooks handle the initramfs + boot entry)").c_str());
+            if (steps.size() == 1) {
                 check(steps[0].cmd == "pacman -S --needed linux" && steps[0].escalate,
                       (label + "[0]: pacman install").c_str());
-                check(steps[1].cmd == "mkinitcpio -P" && steps[1].escalate, (label + "[1]: mkinitcpio -P").c_str());
-                check(!contains_cmd({steps[0].cmd, steps[1].cmd}, "grub-mkconfig"),
+                check(!contains_cmd({steps[0].cmd}, "grub-mkconfig"),
                       (label + ": no GRUB refresh step").c_str());
             }
         }
@@ -158,19 +158,17 @@ int main() {
             true              // buildable
         };
         const std::vector<InstallStep> uki = plan_steps(aur, Bootloader::UKI);
-        check(uki.size() == 2, "AUR+UKI: exactly 2 steps");
-        if (uki.size() == 2) {
+        check(uki.size() == 1, "AUR+UKI: exactly 1 step (install only)");
+        if (uki.size() == 1) {
             check(uki[0].cmd == "paru -S --needed linux-aurx" && !uki[0].escalate,
                   "AUR+UKI[0]: non-escalated `paru -S --needed`");
-            check(uki[1].cmd == "mkinitcpio -P" && uki[1].escalate, "AUR+UKI[1]: escalated `mkinitcpio -P`");
         }
         const std::vector<InstallStep> grub = plan_steps(aur, Bootloader::GRUB);
-        check(grub.size() == 3, "AUR+GRUB: exactly 3 steps");
-        if (grub.size() == 3) {
+        check(grub.size() == 2, "AUR+GRUB: exactly 2 steps (install + GRUB refresh)");
+        if (grub.size() == 2) {
             check(grub[0].cmd == "paru -S --needed linux-aurx" && !grub[0].escalate, "AUR+GRUB[0]: paru non-escalated");
-            check(grub[1].cmd == "mkinitcpio -P" && grub[1].escalate, "AUR+GRUB[1]: mkinitcpio escalated");
-            check(grub[2].cmd == "grub-mkconfig -o /boot/grub/grub.cfg" && grub[2].escalate,
-                  "AUR+GRUB[2]: GRUB refresh escalated");
+            check(grub[1].cmd == "grub-mkconfig -o /boot/grub/grub.cfg" && grub[1].escalate,
+                  "AUR+GRUB[1]: GRUB refresh escalated");
         }
     }
 
@@ -209,11 +207,10 @@ int main() {
         check(xanmod->precompiled_available && xanmod->install_repo == "chaotic-aur",
               "xanmod: precompiled from the chaotic-aur pacman repo (curated table)");
         const std::vector<InstallStep> steps = plan_steps(*xanmod, Bootloader::SYSTEMD_BOOT);
-        check(steps.size() == 2, "xanmod+systemd-boot: exactly 2 steps");
-        if (steps.size() == 2) {
+        check(steps.size() == 1, "xanmod+systemd-boot: exactly 1 step (install only)");
+        if (steps.size() == 1) {
             check(steps[0].cmd == "pacman -S --needed linux-xanmod" && steps[0].escalate,
                   "xanmod[0]: escalated `pacman -S --needed linux-xanmod` (chaotic-aur is pacman, not AUR)");
-            check(steps[1].cmd == "mkinitcpio -P" && steps[1].escalate, "xanmod[1]: mkinitcpio -P");
         }
     } else {
         std::printf("INFO: linux-xanmod not curated on this table (pre-K3 main) - AUR/pacman branch covered by the synthetic entries\n");
@@ -239,10 +236,15 @@ int main() {
         check(plan.note.empty(), "plan_install(linux): no build-only note");
         check(plan.install_cmds.size() == 1 && plan.install_cmds[0] == "pacman -S --needed linux",
               "plan_install(linux): install_cmds = [`pacman -S --needed linux`]");
-        check(contains_cmd(plan.postinstall_cmds, "mkinitcpio -P"), "plan_install(linux): postinstall has `mkinitcpio -P`");
+        check(!contains_cmd(plan.postinstall_cmds, "mkinitcpio"),
+              "plan_install(linux): no mkinitcpio in the postinstall tail (ALPM hooks handle the initramfs)");
         if (detect_bootloader() == Bootloader::GRUB) {
-            check(contains_cmd(plan.postinstall_cmds, "grub-mkconfig -o /boot/grub/grub.cfg"),
-                  "plan_install(linux): GRUB refresh present (live detect = GRUB)");
+            check(plan.postinstall_cmds.size() == 1
+                  && plan.postinstall_cmds[0] == "grub-mkconfig -o /boot/grub/grub.cfg",
+                  "plan_install(linux): postinstall = [grub-mkconfig] (live detect = GRUB)");
+        } else {
+            check(plan.postinstall_cmds.empty(),
+                  "plan_install(linux): empty postinstall (live detect != GRUB — the ALPM hooks handle it)");
         }
         std::printf("INFO: plan_install(linux) -> %zu install + %zu postinstall cmd(s), live bootloader = %s\n",
                     plan.install_cmds.size(), plan.postinstall_cmds.size(), bootloader_name(detect_bootloader()).c_str());
@@ -281,14 +283,12 @@ int main() {
         RecordingRunner ok_runner{};
         const InstallKernelResult ok_result = install_kernel(*linux, ok_runner.fn, Bootloader::GRUB);
         check(ok_result.ok && ok_result.error.empty(), "install_kernel(linux, GRUB, ok): ok, no error");
-        check(ok_runner.calls.size() == 3, "install_kernel: exactly 3 commands run, in order");
-        if (ok_runner.calls.size() == 3) {
+        check(ok_runner.calls.size() == 2, "install_kernel: exactly 2 commands run, in order");
+        if (ok_runner.calls.size() == 2) {
             check(ok_runner.calls[0].first == "pacman -S --needed linux" && ok_runner.calls[0].second,
                   "install_kernel[0]: escalated pacman");
-            check(ok_runner.calls[1].first == "mkinitcpio -P" && ok_runner.calls[1].second,
-                  "install_kernel[1]: escalated mkinitcpio -P");
-            check(ok_runner.calls[2].first == "grub-mkconfig -o /boot/grub/grub.cfg" && ok_runner.calls[2].second,
-                  "install_kernel[2]: escalated grub-mkconfig");
+            check(ok_runner.calls[1].first == "grub-mkconfig -o /boot/grub/grub.cfg" && ok_runner.calls[1].second,
+                  "install_kernel[1]: escalated grub-mkconfig");
         }
         check(!ok_result.boot_instructions.empty() && ok_result.boot_instructions.back() == expected_note("linux"),
               "install_kernel: boot instructions filled, ends with the note");
@@ -319,13 +319,12 @@ int main() {
         RecordingRunner runner{};
         const InstallKernelResult result = install_kernel(aur, runner.fn, Bootloader::GRUB);
         check(result.ok, "install_kernel(AUR, ok runner): ok");
-        check(runner.calls.size() == 3, "install_kernel(AUR): exactly 3 commands");
-        if (runner.calls.size() == 3) {
+        check(runner.calls.size() == 2, "install_kernel(AUR): exactly 2 commands");
+        if (runner.calls.size() == 2) {
             check(runner.calls[0].first == "paru -S --needed linux-aurx" && !runner.calls[0].second,
                   "install_kernel(AUR)[0]: non-escalated paru");
-            check(runner.calls[1].first == "mkinitcpio -P" && runner.calls[1].second, "install_kernel(AUR)[1]: mkinitcpio");
-            check(runner.calls[2].first == "grub-mkconfig -o /boot/grub/grub.cfg" && runner.calls[2].second,
-                  "install_kernel(AUR)[2]: grub-mkconfig");
+            check(runner.calls[1].first == "grub-mkconfig -o /boot/grub/grub.cfg" && runner.calls[1].second,
+                  "install_kernel(AUR)[1]: grub-mkconfig");
         }
     }
 
