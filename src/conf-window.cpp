@@ -49,6 +49,7 @@
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QProcess>
 #include <QSignalBlocker>
 #include <QStringList>
 
@@ -754,6 +755,23 @@ void ConfWindow::handle_build_done() noexcept {
     fs::remove(check_tmp_path);
 
     fmt::print("success\n");
+
+    // Bring this window to the front BEFORE the modal: after a long
+    // unattended build the ConfWindow can sit buried behind the main
+    // window, and a modal parented to a buried window is invisible to
+    // the user (the frozen-behind-the-modal bug). raise() +
+    // activateWindow() restores the window's focus, so the question
+    // box appears on top of it.
+    raise();
+    activateWindow();
+    // Desktop notification as a backup (it is visible even if the
+    // window manager does not hand focus to the window): fire-and-forget
+    // notify-send — the same tool the terminal-helper uses for its own
+    // notifications.
+    QProcess::startDetached("notify-send",
+                            {"--app-name=Kernel Manager",
+                             "Kernel build finished",
+                             "Do you want to install build packages?"});
 
     auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Do you want to install build packages?"));
     if (res == QMessageBox::Yes) {

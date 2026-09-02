@@ -52,31 +52,49 @@ int run_real_command(const std::string& cmd, bool escalate) noexcept {
            || cmd.starts_with(KM_HELPER_DIR "/build_helper.sh");
 }
 
-// The post-install tail every precompiled install gets: build the
-// pending DKMS modules for the new kernel, regenerate the initramfs,
-// and (only for GRUB) refresh the bootloader config.
+// The post-install tail every precompiled install gets: rebuild the
+// kernel-specific driver packages for the new kernel (the pacman-based
+// nvidia driver first — it is not DKMS, so `dkms autoinstall` never
+// touches it — then any pending DKMS modules), regenerate the
+// initramfs, and (only for GRUB) refresh the bootloader config.
 void append_postinstall_tail(std::vector<InstallStep>& steps, Bootloader bl) {
     // Boot-safety: the ALPM hooks (kernel-install: 50-dracut,
     // 90-loaderentry) run DURING the package transaction, which is
-    // BEFORE DKMS has built the modules (nvidia, zfs, r8169, ...) for
-    // the new kernel. If the GPU driver is a DKMS module, the hook's
-    // dracut/mkinitcpio pass produced an initramfs that is missing it,
-    // so the new kernel comes up with no display output and the system
-    // will not boot. Re-running the two steps below — DKMS build first,
-    // initramfs regeneration second — fixes that ordering.
+    // BEFORE the GPU driver has been rebuilt for the new kernel. The
+    // hook's dracut/mkinitcpio pass then produced an initramfs that is
+    // missing the driver, so the new kernel comes up with no display
+    // output and the system will not boot. Re-running the two steps
+    // below — driver rebuild first, initramfs regeneration second —
+    // fixes that ordering.
 
-    // 1. Build the pending DKMS modules for the new kernel. Must run
-    //    BEFORE the initramfs regeneration so the drivers are present
-    //    when dracut/mkinitcpio package them. No-op when dkms is not
-    //    installed (the `|| true` guard keeps a missing tool from
-    //    failing the install).
-    steps.push_back({"dkms autoinstall 2>/dev/null || true", true});
+    // 1. Rebuild the kernel-specific driver packages for the new
+    //    kernel. Must run BEFORE the initramfs regeneration so the
+    //    drivers are present when dracut/mkinitcpio package them.
+    //    - nvidia: on this system the driver is a plain pacman package
+    //      (NOT DKMS), so `dkms autoinstall` never rebuilds it — a
+    //      new kernel needs the package reinstalled (pacman -U) to
+    //      get its modules against the new kernel.
+    //    - nvidia-dkms / zfs: DKMS modules, rebuilt by `dkms
+    //      autoinstall` (which builds every pending module).
+    //    Guarded: each sub-action is a no-op when its package is not
+    //    installed, and the trailing `; true` keeps a failed rebuild
+    //    from failing the install (the driver can be rebuilt by hand
+    //    later; the old kernel still boots).
+    steps.push_back(
+        {"sh -c 'pacman -Q nvidia >/dev/null 2>&1 && pacman -U --noconfirm nvidia 2>&1; "
+         "pacman -Q nvidia-dkms >/dev/null 2>&1 && dkms autoinstall 2>&1; "
+         "pacman -Q zfs >/dev/null 2>&1 && dkms autoinstall 2>&1; true'",
+         true});
 
     // 2. Regenerate the initramfs with whichever tool the system has:
-    //    dracut (EndeavourOS/Fedora-style) preferred, mkinitcpio
-    //    (plain Arch/Manjaro) as the fallback. The `|| true` guard
-    //    keeps a system with neither tool from failing the install.
-    steps.push_back({"dracut -f 2>/dev/null || mkinitcpio -P 2>/dev/null || true", true});
+    //    dracut (EndeavourOS/Fedora-style) and/or mkinitcpio (plain
+    //    Arch/Manjaro), each guarded by a `command -v` probe. The
+    //    trailing `; true` keeps a system with neither tool from
+    //    failing the install.
+    steps.push_back(
+        {"sh -c 'command -v dracut >/dev/null 2>&1 && dracut -f 2>&1; "
+         "command -v mkinitcpio >/dev/null 2>&1 && mkinitcpio -P 2>&1; true'",
+         true});
 
     // 3. Configure the bootloader: only GRUB needs a manual refresh
     //    (grub-mkconfig does not auto-detect new kernels).
@@ -149,17 +167,24 @@ std::string shell_quote(std::string_view s) {
 }
 
 // The step's short label for the log: the first two whitespace-separated
-// words of the command ("pacman -U", "dkms autoinstall", "dracut -f") —
+// words of the command ("pacman -U", "dracut -f", "grub-mkconfig -o") —
 // enough to identify the step without the long, quote-laden package
-// paths.
+// paths. A `sh -c '...'` wrapper (the guarded tail steps) is stripped
+// first so the label names the inner command ("pacman -Q",
+// "command -v"), not the wrapper.
 std::string short_label(std::string_view cmd) {
+    std::string_view inner = cmd;
+    constexpr std::string_view kShcWrapper = "sh -c '";
+    if (inner.starts_with(kShcWrapper) && inner.ends_with('\'') && inner.size() > kShcWrapper.size() + 1) {
+        inner = inner.substr(kShcWrapper.size(), inner.size() - kShcWrapper.size() - 1);
+    }
     int words = 0;
-    for (std::size_t i = 0; i < cmd.size(); ++i) {
-        if (cmd[i] == ' ' && ++words == 2) {
-            return std::string{cmd.substr(0, i)};
+    for (std::size_t i = 0; i < inner.size(); ++i) {
+        if (inner[i] == ' ' && ++words == 2) {
+            return std::string{inner.substr(0, i)};
         }
     }
-    return std::string{cmd};
+    return std::string{inner};
 }
 
 // The install log's two timestamp forms for one epoch-seconds value,

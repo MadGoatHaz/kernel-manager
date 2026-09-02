@@ -22,10 +22,11 @@
 // modules it reuses (known_kernels, bootloader, boot_instructions,
 // aur_kernel, utils) with the project's GCC warning set and asserts:
 //   - plan_steps (pure, table-driven): core pacman precompiled + GRUB
-//     (exact 4-step sequence — install, DKMS autoinstall, initramfs
-//     regeneration (dracut || mkinitcpio), GRUB refresh —, escalation
-//     flags), systemd-boot/UKI/UNKNOWN (3 steps — install + DKMS +
-//     initramfs; no GRUB refresh), the AUR branch (non-escalated
+//     (exact 4-step sequence — install, kernel-specific driver rebuild
+//     (nvidia pacman reinstall + DKMS), initramfs regeneration (dracut
+//     / mkinitcpio, command -v guarded), GRUB refresh —, escalation
+//     flags), systemd-boot/UKI/UNKNOWN (3 steps — install + driver
+//     rebuild + initramfs; no GRUB refresh), the AUR branch (non-escalated
 //     `paru -S --needed` + the same tail), buildable-only (single
 //     non-escalated build-helper step — makepkg with auto GPG import —,
 //     mirroring aur_kernel.cpp), synthetic entries
@@ -79,11 +80,11 @@ bool contains(const std::string& hay, const std::string& needle) {
 }
 
 // True when any command in the list STARTS with the prefix (a
-// substring match would be wrong: the dracut-preferred initramfs step
-// contains "mkinitcpio" as its fallback, so only a prefix test can
-// tell a standalone mkinitcpio step from the dracut fallback). Used to
-// assert the initramfs step is dracut-preferred and that no GRUB
-// refresh step is present on the non-GRUB bootloaders.
+// substring match would be wrong: the guarded initramfs step contains
+// "mkinitcpio" as one of its `command -v` sub-actions, so only a
+// prefix test can tell a standalone mkinitcpio step from the guarded
+// sub-action). Used to assert no standalone mkinitcpio / dkms step is
+// present and that no GRUB refresh step is on the non-GRUB bootloaders.
 bool any_starts_with(const std::vector<std::string>& cmds, const std::string& prefix) {
     for (const auto& cmd : cmds) {
         if (cmd.starts_with(prefix)) {
@@ -96,14 +97,26 @@ bool any_starts_with(const std::vector<std::string>& cmds, const std::string& pr
 // The post-install tail commands append_postinstall_tail emits (the
 // exact strings the .cpp pushes, kept here so the assertions stay in
 // lockstep with the implementation):
-//   kDkms      — build the pending DKMS modules for the new kernel
-//   kInitramfs — regenerate the initramfs, dracut preferred,
-//                mkinitcpio fallback (`|| true` so a missing tool
-//                never fails the install)
+//   kDrivers   — rebuild the kernel-specific driver packages for the
+//                new kernel: the pacman-based nvidia driver reinstalled
+//                (NOT DKMS — `dkms autoinstall` never touches it),
+//                nvidia-dkms / zfs via `dkms autoinstall`; every
+//                sub-action guarded (a no-op when absent) and the
+//                trailing `; true` keeps a failed rebuild from failing
+//                the install
+//   kInitramfs — regenerate the initramfs with whichever tool(s) the
+//                system has (`command -v` guarded; dracut /
+//                mkinitcpio), trailing `; true` so a missing tool
+//                never fails the install
 //   kGrub      — the GRUB-only bootloader refresh
-constexpr const char* kDkms      = "dkms autoinstall 2>/dev/null || true";
-constexpr const char* kInitramfs = "dracut -f 2>/dev/null || mkinitcpio -P 2>/dev/null || true";
-constexpr const char* kGrub      = "grub-mkconfig -o /boot/grub/grub.cfg";
+constexpr const char* kDrivers =
+    "sh -c 'pacman -Q nvidia >/dev/null 2>&1 && pacman -U --noconfirm nvidia 2>&1; "
+    "pacman -Q nvidia-dkms >/dev/null 2>&1 && dkms autoinstall 2>&1; "
+    "pacman -Q zfs >/dev/null 2>&1 && dkms autoinstall 2>&1; true'";
+constexpr const char* kInitramfs =
+    "sh -c 'command -v dracut >/dev/null 2>&1 && dracut -f 2>&1; "
+    "command -v mkinitcpio >/dev/null 2>&1 && mkinitcpio -P 2>&1; true'";
+constexpr const char* kGrub = "grub-mkconfig -o /boot/grub/grub.cfg";
 
 // The mandatory closing note: one constant text instructions_for (K6)
 // appends for every bootloader (the kernel is installed and ready to
@@ -138,14 +151,14 @@ int main() {
     const KnownKernel* const linux = maybe_linux.has_value() ? *maybe_linux : nullptr;
     if (linux != nullptr) {
         const std::vector<InstallStep> grub = plan_steps(*linux, Bootloader::GRUB);
-        check(grub.size() == 4, "linux+GRUB: exactly 4 steps (install + DKMS + initramfs + GRUB refresh)");
+        check(grub.size() == 4, "linux+GRUB: exactly 4 steps (install + driver rebuild + initramfs + GRUB refresh)");
         if (grub.size() == 4) {
             check(grub[0].cmd == "pacman -S --needed linux" && grub[0].escalate,
                   "linux+GRUB[0]: escalated `pacman -S --needed linux`");
-            check(grub[1].cmd == kDkms && grub[1].escalate,
-                  "linux+GRUB[1]: escalated DKMS autoinstall (before the initramfs regen)");
+            check(grub[1].cmd == kDrivers && grub[1].escalate,
+                  "linux+GRUB[1]: escalated driver rebuild (nvidia + DKMS, before the initramfs regen)");
             check(grub[2].cmd == kInitramfs && grub[2].escalate,
-                  "linux+GRUB[2]: escalated initramfs regeneration (dracut || mkinitcpio)");
+                  "linux+GRUB[2]: escalated initramfs regeneration (dracut / mkinitcpio, guarded)");
             check(grub[3].cmd == kGrub && grub[3].escalate,
                   "linux+GRUB[3]: escalated GRUB config regeneration");
         }
@@ -154,14 +167,14 @@ int main() {
             const std::string label = bootloader_name(bl);
             const std::vector<InstallStep> steps = plan_steps(*linux, bl);
             check(steps.size() == 3,
-                  (label + ": exactly 3 steps (install + DKMS + initramfs; no GRUB refresh)").c_str());
+                  (label + ": exactly 3 steps (install + driver rebuild + initramfs; no GRUB refresh)").c_str());
             if (steps.size() == 3) {
                 check(steps[0].cmd == "pacman -S --needed linux" && steps[0].escalate,
                       (label + "[0]: pacman install").c_str());
-                check(steps[1].cmd == kDkms && steps[1].escalate,
-                      (label + "[1]: escalated DKMS autoinstall").c_str());
+                check(steps[1].cmd == kDrivers && steps[1].escalate,
+                      (label + "[1]: escalated driver rebuild (nvidia + DKMS)").c_str());
                 check(steps[2].cmd == kInitramfs && steps[2].escalate,
-                      (label + "[2]: escalated initramfs regeneration").c_str());
+                      (label + "[2]: escalated initramfs regeneration (guarded)").c_str());
                 check(!any_starts_with({steps[0].cmd, steps[1].cmd, steps[2].cmd}, "grub-mkconfig"),
                       (label + ": no GRUB refresh step").c_str());
             }
@@ -185,20 +198,20 @@ int main() {
             true              // buildable
         };
         const std::vector<InstallStep> uki = plan_steps(aur, Bootloader::UKI);
-        check(uki.size() == 3, "AUR+UKI: exactly 3 steps (install + DKMS + initramfs)");
+        check(uki.size() == 3, "AUR+UKI: exactly 3 steps (install + driver rebuild + initramfs)");
         if (uki.size() == 3) {
             check(uki[0].cmd == "paru -S --needed linux-aurx" && !uki[0].escalate,
                   "AUR+UKI[0]: non-escalated `paru -S --needed`");
-            check(uki[1].cmd == kDkms && uki[1].escalate,
-                  "AUR+UKI[1]: escalated DKMS autoinstall");
+            check(uki[1].cmd == kDrivers && uki[1].escalate,
+                  "AUR+UKI[1]: escalated driver rebuild (nvidia + DKMS)");
             check(uki[2].cmd == kInitramfs && uki[2].escalate,
-                  "AUR+UKI[2]: escalated initramfs regeneration");
+                  "AUR+UKI[2]: escalated initramfs regeneration (guarded)");
         }
         const std::vector<InstallStep> grub = plan_steps(aur, Bootloader::GRUB);
-        check(grub.size() == 4, "AUR+GRUB: exactly 4 steps (install + DKMS + initramfs + GRUB refresh)");
+        check(grub.size() == 4, "AUR+GRUB: exactly 4 steps (install + driver rebuild + initramfs + GRUB refresh)");
         if (grub.size() == 4) {
             check(grub[0].cmd == "paru -S --needed linux-aurx" && !grub[0].escalate, "AUR+GRUB[0]: paru non-escalated");
-            check(grub[1].cmd == kDkms && grub[1].escalate, "AUR+GRUB[1]: DKMS autoinstall escalated");
+            check(grub[1].cmd == kDrivers && grub[1].escalate, "AUR+GRUB[1]: driver rebuild escalated");
             check(grub[2].cmd == kInitramfs && grub[2].escalate, "AUR+GRUB[2]: initramfs regeneration escalated");
             check(grub[3].cmd == kGrub && grub[3].escalate,
                   "AUR+GRUB[3]: GRUB refresh escalated");
@@ -240,12 +253,12 @@ int main() {
         check(xanmod->precompiled_available && xanmod->install_repo == "chaotic-aur",
               "xanmod: precompiled from the chaotic-aur pacman repo (curated table)");
         const std::vector<InstallStep> steps = plan_steps(*xanmod, Bootloader::SYSTEMD_BOOT);
-        check(steps.size() == 3, "xanmod+systemd-boot: exactly 3 steps (install + DKMS + initramfs)");
+        check(steps.size() == 3, "xanmod+systemd-boot: exactly 3 steps (install + driver rebuild + initramfs)");
         if (steps.size() == 3) {
             check(steps[0].cmd == "pacman -S --needed linux-xanmod" && steps[0].escalate,
                   "xanmod[0]: escalated `pacman -S --needed linux-xanmod` (chaotic-aur is pacman, not AUR)");
-            check(steps[1].cmd == kDkms && steps[2].cmd == kInitramfs,
-                  "xanmod+systemd-boot: DKMS + initramfs tail (no GRUB refresh)");
+            check(steps[1].cmd == kDrivers && steps[2].cmd == kInitramfs,
+                  "xanmod+systemd-boot: driver rebuild + initramfs tail (no GRUB refresh)");
         }
     } else {
         std::printf("INFO: linux-xanmod not curated on this table (pre-K3 main) - AUR/pacman branch covered by the synthetic entries\n");
@@ -271,24 +284,26 @@ int main() {
         check(plan.note.empty(), "plan_install(linux): no build-only note");
         check(plan.install_cmds.size() == 1 && plan.install_cmds[0] == "pacman -S --needed linux",
               "plan_install(linux): install_cmds = [`pacman -S --needed linux`]");
-        // The postinstall tail is now the boot-safety sequence: the DKMS
-        // build + the initramfs regeneration on every bootloader, plus
-        // the GRUB refresh when the live detection is GRUB.
+        // The postinstall tail is now the boot-safety sequence: the
+        // kernel-specific driver rebuild (pacman nvidia reinstall + DKMS)
+        // + the initramfs regeneration on every bootloader, plus the
+        // GRUB refresh when the live detection is GRUB.
         check(plan.postinstall_cmds.size() >= 2
-              && plan.postinstall_cmds[0] == kDkms
+              && plan.postinstall_cmds[0] == kDrivers
               && plan.postinstall_cmds[1] == kInitramfs,
-              "plan_install(linux): postinstall starts with [DKMS autoinstall, initramfs regen]");
-        // The initramfs step must be dracut-preferred: no standalone
-        // mkinitcpio command (it may only appear as the dracut fallback
-        // inside kInitramfs itself).
-        check(!any_starts_with(plan.postinstall_cmds, "mkinitcpio"),
-              "plan_install(linux): no standalone mkinitcpio step (dracut is preferred)");
+              "plan_install(linux): postinstall starts with [driver rebuild, initramfs regen]");
+        // No standalone legacy step may remain: neither a bare `dkms
+        // autoinstall` nor a standalone `mkinitcpio` command may START
+        // a tail step (both may only appear as guarded sub-actions
+        // inside kDrivers / kInitramfs themselves).
+        check(!any_starts_with(plan.postinstall_cmds, "mkinitcpio") && !any_starts_with(plan.postinstall_cmds, "dkms"),
+              "plan_install(linux): no standalone mkinitcpio / dkms step (dracut-preferred, guarded)");
         if (detect_bootloader() == Bootloader::GRUB) {
             check(plan.postinstall_cmds.size() == 3 && plan.postinstall_cmds[2] == kGrub,
-                  "plan_install(linux): postinstall = [dkms, initramfs, grub-mkconfig] (live detect = GRUB)");
+                  "plan_install(linux): postinstall = [drivers, initramfs, grub-mkconfig] (live detect = GRUB)");
         } else {
             check(plan.postinstall_cmds.size() == 2,
-                  "plan_install(linux): postinstall = [dkms, initramfs] (live detect != GRUB — no GRUB refresh)");
+                  "plan_install(linux): postinstall = [drivers, initramfs] (live detect != GRUB — no GRUB refresh)");
         }
         std::printf("INFO: plan_install(linux) -> %zu install + %zu postinstall cmd(s), live bootloader = %s\n",
                     plan.install_cmds.size(), plan.postinstall_cmds.size(), bootloader_name(detect_bootloader()).c_str());
@@ -331,10 +346,10 @@ int main() {
         if (ok_runner.calls.size() == 4) {
             check(ok_runner.calls[0].first == "pacman -S --needed linux" && ok_runner.calls[0].second,
                   "install_kernel[0]: escalated pacman");
-            check(ok_runner.calls[1].first == kDkms && ok_runner.calls[1].second,
-                  "install_kernel[1]: escalated DKMS autoinstall");
+            check(ok_runner.calls[1].first == kDrivers && ok_runner.calls[1].second,
+                  "install_kernel[1]: escalated driver rebuild (nvidia + DKMS)");
             check(ok_runner.calls[2].first == kInitramfs && ok_runner.calls[2].second,
-                  "install_kernel[2]: escalated initramfs regeneration");
+                  "install_kernel[2]: escalated initramfs regeneration (guarded)");
             check(ok_runner.calls[3].first == kGrub && ok_runner.calls[3].second,
                   "install_kernel[3]: escalated grub-mkconfig");
         }
@@ -371,10 +386,10 @@ int main() {
         if (runner.calls.size() == 4) {
             check(runner.calls[0].first == "paru -S --needed linux-aurx" && !runner.calls[0].second,
                   "install_kernel(AUR)[0]: non-escalated paru");
-            check(runner.calls[1].first == kDkms && runner.calls[1].second,
-                  "install_kernel(AUR)[1]: escalated DKMS autoinstall");
+            check(runner.calls[1].first == kDrivers && runner.calls[1].second,
+                  "install_kernel(AUR)[1]: escalated driver rebuild (nvidia + DKMS)");
             check(runner.calls[2].first == kInitramfs && runner.calls[2].second,
-                  "install_kernel(AUR)[2]: escalated initramfs regeneration");
+                  "install_kernel(AUR)[2]: escalated initramfs regeneration (guarded)");
             check(runner.calls[3].first == kGrub && runner.calls[3].second,
                   "install_kernel(AUR)[3]: grub-mkconfig");
         }

@@ -38,11 +38,13 @@
 //     (k8 pattern — the real runCmdTerminal is never resolved, no
 //     terminal, pkexec, pacman or network is touched): fixture dir +
 //     GRUB ⇒ exactly 4 calls ([0] the exact `pacman -U '<abs1>'
-//     '<abs2>'`, [1] DKMS autoinstall, [2] initramfs regeneration
-//     (dracut || mkinitcpio), [3] `grub-mkconfig -o /boot/grub/
-//     grub.cfg`, all escalated) + ok + identity linux-test / 1.2.3-4 +
-//     boot instructions filled; UNKNOWN ⇒ 3 calls (install + DKMS +
-//     initramfs — no GRUB refresh); empty dir ⇒ the exact "no
+//     '<abs2>'`, [1] kernel-specific driver rebuild (nvidia pacman
+//     reinstall + DKMS), [2] initramfs regeneration (dracut /
+//     mkinitcpio, `command -v` guarded), [3] `grub-mkconfig -o
+//     /boot/grub/grub.cfg`, all escalated) + ok + identity linux-test /
+//     1.2.3-4 + boot instructions filled; UNKNOWN ⇒ 3 calls (install +
+//     driver rebuild + initramfs — no GRUB refresh); empty dir ⇒ the
+//     exact "no
 //     packages" error, 0 calls, no instructions; fake rc = 1 on step
 //     0 ⇒ ok = false, the error names the pacman step + rc, exactly 1
 //     call, instructions still filled (graceful stop).
@@ -79,13 +81,20 @@ constexpr const char* expected_note =
 // The post-install tail commands append_postinstall_tail emits (the
 // exact strings the .cpp pushes — same constants the k8 harness uses,
 // kept in lockstep with the implementation):
-//   kDkms      — build the pending DKMS modules for the new kernel
-//   kInitramfs — regenerate the initramfs, dracut preferred,
-//                mkinitcpio fallback
+//   kDrivers   — rebuild the kernel-specific driver packages for the
+//                new kernel (pacman nvidia reinstall + DKMS; every
+//                sub-action guarded, trailing `; true`)
+//   kInitramfs — regenerate the initramfs with whichever tool(s) the
+//                system has (`command -v` guarded, trailing `; true`)
 //   kGrub      — the GRUB-only bootloader refresh
-constexpr const char* kDkms      = "dkms autoinstall 2>/dev/null || true";
-constexpr const char* kInitramfs = "dracut -f 2>/dev/null || mkinitcpio -P 2>/dev/null || true";
-constexpr const char* kGrub      = "grub-mkconfig -o /boot/grub/grub.cfg";
+constexpr const char* kDrivers =
+    "sh -c 'pacman -Q nvidia >/dev/null 2>&1 && pacman -U --noconfirm nvidia 2>&1; "
+    "pacman -Q nvidia-dkms >/dev/null 2>&1 && dkms autoinstall 2>&1; "
+    "pacman -Q zfs >/dev/null 2>&1 && dkms autoinstall 2>&1; true'";
+constexpr const char* kInitramfs =
+    "sh -c 'command -v dracut >/dev/null 2>&1 && dracut -f 2>&1; "
+    "command -v mkinitcpio >/dev/null 2>&1 && mkinitcpio -P 2>&1; true'";
+constexpr const char* kGrub = "grub-mkconfig -o /boot/grub/grub.cfg";
 
 // A recording command runner (k8 pattern): returns a fixed exit code
 // for every step and records the (cmd, escalate) pairs asked to run,
@@ -263,15 +272,15 @@ int main() {
         RecordingRunner runner{};
         const DirInstallResult grub = install_from_directory(pkgs_dir, runner.fn, Bootloader::GRUB);
         check(grub.ok && grub.error.empty(), "C: fixture dir + GRUB ⇒ ok, no error");
-        check(runner.calls.size() == 4, "C: GRUB ⇒ exactly 4 calls (pacman -U, DKMS, initramfs, grub-mkconfig)");
+        check(runner.calls.size() == 4, "C: GRUB ⇒ exactly 4 calls (pacman -U, driver rebuild, initramfs, grub-mkconfig)");
         if (runner.calls.size() == 4) {
             check(runner.calls[0].first == "pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'"
                   && runner.calls[0].second,
                   "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'` (quoted absolutes, no glob)");
-            check(runner.calls[1].first == kDkms && runner.calls[1].second,
-                  "C[1]: escalated DKMS autoinstall");
+            check(runner.calls[1].first == kDrivers && runner.calls[1].second,
+                  "C[1]: escalated driver rebuild (nvidia + DKMS)");
             check(runner.calls[2].first == kInitramfs && runner.calls[2].second,
-                  "C[2]: escalated initramfs regeneration");
+                  "C[2]: escalated initramfs regeneration (guarded)");
             check(runner.calls[3].first == kGrub && runner.calls[3].second,
                   "C[3]: escalated GRUB config regeneration");
         }
@@ -285,15 +294,15 @@ int main() {
         RecordingRunner unknown_runner{};
         const DirInstallResult unknown = install_from_directory(pkgs_dir, unknown_runner.fn, Bootloader::UNKNOWN);
         check(unknown.ok, "C: fixture dir + UNKNOWN ⇒ ok");
-        check(unknown_runner.calls.size() == 3, "C: UNKNOWN ⇒ 3 calls (install + DKMS + initramfs, no grub-mkconfig)");
+        check(unknown_runner.calls.size() == 3, "C: UNKNOWN ⇒ 3 calls (install + driver rebuild + initramfs, no grub-mkconfig)");
         if (unknown_runner.calls.size() == 3) {
             check(unknown_runner.calls[0].first == "pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'"
                   && unknown_runner.calls[0].second,
                   "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'`");
-            check(unknown_runner.calls[1].first == kDkms && unknown_runner.calls[1].second,
-                  "C[1]: escalated DKMS autoinstall");
+            check(unknown_runner.calls[1].first == kDrivers && unknown_runner.calls[1].second,
+                  "C[1]: escalated driver rebuild (nvidia + DKMS)");
             check(unknown_runner.calls[2].first == kInitramfs && unknown_runner.calls[2].second,
-                  "C[2]: escalated initramfs regeneration");
+                  "C[2]: escalated initramfs regeneration (guarded)");
         }
         check(unknown.boot_instructions.size() == 3 && unknown.boot_instructions.back() == expected_note,
               "C: UNKNOWN boot instructions filled (2 steps + the note)");

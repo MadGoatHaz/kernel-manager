@@ -59,12 +59,17 @@ using CommandRunner = std::function<int(const std::string& cmd, bool escalate)>;
 // (known_kernels.hpp):
 //   precompiled + pacman repo (core/extra/cachyos/chaotic-aur/liquorix):
 //       `pacman -S --needed <package>` (escalated)
-//       -> the post-install tail: `dkms autoinstall` (builds the pending
-//          DKMS modules for the new kernel — nvidia/zfs/etc. — BEFORE
-//          the initramfs regeneration, boot-safety: the ALPM hook's
-//          pass runs during the transaction, before the DKMS build)
-//          -> `dracut -f` or `mkinitcpio -P` (regenerates the initramfs
-//          with whichever tool the system has)
+//       -> the post-install tail: the kernel-specific driver packages
+//          rebuilt for the new kernel BEFORE the initramfs regeneration
+//          (boot-safety: the ALPM hook's pass runs during the
+//          transaction, before the driver rebuild) — the pacman-based
+//          nvidia driver reinstalled via `pacman -U` (it is NOT DKMS, so
+//          `dkms autoinstall` never touches it), nvidia-dkms / zfs via
+//          `dkms autoinstall` — each sub-action guarded: a no-op when
+//          its package is absent, and the step never fails the install
+//          -> `dracut -f` and/or `mkinitcpio -P` (regenerates the
+//          initramfs with whichever tool(s) the system has, each
+//          `command -v`-guarded)
 //          -> GRUB only: `grub-mkconfig -o /boot/grub/grub.cfg`
 //          (escalated — the sole manual bootloader step; systemd-boot /
 //          UKI auto-detect the BLS entry, so they get the tail without
@@ -122,7 +127,7 @@ struct InstallPlan {
     std::string repo;    // pacman repo name ("aur" when AUR; "" when unknown)
     bool precompiled = false;
     std::vector<std::string> install_cmds;      // the package install step(s)
-    std::vector<std::string> postinstall_cmds;  // the post-install tail: DKMS build + initramfs regen (always), + the GRUB refresh (GRUB only; the ALPM hook's own pass is superseded because it runs before the DKMS build)
+    std::vector<std::string> postinstall_cmds;  // the post-install tail: driver rebuild (nvidia pacman reinstall + DKMS) + initramfs regen (always), + the GRUB refresh (GRUB only; the ALPM hook's own pass is superseded because it runs before the driver rebuild)
     std::string note;                           // build-only guidance ("" when precompiled)
 };
 
@@ -206,9 +211,9 @@ struct DirInstallResult {
 // (no shell glob — the 0c918d4 pkexec-CWD-reset rationale: the root
 // shell starts in $HOME, so relative paths break, and quoting keeps a
 // spaced name one word instead of word-splitting an expanded glob)
-// followed by the standard post-install tail (the DKMS build +
-// initramfs regeneration, plus the GRUB-only config refresh), each
-// step through `runner`:
+// followed by the standard post-install tail (the kernel-specific
+// driver rebuild + initramfs regeneration, plus the GRUB-only config
+// refresh), each step through `runner`:
 //   - an empty runner selects the real one (utils::runCmdTerminal, the
 //     shared pkexec terminal path; resolved in the .cpp so this header
 //     stays Qt-free)
