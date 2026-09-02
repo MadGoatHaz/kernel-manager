@@ -28,9 +28,12 @@
 // kernel at the next boot, chosen from the detected Bootloader. The
 // result is a pure function of its two inputs (no filesystem access,
 // no commands run): the kernel package base is substituted into the
-// step text, and a mandatory closing note about the /boot/vmlinuz
-// binary and initramfs regeneration is always appended last, so any
-// bootloader yields a non-empty, ordered, display-ready list.
+// step text, and a mandatory closing note (the kernel is installed
+// and ready to boot; select it from the bootloader menu at the next
+// reboot — the ALPM hooks already built the initramfs + boot entry,
+// so no tool command and no /boot/ or /efi/ loader path is named) is
+// always appended last, so any bootloader yields a non-empty,
+// ordered, display-ready list.
 [[gnu::pure]] [[nodiscard]] std::vector<std::string> instructions_for(Bootloader bl,
                                                                       const std::string& kernel_pkgbase);
 

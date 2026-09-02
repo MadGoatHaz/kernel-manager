@@ -71,11 +71,9 @@ void check(bool condition, const char* what) {
 }
 
 // The mandatory closing note instructions_for (K6) appends for every
-// bootloader (same text the k8 harness asserts).
-std::string expected_note(const std::string& pkgbase) {
-    return "The kernel binary is at `/boot/vmlinuz-" +
-           pkgbase + "`; the initramfs is regenerated automatically on install (ALPM hook) or via `sudo mkinitcpio -P`";
-}
+// bootloader: one constant text (same text the k8 harness asserts).
+constexpr const char* expected_note =
+    "The kernel is installed and ready to boot. Select it from your bootloader menu at next reboot.";
 
 // A recording command runner (k8 pattern): returns a fixed exit code
 // for every step and records the (cmd, escalate) pairs asked to run,
@@ -263,7 +261,7 @@ int main() {
         }
         check(grub.name == "linux-test" && grub.version == "1.2.3-4",
               "C: identity = the kernel package (linux-test / 1.2.3-4)");
-        check(grub.boot_instructions.size() == 4 && grub.boot_instructions.back() == expected_note("linux-test"),
+        check(grub.boot_instructions.size() == 4 && grub.boot_instructions.back() == expected_note,
               "C: GRUB boot instructions filled (3 steps + the note, ends with the note)");
 
         // Fixture dir + UNKNOWN: 1 call (no GRUB refresh — the ALPM
@@ -277,7 +275,7 @@ int main() {
                   && unknown_runner.calls[0].second,
                   "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'`");
         }
-        check(unknown.boot_instructions.size() == 3 && unknown.boot_instructions.back() == expected_note("linux-test"),
+        check(unknown.boot_instructions.size() == 3 && unknown.boot_instructions.back() == expected_note,
               "C: UNKNOWN boot instructions filled (2 steps + the note)");
 
         // Empty dir: the exact error, zero runner calls (the D2 guard),
@@ -300,7 +298,7 @@ int main() {
         check(fail.error == "Command failed (exit code 1): pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'",
               "C: the error names the pacman step + rc 1");
         check(fail_runner.calls.size() == 1, "C: exactly 1 call (the post-install tail is skipped)");
-        check(fail.boot_instructions.size() == 4 && fail.boot_instructions.back() == expected_note("linux-test"),
+        check(fail.boot_instructions.size() == 4 && fail.boot_instructions.back() == expected_note,
               "C: boot instructions still filled on failure");
     }
 
