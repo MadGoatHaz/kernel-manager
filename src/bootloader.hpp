@@ -44,11 +44,17 @@ struct BootloaderProbe {
 
 // Pure detection (first match wins): UKI > systemd-boot > GRUB > UNKNOWN.
 //   1. UKI          — dir_has_uki("/boot/EFI/Linux") or dir_has_uki("/efi/EFI/Linux")
-//   2. SYSTEMD_BOOT — command_exists("bootctl") AND (loader.conf under
-//                     /boot or /efi, or /boot/loader/entries exists)
-//   3. GRUB         — /boot/grub/grub.cfg or /etc/grub.d exists, or
-//                     grub-mkconfig / grub-editenv on PATH
-//   4. UNKNOWN      — no signal
+//   2. strong GRUB  — path_exists("/boot/grub/grub.cfg") OR (command_exists(
+//                     "grub-mkconfig") AND path_exists("/etc/default/grub")).
+//                     Weak leftovers (/etc/grub.d, bare grub-editenv) are NOT
+//                     signals: they exist on non-GRUB systems (fwupd).
+//   3. SYSTEMD_BOOT — command_exists("bootctl") AND (loader.conf under
+//                     /boot or /efi, or entries dir under /boot or /efi, OR
+//                     no strong GRUB signal — bootctl is systemd-boot
+//                     specific, so with the ESP unreadable its presence
+//                     alone is trusted over a missing loader path)
+//   4. GRUB         — strong GRUB (step 2)
+//   5. UNKNOWN      — no signal
 Bootloader detect_bootloader(const BootloaderProbe& probe);
 
 // Real detection: std::filesystem probes for paths/UKI + a popen

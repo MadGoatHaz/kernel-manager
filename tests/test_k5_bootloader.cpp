@@ -24,8 +24,12 @@
 // probes only (no filesystem, no command probes), asserting:
 //   - each heuristic branch returns its bootloader (UKI / systemd-boot
 //     / GRUB / UNKNOWN)
-//   - the priority order (UKI > systemd-boot > GRUB) and the
-//     bootctl-requires-loader-signal rule
+//   - the priority order (UKI > systemd-boot > GRUB)
+//   - bootctl is trusted with no loader signal when there is no strong
+//     GRUB signal (ESP unreadable), and yields GRUB when there is one
+//   - strong GRUB = /boot/grub/grub.cfg, or grub-mkconfig +
+//     /etc/default/grub; weak leftovers (/etc/grub.d, bare
+//     grub-mkconfig, bare grub-editenv) are NOT signals
 //   - a partially populated (or empty) probe is safe and yields UNKNOWN
 //   - bootloader_name() is non-empty (and exact) for all four values
 //   - the real detect_bootloader() runs without crashing on this box
@@ -96,14 +100,38 @@ int main() {
         check(detect_bootloader(probe) == Bootloader::SYSTEMD_BOOT, "systemd-boot: bootctl + /boot/loader/entries");
     }
     {
-        // bootctl present but no loader signal: NOT systemd-boot.
         auto probe = no_signal_probe();
         probe.command_exists = [](std::string_view cmd) { return cmd == "bootctl"; };
-        check(detect_bootloader(probe) == Bootloader::UNKNOWN, "systemd-boot: bootctl without any loader signal -> UNKNOWN");
+        probe.path_exists = [](std::string_view path) { return path == "/efi/loader/entries"; };
+        check(detect_bootloader(probe) == Bootloader::SYSTEMD_BOOT, "systemd-boot: bootctl + /efi/loader/entries");
+    }
+    {
+        // bootctl present but no loader signal and no GRUB signal (the
+        // ESP is unreadable): bootctl is systemd-boot specific, so the
+        // presence of the command alone is trusted.
+        auto probe = no_signal_probe();
+        probe.command_exists = [](std::string_view cmd) { return cmd == "bootctl"; };
+        check(detect_bootloader(probe) == Bootloader::SYSTEMD_BOOT, "systemd-boot: bootctl, unreadable ESP (no loader signal) -> SYSTEMD_BOOT");
+    }
+    {
+        // bootctl present but no loader signal and a strong GRUB signal
+        // (grub.cfg): the GRUB signal wins — this is not systemd-boot.
+        auto probe = no_signal_probe();
+        probe.command_exists = [](std::string_view cmd) { return cmd == "bootctl"; };
+        probe.path_exists = [](std::string_view path) { return path == "/boot/grub/grub.cfg"; };
+        check(detect_bootloader(probe) == Bootloader::GRUB, "systemd-boot: bootctl + no loader signal + grub.cfg -> GRUB");
+    }
+    {
+        // Same via the second strong signal: grub-mkconfig +
+        // /etc/default/grub (but no loader paths visible).
+        auto probe = no_signal_probe();
+        probe.command_exists = [](std::string_view cmd) { return cmd == "bootctl" || cmd == "grub-mkconfig"; };
+        probe.path_exists = [](std::string_view path) { return path == "/etc/default/grub"; };
+        check(detect_bootloader(probe) == Bootloader::GRUB, "systemd-boot: bootctl + no loader signal + grub-mkconfig & /etc/default/grub -> GRUB");
     }
 
     // ------------------------------------------------------------------
-    // 3. GRUB: each signal individually.
+    // 3. GRUB: strong signals only; weak leftovers are not signals.
     // ------------------------------------------------------------------
     {
         auto probe = no_signal_probe();
@@ -112,18 +140,41 @@ int main() {
     }
     {
         auto probe = no_signal_probe();
+        probe.command_exists = [](std::string_view cmd) { return cmd == "grub-mkconfig"; };
+        probe.path_exists = [](std::string_view path) { return path == "/etc/default/grub"; };
+        check(detect_bootloader(probe) == Bootloader::GRUB, "GRUB: grub-mkconfig on PATH + /etc/default/grub exists");
+    }
+    {
+        // Strong signal plus the fwupd leftover: the leftover must not
+        // change the outcome (it is not itself a signal).
+        auto probe = no_signal_probe();
+        probe.command_exists = [](std::string_view cmd) { return cmd == "grub-mkconfig"; };
+        probe.path_exists = [](std::string_view path) { return path == "/etc/default/grub" || path == "/etc/grub.d"; };
+        check(detect_bootloader(probe) == Bootloader::GRUB, "GRUB: strong signal + /etc/grub.d leftover stays GRUB");
+    }
+    {
+        // Weak leftovers alone: NOT GRUB.
+        auto probe = no_signal_probe();
         probe.path_exists = [](std::string_view path) { return path == "/etc/grub.d"; };
-        check(detect_bootloader(probe) == Bootloader::GRUB, "GRUB: /etc/grub.d exists");
+        check(detect_bootloader(probe) == Bootloader::UNKNOWN, "GRUB: /etc/grub.d alone (fwupd leftover) -> UNKNOWN");
     }
     {
         auto probe = no_signal_probe();
         probe.command_exists = [](std::string_view cmd) { return cmd == "grub-mkconfig"; };
-        check(detect_bootloader(probe) == Bootloader::GRUB, "GRUB: grub-mkconfig on PATH");
+        check(detect_bootloader(probe) == Bootloader::UNKNOWN, "GRUB: grub-mkconfig alone (no /etc/default/grub) -> UNKNOWN");
     }
     {
         auto probe = no_signal_probe();
         probe.command_exists = [](std::string_view cmd) { return cmd == "grub-editenv"; };
-        check(detect_bootloader(probe) == Bootloader::GRUB, "GRUB: grub-editenv on PATH");
+        check(detect_bootloader(probe) == Bootloader::UNKNOWN, "GRUB: grub-editenv alone -> UNKNOWN");
+    }
+    {
+        // /etc/default/grub without grub-mkconfig: still not a strong
+        // signal (grub-editenv is not counted).
+        auto probe = no_signal_probe();
+        probe.command_exists = [](std::string_view cmd) { return cmd == "grub-editenv"; };
+        probe.path_exists = [](std::string_view path) { return path == "/etc/default/grub"; };
+        check(detect_bootloader(probe) == Bootloader::UNKNOWN, "GRUB: grub-editenv + /etc/default/grub (no grub-mkconfig) -> UNKNOWN");
     }
 
     // ------------------------------------------------------------------
