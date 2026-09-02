@@ -8,8 +8,8 @@
 # linked only because utils.hpp includes <QString>). Environment-tolerant:
 # every expected set is derived from the live local/sync DBs and the curated
 # table — no hard-coded row counts.
-# The pre-existing utils.cpp:103 -Wignored-attributes warning is expected
-# (run_k7.sh precedent); no other warning may appear.
+# 0 source warnings (cycle-7 C7a eliminated the -Wignored-attributes
+# baseline); no other warning may appear.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
