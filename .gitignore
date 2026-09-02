@@ -43,3 +43,5 @@ config-option-lib/target
 
 # Local work directory (tests, scripts, docs, blueprints) — never uploaded
 Work/
+# Per-cycle planning docs — local-only (plans/PLAN.md rides the worktree, never uploaded)
+plans/
