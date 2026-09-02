@@ -11,7 +11,9 @@ kernel-manager is a Qt6 GUI for managing Linux kernels on Arch Linux and Arch-ba
 
 - **Browse 21 maintained kernel variants** — official Arch, CachyOS, and community kernels (XanMod, TKG, Liquorix, Clear, mainline) — each with a description tooltip. The list is complete: kernels whose repository is not enabled appear as clearly-marked, non-selectable info-rows with the reason, and an **Installed** column truthfully reports which kernels are installed on the system (✓/—).
 - **Install pre-compiled kernels with one action** — from `[core]`/`[extra]`, the CachyOS repositories, `chaotic-aur`, or the AUR (via `paru`). kernel-manager handles the package install, initramfs regeneration (`mkinitcpio`), and bootloader refresh for you.
+- **Install kernels from a directory** — right-click the "Install from directory…" row in the kernel list, pick the folder containing your built `*.pkg.tar.zst` package(s), and kernel-manager installs them (`pacman -U`) with the same initramfs + bootloader refresh. Kernels installed from local files appear in the list as `local/<name>` entries — with a real version and a remove checkbox — so you can uninstall them from the list the same way.
 - **Build custom kernels from source** — pick a known package in the source dropdown (or enter any git URL), tweak compile options and patches, and compile with `makepkg`. Build options are data-driven per kernel family: the full 17-option CachyOS suite for `linux-cachyos` and its 6 sibling flavors, CPU-optimization + modprobed-db for the 4 XanMod flavors, and modprobed-db for Liquorix — shown only where the selected source's PKGBUILD actually consumes them, so official Arch, mainline, Clear, and TKG intentionally show none.
+- **Choose where builds happen** — a bottom-left build-directory selector (path label + "Browse…") lets you point kernel-manager at any folder for its build trees; the choice persists across sessions (default: `~/.cache/kernel-manager/pkgbuilds`).
 - **Bootloader-aware boot instructions** — the app detects which boot loader is in use (Unified Kernel Image, systemd-boot, GRUB, or unknown) and shows numbered steps for selecting the new kernel at next boot, including how to make it the default.
 - **Right-click context menu on every kernel** — *Install pre-compiled* (enabled only when the kernel is actually installable from its repository), *Build custom*, or *Show boot instructions*.
 - **Unified privilege escalation via polkit** — a single `auth_admin` action (no `sudo` required).
@@ -59,10 +61,11 @@ kernel-manager tracks 21 maintained Arch kernel variants, each mapped to its own
 
 ## How it works
 
-kernel-manager offers two complementary paths:
+kernel-manager offers three complementary paths:
 
 - **Install pre-compiled** — one action installs the kernel package from your configured pacman repositories (or the AUR, via `paru`), regenerates the initramfs with `mkinitcpio`, and refreshes the bootloader. The kernel list is complete: kernels whose repository is not enabled appear as clearly-marked, non-selectable info-rows with the reason (repository not enabled vs. package not in the repository), the **Installed** column truthfully reports which kernels are installed on this system (pacman local DB, ✓/—), and the context menu's *Install pre-compiled* action reflects real availability.
-- **Build custom** — the configure flow clones the selected source (an AUR package or any git URL), lets you adjust compile options and patches, and compiles the kernel with `makepkg`.
+- **Install from a directory** — for packages built anywhere (your own `makepkg` run, a download, another machine): right-click the "Install from directory…" row, pick the folder with the `*.pkg.tar.zst` package(s), and kernel-manager installs them with `pacman -U`, regenerates the initramfs, and refreshes the bootloader. The kernel then appears in the list as a `local/<name>` entry, removable by unchecking it.
+- **Build custom** — the configure flow clones the selected source (an AUR package or any git URL) into the build directory of your choice (bottom-left selector, persisted), lets you adjust compile options and patches, and compiles the kernel with `makepkg` (missing GPG signing keys are imported automatically).
 
 After a kernel is installed or built, kernel-manager detects your boot loader (in priority order: Unified Kernel Image → systemd-boot → GRUB → unknown) and shows numbered steps for selecting the new kernel at your next boot — including the mandatory `/boot/vmlinuz-<pkg>` / `mkinitcpio` note — and for making it the default entry.
 
