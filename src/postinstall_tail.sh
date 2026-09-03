@@ -196,8 +196,124 @@ fi
 # Trailing marker line the app can surface/grep:
 log "INITRAMFS_STAGE_DONE verdict=$VERDICT kver=$KVER"
 
-# --- (4) verify stage + 3-state verdict output — chunk C inserts it HERE -----
-# (extramodules/ + updates/dkms/ module probe for $KVER, per-$KVER initramfs
-#  non-empty, BLS entry / grub-mkconfig for $BL; then the final VERDICT line)
+# --- (4) verify stage (D-E, R2, R3) — the final stage: confirm the new kernel
+# is actually boot-safe, then emit the 3-state verdict -------------------------
+# The VERDICT here is the REAL accumulation of every stage's results: chunks
+# A/B set it on any failed sub-action (no ||true masking anywhere in this
+# script — each failure branch logs + sets it), and this stage adds the
+# boot-safety checks on top. The 3-state model (R4):
+#   BOOT_SAFE               — this script exits 0: driver modules + a non-empty
+#                             per-$KVER initramfs + a BLS/grub entry all
+#                             verified for $KVER;
+#   INSTALLED_NOT_BOOT_SAFE — this script exits 1: the package is installed but
+#                             a gap remains (the app names it from these lines);
+#   INSTALLATION_FAILED     — never this script's rc: that is the separate
+#                             phase-a pacman rc (D-E: the app computes it).
+
+# (4a) driver module for $KVER — the CORRECT probe path (R2): out-of-tree
+# nvidia modules land in extramodules/ (binary pkg) or updates/dkms/ (dkms
+# pkg) under /usr/lib/modules/$KVER — NEVER in kernel/drivers/video/ (the old,
+# wrong probe: out-of-tree modules don't live there). A present .ko ⇒ the
+# display driver is in the new kernel's module tree; absent while a nvidia
+# pkg is installed ⇒ the driver is missing for this kernel ⇒ not boot-safe
+# (binary-nvidia on a custom version is exactly this gap).
+modfile=$(find "/usr/lib/modules/$KVER" \( -path '*/extramodules/nvidia*.ko*' -o -path '*/updates/dkms/nvidia*.ko*' \) 2>/dev/null | head -1)
+nvidia_pkg_installed=0
+for p in nvidia nvidia-open nvidia-lts nvidia-open-lts nvidia-dkms nvidia-open-dkms; do
+    if pacman -Q "$p" >/dev/null 2>&1; then
+        nvidia_pkg_installed=1
+        break
+    fi
+done
+if [ -n "$modfile" ]; then
+    log "verify: nvidia module present for $KVER ($modfile)"
+elif [ "$nvidia_pkg_installed" -eq 1 ]; then
+    log "WARN: no nvidia module for $KVER — install nvidia-dkms/nvidia-open-dkms (custom kernel); the display driver is missing from the new kernel"
+    VERDICT=1
+else
+    log "verify: no nvidia package installed — module probe not applicable (a plain kernel boots without it)"
+fi
+
+# (4b) per-$KVER initramfs — the image the BLS entry actually reads: the
+# systemd-boot ESP machine-id layout (/efi/<machine-id>/<KVER>/initrd — chunk
+# B's deploy_esp_initrd / kernel-install target) when that layout exists, else
+# the /boot copy (dracut/mkinitcpio output; a grub/UKI system reads its
+# initramfs from /boot). Must be present AND non-empty.
+initrd_found=""
+for c in "/efi/$(cat /etc/machine-id 2>/dev/null)/$KVER/initrd" \
+         "/boot/initramfs-$KVER.img" \
+         "/boot/initramfs-$(uname -m)-$KVER.img" \
+         "/initramfs-$KVER.img"; do
+    if [ -s "$c" ]; then
+        initrd_found="$c"
+        break
+    fi
+done
+if [ -n "$initrd_found" ]; then
+    log "verify: initramfs for $KVER present and non-empty ($initrd_found)"
+else
+    log "WARN: no non-empty initramfs for $KVER (checked the ESP machine-id layout + /boot) — the new kernel has no initramfs"
+    VERDICT=1
+fi
+
+# (4c) BLS entry / GRUB refresh for $KVER (R3) — per the $BL arg:
+#   systemd-boot — a BLS entry for $KVER must exist where the loader reads
+#                  entries (/efi/loader/entries — e.g. the EOS
+#                  <machine-id>-<KVER>.conf — or /boot/loader/entries);
+#   grub         — the GRUB refresh (grub-mkconfig) moves into the tail (it
+#                  was inline step 3 before the consolidation); it must
+#                  succeed so $KVER has a GRUB menu entry;
+#   uki/unknown  — no-op: the loaderentry/kernel-install hook maintains the
+#                  boot entry automatically.
+case "$BL" in
+    systemd-boot)
+        bls_found=""
+        for d in /efi/loader/entries /boot/loader/entries; do
+            for f in "$d"/*-"$KVER".conf; do
+                if [ -s "$f" ]; then
+                    bls_found="$f"
+                    break
+                fi
+            done
+            if [ -n "$bls_found" ]; then
+                break
+            fi
+        done
+        if [ -n "$bls_found" ]; then
+            log "verify: BLS entry for $KVER present ($bls_found)"
+        else
+            log "WARN: no BLS entry for $KVER (checked /efi/loader/entries + /boot/loader/entries) — the new kernel has no boot entry"
+            VERDICT=1
+        fi
+        ;;
+    grub)
+        if command -v grub-mkconfig >/dev/null 2>&1; then
+            if grub-mkconfig -o /boot/grub/grub.cfg; then
+                log "verify: grub-mkconfig refreshed the GRUB entry for $KVER"
+            else
+                log "WARN: 'grub-mkconfig -o /boot/grub/grub.cfg' failed — the new kernel may have no GRUB entry"
+                VERDICT=1
+            fi
+        else
+            log "WARN: grub-mkconfig not found — cannot refresh the GRUB entry for $KVER"
+            VERDICT=1
+        fi
+        ;;
+    uki|unknown)
+        log "verify: bootloader '$BL' — no explicit check (the BLS entry is hook-maintained)"
+        ;;
+    *)
+        # Out of the systemd-boot|grub|uki|unknown contract (the app always
+        # passes one of the four) — treat like unknown, never a verdict hit.
+        log "verify: bootloader '${BL:-unknown}' — no explicit check"
+        ;;
+esac
+
+# Trailing marker line the app can surface/grep:
+log "VERIFY_STAGE_DONE verdict=$VERDICT kver=$KVER"
+
+# The final 3-state verdict — the exit code IS the verdict (the sentinel
+# wrapper captures it; finish() also mirrors it to VERDICT_FILE):
+echo "VERDICT: $([ "$VERDICT" -eq 0 ] && echo BOOT_SAFE || echo INSTALLED_NOT_BOOT_SAFE)"
 
 finish "$VERDICT"
