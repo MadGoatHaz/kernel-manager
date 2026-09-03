@@ -8,8 +8,9 @@
 #       never uname (R1);
 #   (2) driver sync — the FULL nvidia family + dkms + zfs, per-package guarded
 #       (D-B); drivers MUST precede the initramfs;
-#   (3) initramfs — targets <KVER> (chunk B: reinstall-kernels →
-#       dracut --force --kver → mkinitcpio -k, each command -v-probed);
+#   (3) initramfs — targets <KVER> (reinstall-kernels →
+#       dracut --force --kver → mkinitcpio -k, each command -v-probed; the
+#       ESP machine-id layout is deployed explicitly when it exists);
 #   (4) verify + verdict — chunk C (extramodules/ + updates/dkms/ module probe,
 #       per-<KVER> initramfs non-empty, BLS/grub check).
 #
@@ -48,6 +49,47 @@ finish() {
         echo "$rc" > "$VERDICT_FILE" || true
     fi
     exit "$rc"
+}
+
+# Deploy the freshly generated initramfs to the systemd-boot ESP machine-id
+# layout (/efi/<machine-id>/<KVER>/initrd) when that layout exists
+# (EndeavourOS / systemd-boot installs). `dracut` and `mkinitcpio` write
+# their output to /boot only, but the BLS entry on such systems references
+# the ESP copy — without this deploy the new kernel would boot with the
+# STALE initrd (missing the just-rebuilt driver modules) ⇒ not boot-safe.
+# reinstall-kernels needs no such step: kernel-install deploys the ESP copy
+# itself. No-op (return 0) when the layout is absent (grub/UKI systems read
+# the initramfs from /boot). A failed deploy sets the verdict, never aborts
+# (no set -e).
+deploy_esp_initrd() {
+    local kver="$1" mid src esp_layout c
+    mid=$(cat /etc/machine-id 2>/dev/null)
+    if [ -z "$mid" ] || [ ! -d "/efi/$mid/$kver" ]; then
+        return 0
+    fi
+    esp_layout="/efi/$mid/$kver/initrd"
+    # Fresh image candidates: dracut names it initramfs-<kver>.img (in /boot,
+    # or / when the boot files live on the root fs); mkinitcpio may append
+    # the arch (initramfs-<kver>-<arch>.img) — take the first non-empty one.
+    src=""
+    for c in "/boot/initramfs-$kver.img" "/initramfs-$kver.img" \
+             /boot/initramfs-"$kver".* /initramfs-"$kver".*; do
+        if [ -s "$c" ]; then
+            src="$c"
+            break
+        fi
+    done
+    if [ -z "$src" ]; then
+        log "WARN: esp-deploy: no fresh non-empty initramfs for $kver in /boot — the ESP keeps the stale initrd"
+        VERDICT=1
+        return 0
+    fi
+    if cp -f "$src" "$esp_layout"; then
+        log "esp-deploy: $src -> $esp_layout (the BLS entry now reads the fresh initrd)"
+    else
+        log "WARN: esp-deploy: failed to copy $src -> $esp_layout"
+        VERDICT=1
+    fi
 }
 
 # --- (1) KVER derivation (R1: from the package's .PKGINFO, never uname) -----
@@ -106,9 +148,53 @@ fi
 # Trailing marker line the app can surface/grep:
 log "DRIVER_STAGE_DONE verdict=$VERDICT kver=$KVER"
 
-# --- (3) initramfs stage — chunk B inserts it HERE, after the drivers --------
-# (reinstall-kernels [EOS] → dracut --force --kver $KVER → mkinitcpio -k $KVER,
-#  each command -v-probed; only the first available runs; a missing tool ⇒ 1)
+# --- (3) initramfs stage (D-C): targets the NEW kernel version $KVER --------
+# Reuses the $KVER derived above (from the package, never uname), and runs
+# AFTER the driver stage: a module that lands after the initramfs generation
+# is missing from the new kernel's initramfs ⇒ the system won't boot.
+# Tool preference — only the first available runs (each command -v-probed, so
+# the stage is safe on any pacman-family distro even if the family detection
+# is wrong):
+#   reinstall-kernels   the EndeavourOS blessed repair (kernel-install add per
+#                       installed kernel; deploys the initrd to the ESP
+#                       machine-id layout and refreshes the BLS entry itself)
+#   dracut --force --kver  Arch/EOS: regenerate ONLY $KVER's initramfs (NOT
+#                       bare -f, which targets the RUNNING kernel — C2); the
+#                       ESP machine-id layout is then deployed explicitly
+#   mkinitcpio -k       plain Arch/Manjaro (mkinitcpio-based distros; NOT -P,
+#                       which regenerates all installed kernels)
+# No --add/force_drivers (D-C reject): dracut hard-fails when a forced module
+# is missing, so a missing driver is reported by the verdict instead.
+# A failed sub-action logs + sets the verdict and never aborts (no set -e).
+if command -v reinstall-kernels >/dev/null 2>&1; then
+    log "initramfs: reinstall-kernels (EOS blessed; kernel-install handles the ESP deploy)"
+    if ! reinstall-kernels; then
+        log "WARN: 'reinstall-kernels' failed — the new kernel may not be boot-safe"
+        VERDICT=1
+    fi
+elif command -v dracut >/dev/null 2>&1; then
+    log "initramfs: dracut --force --kver $KVER"
+    if ! dracut --force --kver "$KVER"; then
+        log "WARN: 'dracut --force --kver $KVER' failed — the new kernel may not be boot-safe"
+        VERDICT=1
+    else
+        deploy_esp_initrd "$KVER"
+    fi
+elif command -v mkinitcpio >/dev/null 2>&1; then
+    log "initramfs: mkinitcpio -k $KVER"
+    if ! mkinitcpio -k "$KVER"; then
+        log "WARN: 'mkinitcpio -k $KVER' failed — the new kernel may not be boot-safe"
+        VERDICT=1
+    else
+        deploy_esp_initrd "$KVER"
+    fi
+else
+    log "ERROR: no initramfs tool available (reinstall-kernels/dracut/mkinitcpio all missing) — the new kernel has no initramfs ⇒ not boot-safe"
+    VERDICT=1
+fi
+
+# Trailing marker line the app can surface/grep:
+log "INITRAMFS_STAGE_DONE verdict=$VERDICT kver=$KVER"
 
 # --- (4) verify stage + 3-state verdict output — chunk C inserts it HERE -----
 # (extramodules/ + updates/dkms/ module probe for $KVER, per-$KVER initramfs
