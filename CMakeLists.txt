@@ -226,6 +226,11 @@ install(
 )
 
 install(
+    PROGRAMS ${CMAKE_SOURCE_DIR}/src/postinstall_tail.sh
+    DESTINATION ${KM_HELPER_DIR}
+)
+
+install(
     FILES org.archlinux.kernel-manager.pkexec.policy
    DESTINATION "${POLKITQT-1_POLICY_FILES_INSTALL_DIR}"
 )
