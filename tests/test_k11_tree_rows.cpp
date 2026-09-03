@@ -74,14 +74,25 @@ std::string name_of(const Kernel& k) {
 
 // A row's origin is "live" iff its repo is a registered sync DB of the
 // handle and the named package is present in it. An AUR row (repo "aur")
-// is not sync-DB-sourced; an info-row of a disabled (or package-less) repo
-// matches nothing.
+// is not sync-DB-sourced; a "local/<name>" row (the D3 pass) is sourced
+// from the local DB, so it is live iff the package is present there; an
+// info-row of a disabled (or package-less) repo matches nothing.
 bool origin_is_live(alpm_handle_t* handle, const Kernel& k) {
     const std::string_view repo = k.get_repo();
     if (repo == "aur") {
         return false;
     }
     const std::string name = name_of(k);
+    if (repo == "local") {
+        // D-G: the D3 pass emits a local/<name> row only when the package is
+        // in the local DB (non-null m_pkg), so such a row is "live" iff the
+        // package is present in the local DB. Probe the real local-DB state
+        // here (never assume a fixed row set) so the check stays robust to
+        // machine-specific local-DB contents — the prior
+        // local/linux-cachyos-custom failure class.
+        auto* localdb = alpm_get_localdb(handle);
+        return localdb != nullptr && alpm_db_get_pkg(localdb, name.c_str()) != nullptr;
+    }
     for (alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
         auto* db = reinterpret_cast<alpm_db_t*>(i->data);
         if (std::string_view{alpm_db_get_name(db)} != repo) {
