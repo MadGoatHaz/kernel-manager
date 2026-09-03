@@ -21,16 +21,13 @@
 // precedent of tests/run_k6.sh). Compiles the real module plus the
 // modules it reuses (known_kernels, bootloader, boot_instructions,
 // aur_kernel, utils) with the project's GCC warning set and asserts:
-//   - plan_steps (pure, table-driven): core pacman precompiled + GRUB
-//     (exact 4-step sequence — install, kernel-specific driver rebuild
-//     (nvidia pacman reinstall + DKMS), initramfs regeneration (dracut
-//     / mkinitcpio, command -v guarded), GRUB refresh —, escalation
-//     flags), systemd-boot/UKI/UNKNOWN (3 steps — install + driver
-//     rebuild + initramfs; no GRUB refresh), the AUR branch (non-escalated
-//     `paru -S --needed` + the same tail), buildable-only (single
-//     non-escalated build-helper step — makepkg with auto GPG import —,
-//     mirroring aur_kernel.cpp), synthetic entries
-//     (environment-independent)
+//   - plan_steps (pure, table-driven): core pacman precompiled (exact
+//     2-step sequence — the package install + the single consolidated
+//     postinstall_tail.sh step (chunk E), per-bootloader tail args,
+//     escalation flags), the AUR branch (non-escalated `paru -S --needed`
+//     + the same single tail), buildable-only (single non-escalated
+//     build-helper step — makepkg with auto GPG import —, mirroring
+//     aur_kernel.cpp), synthetic entries (environment-independent)
 //   - the real-table cases (linux always; linux-xanmod + linux-tkg
 //     gated on the K3 community rows so the harness passes on a
 //     13-row pre-K3 main too): xanmod is precompiled from the
@@ -41,10 +38,12 @@
 //     commands + the Build-custom note), build-only (no commands +
 //     note)
 //   - install_kernel with a recording CommandRunner: the exact
-//     cmd/escalate sequence on success; a failing first step =>
-//     ok=false, error names the command, the post-install tail is
-//     skipped, no crash, boot instructions still filled; buildable-only
-//     => graceful note, zero commands run
+//     cmd/escalate sequence on success (package install + the single
+//     tail); the 3-state verdict (D-E) from the REAL rcs — phase-a
+//     rc!=0 => INSTALLATION_FAILED (the tail is skipped); tail rc 0 =>
+//     BOOT_SAFE (ok); tail rc 1 or 2 => INSTALLED_NOT_BOOT_SAFE (ok
+//     false, never a false SUCCESS); buildable-only => graceful note,
+//     zero commands run
 //   - execute_plan: build-only => false + note (real runner selected
 //     but never used — nothing is executed); failing injected runner =>
 //     false + error + one command attempted; ok injected runner => true
@@ -94,29 +93,27 @@ bool any_starts_with(const std::vector<std::string>& cmds, const std::string& pr
     return false;
 }
 
-// The post-install tail commands append_postinstall_tail emits (the
-// exact strings the .cpp pushes, kept here so the assertions stay in
-// lockstep with the implementation):
-//   kDrivers   — rebuild the kernel-specific driver packages for the
-//                new kernel: the pacman-based nvidia driver reinstalled
-//                (NOT DKMS — `dkms autoinstall` never touches it),
-//                nvidia-dkms / zfs via `dkms autoinstall`; every
-//                sub-action guarded (a no-op when absent) and the
-//                trailing `; true` keeps a failed rebuild from failing
-//                the install
-//   kInitramfs — regenerate the initramfs with whichever tool(s) the
-//                system has (`command -v` guarded; dracut /
-//                mkinitcpio), trailing `; true` so a missing tool
-//                never fails the install
-//   kGrub      — the GRUB-only bootloader refresh
-constexpr const char* kDrivers =
-    "sh -c 'pacman -Q nvidia >/dev/null 2>&1 && pacman -U --noconfirm nvidia 2>&1; "
-    "pacman -Q nvidia-dkms >/dev/null 2>&1 && dkms autoinstall 2>&1; "
-    "pacman -Q zfs >/dev/null 2>&1 && dkms autoinstall 2>&1; true'";
-constexpr const char* kInitramfs =
-    "sh -c 'command -v dracut >/dev/null 2>&1 && dracut -f 2>&1; "
-    "command -v mkinitcpio >/dev/null 2>&1 && mkinitcpio -P 2>&1; true'";
-constexpr const char* kGrub = "grub-mkconfig -o /boot/grub/grub.cfg";
+// The single consolidated tail step append_postinstall_tail emits (chunk E;
+// the exact command the .cpp pushes, kept here so the assertions stay in
+// lockstep with the implementation): ONE postinstall_tail.sh call (chunks
+// A/B/C) carrying (pkgname, kver, bootloader). The bootloader name follows
+// the tail's `case "$BL"` contract (chunk C) — the lowercase systemd-boot /
+// grub / uki / unknown — NOT the UI-facing bootloader_name() strings
+// ("GRUB", "Unified Kernel Image (UKI)", "Unknown") that would fall into the
+// tail's out-of-contract default. `kver` is the .PKGINFO version for a dir
+// install and the EMPTY string for the repo/AUR flow (the tail then derives
+// it from the local DB). The single quotes mirror the .cpp's shell_quote for
+// these quote-free values.
+std::string tail_cmd(const std::string& pkg, const std::string& kver, Bootloader bl) {
+    const char* blname = "unknown";
+    switch (bl) {
+        case Bootloader::SYSTEMD_BOOT: blname = "systemd-boot"; break;
+        case Bootloader::GRUB:         blname = "grub"; break;
+        case Bootloader::UKI:          blname = "uki"; break;
+        case Bootloader::UNKNOWN:      blname = "unknown"; break;
+    }
+    return std::string(KM_HELPER_DIR) + "/postinstall_tail.sh '" + pkg + "' '" + kver + "' '" + blname + "'";
+}
 
 // The mandatory closing note: one constant text instructions_for (K6)
 // appends for every bootloader (the kernel is installed and ready to
@@ -137,6 +134,22 @@ struct RecordingRunner {
     };
 };
 
+// A per-call scripted runner (the D-E 3-state verdict probe): returns a
+// distinct exit code for the Nth call (rcs[0] for call 1, rcs[1] for call 2,
+// ...; 0 past the end) and records the (cmd, escalate) pairs, so a phase-a
+// rc 0 + tail rc 1 can be driven to INSTALLED_NOT_BOOT_SAFE (and a phase-a
+// rc 7 to INSTALLATION_FAILED) — no real terminal, pkexec, pacman or network
+// is touched.
+struct ScriptedRunner {
+    std::vector<int> rcs{};
+    std::vector<std::pair<std::string, bool>> calls{};
+    CommandRunner fn = [this](const std::string& cmd, bool escalate) noexcept -> int {
+        calls.emplace_back(cmd, escalate);
+        const std::size_t idx = calls.size() - 1;
+        return idx < rcs.size() ? rcs[idx] : 0;
+    };
+};
+
 }  // namespace
 
 int main() {
@@ -151,32 +164,24 @@ int main() {
     const KnownKernel* const linux = maybe_linux.has_value() ? *maybe_linux : nullptr;
     if (linux != nullptr) {
         const std::vector<InstallStep> grub = plan_steps(*linux, Bootloader::GRUB);
-        check(grub.size() == 4, "linux+GRUB: exactly 4 steps (install + driver rebuild + initramfs + GRUB refresh)");
-        if (grub.size() == 4) {
+        check(grub.size() == 2, "linux+GRUB: exactly 2 steps (package install + the single consolidated tail)");
+        if (grub.size() == 2) {
             check(grub[0].cmd == "pacman -S --needed linux" && grub[0].escalate,
                   "linux+GRUB[0]: escalated `pacman -S --needed linux`");
-            check(grub[1].cmd == kDrivers && grub[1].escalate,
-                  "linux+GRUB[1]: escalated driver rebuild (nvidia + DKMS, before the initramfs regen)");
-            check(grub[2].cmd == kInitramfs && grub[2].escalate,
-                  "linux+GRUB[2]: escalated initramfs regeneration (dracut / mkinitcpio, guarded)");
-            check(grub[3].cmd == kGrub && grub[3].escalate,
-                  "linux+GRUB[3]: escalated GRUB config regeneration");
+            check(grub[1].cmd == tail_cmd("linux", "", Bootloader::GRUB) && grub[1].escalate,
+                  "linux+GRUB[1]: the single consolidated tail (escalated; the GRUB refresh now lives inside it)");
         }
 
         for (const Bootloader bl : {Bootloader::SYSTEMD_BOOT, Bootloader::UKI, Bootloader::UNKNOWN}) {
             const std::string label = bootloader_name(bl);
             const std::vector<InstallStep> steps = plan_steps(*linux, bl);
-            check(steps.size() == 3,
-                  (label + ": exactly 3 steps (install + driver rebuild + initramfs; no GRUB refresh)").c_str());
-            if (steps.size() == 3) {
+            check(steps.size() == 2,
+                  (label + ": exactly 2 steps (install + the single consolidated tail)").c_str());
+            if (steps.size() == 2) {
                 check(steps[0].cmd == "pacman -S --needed linux" && steps[0].escalate,
                       (label + "[0]: pacman install").c_str());
-                check(steps[1].cmd == kDrivers && steps[1].escalate,
-                      (label + "[1]: escalated driver rebuild (nvidia + DKMS)").c_str());
-                check(steps[2].cmd == kInitramfs && steps[2].escalate,
-                      (label + "[2]: escalated initramfs regeneration (guarded)").c_str());
-                check(!any_starts_with({steps[0].cmd, steps[1].cmd, steps[2].cmd}, "grub-mkconfig"),
-                      (label + ": no GRUB refresh step").c_str());
+                check(steps[1].cmd == tail_cmd("linux", "", bl) && steps[1].escalate,
+                      (label + "[1]: the single consolidated tail (escalated, per-bootloader arg = the tail's name)").c_str());
             }
         }
     }
@@ -198,23 +203,19 @@ int main() {
             true              // buildable
         };
         const std::vector<InstallStep> uki = plan_steps(aur, Bootloader::UKI);
-        check(uki.size() == 3, "AUR+UKI: exactly 3 steps (install + driver rebuild + initramfs)");
-        if (uki.size() == 3) {
+        check(uki.size() == 2, "AUR+UKI: exactly 2 steps (install + the single consolidated tail)");
+        if (uki.size() == 2) {
             check(uki[0].cmd == "paru -S --needed linux-aurx" && !uki[0].escalate,
                   "AUR+UKI[0]: non-escalated `paru -S --needed`");
-            check(uki[1].cmd == kDrivers && uki[1].escalate,
-                  "AUR+UKI[1]: escalated driver rebuild (nvidia + DKMS)");
-            check(uki[2].cmd == kInitramfs && uki[2].escalate,
-                  "AUR+UKI[2]: escalated initramfs regeneration (guarded)");
+            check(uki[1].cmd == tail_cmd("linux-aurx", "", Bootloader::UKI) && uki[1].escalate,
+                  "AUR+UKI[1]: the single consolidated tail (escalated)");
         }
         const std::vector<InstallStep> grub = plan_steps(aur, Bootloader::GRUB);
-        check(grub.size() == 4, "AUR+GRUB: exactly 4 steps (install + driver rebuild + initramfs + GRUB refresh)");
-        if (grub.size() == 4) {
+        check(grub.size() == 2, "AUR+GRUB: exactly 2 steps (install + the single consolidated tail)");
+        if (grub.size() == 2) {
             check(grub[0].cmd == "paru -S --needed linux-aurx" && !grub[0].escalate, "AUR+GRUB[0]: paru non-escalated");
-            check(grub[1].cmd == kDrivers && grub[1].escalate, "AUR+GRUB[1]: driver rebuild escalated");
-            check(grub[2].cmd == kInitramfs && grub[2].escalate, "AUR+GRUB[2]: initramfs regeneration escalated");
-            check(grub[3].cmd == kGrub && grub[3].escalate,
-                  "AUR+GRUB[3]: GRUB refresh escalated");
+            check(grub[1].cmd == tail_cmd("linux-aurx", "", Bootloader::GRUB) && grub[1].escalate,
+                  "AUR+GRUB[1]: the single consolidated tail (escalated)");
         }
     }
 
@@ -253,12 +254,12 @@ int main() {
         check(xanmod->precompiled_available && xanmod->install_repo == "chaotic-aur",
               "xanmod: precompiled from the chaotic-aur pacman repo (curated table)");
         const std::vector<InstallStep> steps = plan_steps(*xanmod, Bootloader::SYSTEMD_BOOT);
-        check(steps.size() == 3, "xanmod+systemd-boot: exactly 3 steps (install + driver rebuild + initramfs)");
-        if (steps.size() == 3) {
+        check(steps.size() == 2, "xanmod+systemd-boot: exactly 2 steps (install + the single consolidated tail)");
+        if (steps.size() == 2) {
             check(steps[0].cmd == "pacman -S --needed linux-xanmod" && steps[0].escalate,
                   "xanmod[0]: escalated `pacman -S --needed linux-xanmod` (chaotic-aur is pacman, not AUR)");
-            check(steps[1].cmd == kDrivers && steps[2].cmd == kInitramfs,
-                  "xanmod+systemd-boot: driver rebuild + initramfs tail (no GRUB refresh)");
+            check(steps[1].cmd == tail_cmd("linux-xanmod", "", Bootloader::SYSTEMD_BOOT) && steps[1].escalate,
+                  "xanmod+systemd-boot: the single consolidated tail (no separate GRUB refresh)");
         }
     } else {
         std::printf("INFO: linux-xanmod not curated on this table (pre-K3 main) - AUR/pacman branch covered by the synthetic entries\n");
@@ -284,27 +285,23 @@ int main() {
         check(plan.note.empty(), "plan_install(linux): no build-only note");
         check(plan.install_cmds.size() == 1 && plan.install_cmds[0] == "pacman -S --needed linux",
               "plan_install(linux): install_cmds = [`pacman -S --needed linux`]");
-        // The postinstall tail is now the boot-safety sequence: the
-        // kernel-specific driver rebuild (pacman nvidia reinstall + DKMS)
-        // + the initramfs regeneration on every bootloader, plus the
-        // GRUB refresh when the live detection is GRUB.
-        check(plan.postinstall_cmds.size() >= 2
-              && plan.postinstall_cmds[0] == kDrivers
-              && plan.postinstall_cmds[1] == kInitramfs,
-              "plan_install(linux): postinstall starts with [driver rebuild, initramfs regen]");
-        // No standalone legacy step may remain: neither a bare `dkms
-        // autoinstall` nor a standalone `mkinitcpio` command may START
-        // a tail step (both may only appear as guarded sub-actions
-        // inside kDrivers / kInitramfs themselves).
-        check(!any_starts_with(plan.postinstall_cmds, "mkinitcpio") && !any_starts_with(plan.postinstall_cmds, "dkms"),
-              "plan_install(linux): no standalone mkinitcpio / dkms step (dracut-preferred, guarded)");
-        if (detect_bootloader() == Bootloader::GRUB) {
-            check(plan.postinstall_cmds.size() == 3 && plan.postinstall_cmds[2] == kGrub,
-                  "plan_install(linux): postinstall = [drivers, initramfs, grub-mkconfig] (live detect = GRUB)");
-        } else {
-            check(plan.postinstall_cmds.size() == 2,
-                  "plan_install(linux): postinstall = [drivers, initramfs] (live detect != GRUB — no GRUB refresh)");
-        }
+        // The postinstall is now the SINGLE consolidated tail (chunk E): one
+        // postinstall_tail.sh step carrying the live-detected bootloader,
+        // with an empty kver (the repo/AUR flow — the tail derives it from
+        // the local DB). No separate driver / initramfs / GRUB refresh
+        // commands remain in the C++ (they all live inside the script).
+        check(plan.postinstall_cmds.size() == 1
+              && plan.postinstall_cmds[0] == tail_cmd("linux", "", detect_bootloader()),
+              "plan_install(linux): postinstall = the single consolidated tail (live detect)");
+        // The single tail call is the only postinstall step, and no inline
+        // driver / initramfs / GRUB command (the old sh -c / dkms /
+        // mkinitcpio / dracut / grub-mkconfig steps) may remain in the C++.
+        check(!any_starts_with(plan.postinstall_cmds, "sh -c")
+              && !any_starts_with(plan.postinstall_cmds, "dkms")
+              && !any_starts_with(plan.postinstall_cmds, "mkinitcpio")
+              && !any_starts_with(plan.postinstall_cmds, "dracut")
+              && !any_starts_with(plan.postinstall_cmds, "grub-mkconfig"),
+              "plan_install(linux): no inline driver / initramfs / GRUB command (command -v-free in the C++)");
         std::printf("INFO: plan_install(linux) -> %zu install + %zu postinstall cmd(s), live bootloader = %s\n",
                     plan.install_cmds.size(), plan.postinstall_cmds.size(), bootloader_name(detect_bootloader()).c_str());
     }
@@ -342,16 +339,13 @@ int main() {
         RecordingRunner ok_runner{};
         const InstallKernelResult ok_result = install_kernel(*linux, ok_runner.fn, Bootloader::GRUB);
         check(ok_result.ok && ok_result.error.empty(), "install_kernel(linux, GRUB, ok): ok, no error");
-        check(ok_runner.calls.size() == 4, "install_kernel: exactly 4 commands run, in order");
-        if (ok_runner.calls.size() == 4) {
+        check(ok_result.verdict == PostinstallVerdict::BOOT_SAFE, "install_kernel(linux, GRUB, ok): verdict == BOOT_SAFE");
+        check(ok_runner.calls.size() == 2, "install_kernel: exactly 2 commands run (package install + the single tail), in order");
+        if (ok_runner.calls.size() == 2) {
             check(ok_runner.calls[0].first == "pacman -S --needed linux" && ok_runner.calls[0].second,
                   "install_kernel[0]: escalated pacman");
-            check(ok_runner.calls[1].first == kDrivers && ok_runner.calls[1].second,
-                  "install_kernel[1]: escalated driver rebuild (nvidia + DKMS)");
-            check(ok_runner.calls[2].first == kInitramfs && ok_runner.calls[2].second,
-                  "install_kernel[2]: escalated initramfs regeneration (guarded)");
-            check(ok_runner.calls[3].first == kGrub && ok_runner.calls[3].second,
-                  "install_kernel[3]: escalated grub-mkconfig");
+            check(ok_runner.calls[1].first == tail_cmd("linux", "", Bootloader::GRUB) && ok_runner.calls[1].second,
+                  "install_kernel[1]: the single consolidated tail (escalated)");
         }
         check(!ok_result.boot_instructions.empty() && ok_result.boot_instructions.back() == expected_note,
               "install_kernel: boot instructions filled, ends with the note");
@@ -359,12 +353,47 @@ int main() {
         RecordingRunner fail_runner{};
         fail_runner.rc = 1;
         const InstallKernelResult fail_result = install_kernel(*linux, fail_runner.fn, Bootloader::GRUB);
-        check(!fail_result.ok, "install_kernel(failing runner): not ok");
+        check(!fail_result.ok, "install_kernel(failing phase-a runner): not ok");
+        check(fail_result.verdict == PostinstallVerdict::INSTALLATION_FAILED,
+              "install_kernel(failing phase-a): verdict == INSTALLATION_FAILED");
         check(contains(fail_result.error, "pacman") && contains(fail_result.error, "1"),
               "install_kernel: error names the failed command and its exit code");
-        check(fail_runner.calls.size() == 1, "install_kernel: post-install tail skipped after the failure");
+        check(fail_runner.calls.size() == 1, "install_kernel: post-install tail skipped after a phase-a failure");
         check(!fail_result.boot_instructions.empty() && fail_result.boot_instructions.back() == expected_note,
               "install_kernel: boot instructions still filled on failure");
+
+        // The D-E 3-state verdict probe (per-call rcs — the phase-a rc and the
+        // tail rc are judged independently; the H3 false-SUCCESS is gone):
+        //   phase-a rc 0 + tail rc 1  => INSTALLED_NOT_BOOT_SAFE (ok false)
+        //   phase-a rc 0 + tail rc 2  => INSTALLED_NOT_BOOT_SAFE (raw rc)
+        //   phase-a rc 0 + tail rc 0  => BOOT_SAFE (ok true)
+        //   phase-a rc 7 (+ tail rc 0)=> INSTALLATION_FAILED (tail skipped)
+        ScriptedRunner not_boot_safe{};
+        not_boot_safe.rcs = {0, 1};
+        const InstallKernelResult r_nbs = install_kernel(*linux, not_boot_safe.fn, Bootloader::GRUB);
+        check(!r_nbs.ok && r_nbs.verdict == PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE,
+              "install_kernel(tail rc=1): INSTALLED_NOT_BOOT_SAFE, not a false SUCCESS");
+        check(contains(r_nbs.error, "not boot-safe") && contains(r_nbs.error, "1"),
+              "install_kernel(tail rc=1): the error names the tail + its raw rc");
+
+        ScriptedRunner tail_rc2{};
+        tail_rc2.rcs = {0, 2};
+        const InstallKernelResult r_rc2 = install_kernel(*linux, tail_rc2.fn, Bootloader::GRUB);
+        check(!r_rc2.ok && r_rc2.verdict == PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE && contains(r_rc2.error, "2"),
+              "install_kernel(tail rc=2): INSTALLED_NOT_BOOT_SAFE with the raw rc (>=2 folds in)");
+
+        ScriptedRunner all_zero{};
+        all_zero.rcs = {0, 0};
+        const InstallKernelResult r_bs = install_kernel(*linux, all_zero.fn, Bootloader::GRUB);
+        check(r_bs.ok && r_bs.verdict == PostinstallVerdict::BOOT_SAFE,
+              "install_kernel(phase-a rc=0 + tail rc=0): BOOT_SAFE, ok");
+
+        ScriptedRunner phase_a_fail{};
+        phase_a_fail.rcs = {7};
+        const InstallKernelResult r_if = install_kernel(*linux, phase_a_fail.fn, Bootloader::GRUB);
+        check(!r_if.ok && r_if.verdict == PostinstallVerdict::INSTALLATION_FAILED,
+              "install_kernel(phase-a rc=7): INSTALLATION_FAILED");
+        check(phase_a_fail.calls.size() == 1, "install_kernel(phase-a rc=7): the tail is skipped");
     }
 
     {
@@ -381,17 +410,14 @@ int main() {
         };
         RecordingRunner runner{};
         const InstallKernelResult result = install_kernel(aur, runner.fn, Bootloader::GRUB);
-        check(result.ok, "install_kernel(AUR, ok runner): ok");
-        check(runner.calls.size() == 4, "install_kernel(AUR): exactly 4 commands");
-        if (runner.calls.size() == 4) {
+        check(result.ok && result.verdict == PostinstallVerdict::BOOT_SAFE,
+              "install_kernel(AUR, ok runner): ok, verdict == BOOT_SAFE");
+        check(runner.calls.size() == 2, "install_kernel(AUR): exactly 2 commands (paru + the single tail)");
+        if (runner.calls.size() == 2) {
             check(runner.calls[0].first == "paru -S --needed linux-aurx" && !runner.calls[0].second,
                   "install_kernel(AUR)[0]: non-escalated paru");
-            check(runner.calls[1].first == kDrivers && runner.calls[1].second,
-                  "install_kernel(AUR)[1]: escalated driver rebuild (nvidia + DKMS)");
-            check(runner.calls[2].first == kInitramfs && runner.calls[2].second,
-                  "install_kernel(AUR)[2]: escalated initramfs regeneration (guarded)");
-            check(runner.calls[3].first == kGrub && runner.calls[3].second,
-                  "install_kernel(AUR)[3]: grub-mkconfig");
+            check(runner.calls[1].first == tail_cmd("linux-aurx", "", Bootloader::GRUB) && runner.calls[1].second,
+                  "install_kernel(AUR)[1]: the single consolidated tail (escalated)");
         }
     }
 
@@ -411,6 +437,8 @@ int main() {
         const InstallKernelResult result = install_kernel(tkg, runner.fn, Bootloader::UNKNOWN);
         check(!result.ok && contains(result.error, "Build-custom"),
               "install_kernel(build-only): graceful Build-custom note");
+        check(result.verdict == PostinstallVerdict::INSTALLATION_FAILED,
+              "install_kernel(build-only): degenerate default verdict == INSTALLATION_FAILED (no precompiled install ran)");
         check(runner.calls.empty(), "install_kernel(build-only): no command run");
         check(!result.boot_instructions.empty() && result.boot_instructions.back() == expected_note,
               "install_kernel(build-only): boot instructions filled (the constant note)");

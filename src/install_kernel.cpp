@@ -52,58 +52,67 @@ int run_real_command(const std::string& cmd, bool escalate) noexcept {
            || cmd.starts_with(KM_HELPER_DIR "/build_helper.sh");
 }
 
-// The post-install tail every precompiled install gets: rebuild the
-// kernel-specific driver packages for the new kernel (the pacman-based
-// nvidia driver first — it is not DKMS, so `dkms autoinstall` never
-// touches it — then any pending DKMS modules), regenerate the
-// initramfs, and (only for GRUB) refresh the bootloader config.
-void append_postinstall_tail(std::vector<InstallStep>& steps, Bootloader bl) {
-    // Boot-safety: the ALPM hooks (kernel-install: 50-dracut,
-    // 90-loaderentry) run DURING the package transaction, which is
-    // BEFORE the GPU driver has been rebuilt for the new kernel. The
-    // hook's dracut/mkinitcpio pass then produced an initramfs that is
-    // missing the driver, so the new kernel comes up with no display
-    // output and the system will not boot. Re-running the two steps
-    // below — driver rebuild first, initramfs regeneration second —
-    // fixes that ordering.
-
-    // 1. Rebuild the kernel-specific driver packages for the new
-    //    kernel. Must run BEFORE the initramfs regeneration so the
-    //    drivers are present when dracut/mkinitcpio package them.
-    //    - nvidia: on this system the driver is a plain pacman package
-    //      (NOT DKMS), so `dkms autoinstall` never rebuilds it — a
-    //      new kernel needs the package reinstalled (pacman -U) to
-    //      get its modules against the new kernel.
-    //    - nvidia-dkms / zfs: DKMS modules, rebuilt by `dkms
-    //      autoinstall` (which builds every pending module).
-    //    Guarded: each sub-action is a no-op when its package is not
-    //    installed, and the trailing `; true` keeps a failed rebuild
-    //    from failing the install (the driver can be rebuilt by hand
-    //    later; the old kernel still boots).
-    steps.push_back(
-        {"sh -c 'pacman -Q nvidia >/dev/null 2>&1 && pacman -U --noconfirm nvidia 2>&1; "
-         "pacman -Q nvidia-dkms >/dev/null 2>&1 && dkms autoinstall 2>&1; "
-         "pacman -Q zfs >/dev/null 2>&1 && dkms autoinstall 2>&1; true'",
-         true});
-
-    // 2. Regenerate the initramfs with whichever tool the system has:
-    //    dracut (EndeavourOS/Fedora-style) and/or mkinitcpio (plain
-    //    Arch/Manjaro), each guarded by a `command -v` probe. The
-    //    trailing `; true` keeps a system with neither tool from
-    //    failing the install.
-    steps.push_back(
-        {"sh -c 'command -v dracut >/dev/null 2>&1 && dracut -f 2>&1; "
-         "command -v mkinitcpio >/dev/null 2>&1 && mkinitcpio -P 2>&1; true'",
-         true});
-
-    // 3. Configure the bootloader: only GRUB needs a manual refresh
-    //    (grub-mkconfig does not auto-detect new kernels).
-    //    systemd-boot / UKI: no-op (BLS entries are auto-detected by
-    //    the kernel-install hook, 90-loaderentry).
-    if (bl == Bootloader::GRUB) {
-        steps.push_back({"grub-mkconfig -o /boot/grub/grub.cfg", true});
+// Shell-quote a string for embedding in the terminal command line: wrap
+// it in single quotes and escape every embedded single quote as '\''
+// (the run_cmd_async CWD-safe quoting precedent, utils.cpp). The value
+// arrives at the receiving script as one intact word.
+std::string shell_quote(std::string_view s) {
+    std::string quoted{"'"};
+    for (const char c : s) {
+        if (c == '\'') {
+            quoted += "'\\''";
+        } else {
+            quoted += c;
+        }
     }
-    // systemd-boot, UKI, UNKNOWN: steps 1 + 2 only
+    quoted += "'";
+    return quoted;
+}
+
+// The bootloader name as postinstall_tail.sh's `case "$BL"` consumes it
+// (the chunk C contract: the lowercase systemd-boot / grub / uki /
+// unknown). The UI-facing bootloader_name() returns different strings
+// ("GRUB", "Unified Kernel Image (UKI)", "Unknown") that would fall into
+// the tail's out-of-contract default (no BLS/grub check at all), so map
+// the enum to the tail's exact names.
+[[gnu::pure]] std::string tail_bootloader_name(Bootloader bl) {
+    switch (bl) {
+        case Bootloader::SYSTEMD_BOOT: return "systemd-boot";
+        case Bootloader::GRUB:         return "grub";
+        case Bootloader::UKI:          return "uki";
+        case Bootloader::UNKNOWN:      return "unknown";
+    }
+    return "unknown";
+}
+
+// The verdict's log/UI label (D-E): the honest 3-state name the result
+// line and the dialogs carry.
+[[gnu::pure]] std::string verdict_label(PostinstallVerdict verdict) {
+    switch (verdict) {
+        case PostinstallVerdict::BOOT_SAFE:               return "BOOT_SAFE";
+        case PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE: return "INSTALLED_NOT_BOOT_SAFE";
+        case PostinstallVerdict::INSTALLATION_FAILED:     return "INSTALLATION_FAILED";
+    }
+    return "UNKNOWN";
+}
+
+// The single consolidated post-install tail every precompiled install
+// gets (chunk E, phase b): ONE escalated postinstall_tail.sh step (the
+// script produced by chunks A/B/C) that, in ONE root session, syncs the
+// kernel drivers, regenerates the initramfs for the new <KVER>, verifies
+// boot-safety and exits with the 3-state verdict rc. `pkgname` is the
+// installed package (the dir flow's .PKGINFO pkgname, the repo/AUR flow's
+// table package) and `kver` the new kernel's version (the dir flow's
+// .PKGINFO version; the repo/AUR flow passes the EMPTY version, which the
+// tail then derives from the local DB itself). This replaces the old
+// three inline fire-and-forget steps (driver rebuild / initramfs / GRUB
+// refresh).
+void append_postinstall_tail(std::vector<InstallStep>& steps, Bootloader bl,
+                             std::string_view pkgname, std::string_view kver) {
+    steps.push_back(
+        {KM_HELPER_DIR "/postinstall_tail.sh " + shell_quote(pkgname) + " " + shell_quote(kver) + " "
+         + shell_quote(tail_bootloader_name(bl)),
+         true});
 }
 
 // The built-package suffix (D2: the literal .pkg.tar.zst per the user
@@ -148,23 +157,6 @@ std::string pkginfo_field(std::string_view content, std::string_view key) {
 }
 
 // ── Install logging (the real-runner path; see install_from_directory) ──
-
-// Shell-quote a string for embedding in the terminal command line: wrap
-// it in single quotes and escape every embedded single quote as '\''
-// (the run_cmd_async CWD-safe quoting precedent, utils.cpp). The value
-// arrives at the receiving script as one intact word.
-std::string shell_quote(std::string_view s) {
-    std::string quoted{"'"};
-    for (const char c : s) {
-        if (c == '\'') {
-            quoted += "'\\''";
-        } else {
-            quoted += c;
-        }
-    }
-    quoted += "'";
-    return quoted;
-}
 
 // The step's short label for the log: the first two whitespace-separated
 // words of the command ("pacman -U", "dracut -f", "grub-mkconfig -o") —
@@ -258,7 +250,10 @@ std::vector<InstallStep> plan_steps(const KnownKernel& kernel, Bootloader bl) {
             // added) installs through pacman.
             steps.push_back({"pacman -S --needed " + kernel.install_package, true});
         }
-        append_postinstall_tail(steps, bl);
+        // Phase b: the single consolidated tail. The repo/AUR flow passes
+        // an EMPTY kver — the tail derives it from the local DB of the
+        // package phase a just installed (chunk A's awk, never uname).
+        append_postinstall_tail(steps, bl, kernel.install_package, "");
         return steps;
     }
 
@@ -313,16 +308,35 @@ InstallKernelResult install_kernel(const KnownKernel& kernel, CommandRunner runn
         }
     }
 
+    // The execution loop (D-E, the 3-state verdict): the phase-(a) package
+    // install runs first; a failure there ⇒ INSTALLATION_FAILED and the tail
+    // never runs. The phase-(b) consolidated tail is identified by its
+    // postinstall_tail.sh command (not by position — the AUR-erase path may
+    // leave it as the only step); its REAL rc (the sentinel-captured exit
+    // code, chunk D) IS the verdict: 0 = BOOT_SAFE, != 0 = INSTALLED_NOT_BOOT_SAFE.
     for (const auto& step : steps) {
         const int rc = runner(step.cmd, step.escalate);
-        if (rc != 0) {
+        if (step.cmd.starts_with(KM_HELPER_DIR "/postinstall_tail.sh")) {
+            // Phase (b): the tail's real rc is the verdict. Never a false
+            // SUCCESS — the H3 fire-and-forget gap is closed by the sentinel.
+            if (rc == 0) {
+                result.verdict = PostinstallVerdict::BOOT_SAFE;
+                result.ok = true;
+            } else {
+                result.verdict = PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE;
+                result.ok = false;
+                result.error = "Post-install tail not boot-safe (exit code " + std::to_string(rc) + "): " + step.cmd;
+            }
+        } else if (rc != 0) {
+            // Phase (a): the package install itself failed (a missing/
+            // disabled repo, an unresolved conflict, a Polkit denial).
+            result.verdict = PostinstallVerdict::INSTALLATION_FAILED;
             result.ok = false;
             result.error = "Command failed (exit code " + std::to_string(rc) + "): " + step.cmd;
-            return result;  // skip the remaining steps; graceful, never a crash
+            return result;  // the tail never runs; graceful, never a crash
         }
     }
 
-    result.ok = true;
     return result;
 }
 
@@ -484,8 +498,10 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
     // ABSOLUTE paths — no shell glob (D2: the 0c918d4 pkexec-CWD-reset
     // rationale, the root shell starts in $HOME so relative paths
     // break; quoting keeps a spaced name one word instead of
-    // word-splitting an expanded glob) — then the standard post-install
-    // tail (reused verbatim).
+    // word-splitting an expanded glob) — then the single consolidated
+    // post-install tail (phase b). The dir flow passes the resolved
+    // .PKGINFO name + version, so the tail targets the new <KVER>
+    // directly (no local-DB derivation needed here).
     std::vector<InstallStep> steps{};
     std::string pacman_cmd = "pacman -U";
     for (const auto& pkg : pkgs) {
@@ -494,7 +510,7 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
         pacman_cmd += " '" + std::filesystem::absolute(pkg).string() + "'";
     }
     steps.push_back({pacman_cmd, true});
-    append_postinstall_tail(steps, bl);
+    append_postinstall_tail(steps, bl, name, version);
 
     // The install log (the real runner only — an injected test runner
     // records the raw commands and never touches the filesystem, so it
@@ -522,18 +538,21 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
         result.log_path = log_path;
     }
 
-    // The execution loop (identical to install_kernel, with the logging
-    // wrapper for the real runner): first failing step ⇒ ok = false,
-    // error names the command + its exit code, the remaining steps are
-    // skipped — graceful, never a crash.
+    // The execution loop (D-E, the 3-state verdict, with the install_logger
+    // wrapper for the real runner): the phase-(a) pacman -U runs first; a
+    // failure ⇒ INSTALLATION_FAILED and the tail never runs. The phase-(b)
+    // consolidated tail (identified by its postinstall_tail.sh command, not
+    // by position) is wrapped in install_logger.sh too, so its REAL rc (the
+    // sentinel-captured exit code, chunk D) lands in the log AND drives the
+    // verdict: 0 = BOOT_SAFE, != 0 = INSTALLED_NOT_BOOT_SAFE.
     for (std::size_t i = 0; i < steps.size(); ++i) {
         const auto& step = steps[i];
         // Real runner: run the step through the installed
         // install_logger.sh — its output streams to the terminal in
         // real time AND is appended to the log (the command, the start
         // time, the command's REAL exit code, the full output). The
-        // command stays a single quoted word: the tail steps carry shell
-        // syntax (`||` fallbacks, `2>/dev/null` guards, quoted paths)
+        // command stays a single quoted word: the tail step carries shell
+        // syntax (the quoted package name / version / bootloader args)
         // that the script re-parses with `bash -c`, and runCmdTerminal's
         // appended `; read -p …` prompt lands AFTER the wrapper on the
         // terminal's command line.
@@ -543,41 +562,31 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
             cmd = KM_HELPER_DIR "/install_logger.sh " + shell_quote(log_path) + " " + shell_quote(label) + " " + shell_quote(cmd);
         }
         const int rc = runner(cmd, step.escalate);
-        if (rc != 0) {
+        if (step.cmd.starts_with(KM_HELPER_DIR "/postinstall_tail.sh")) {
+            // Phase (b): the tail's real rc is the verdict. Never a false
+            // SUCCESS — the H3 fire-and-forget gap is closed by the sentinel.
+            if (rc == 0) {
+                result.verdict = PostinstallVerdict::BOOT_SAFE;
+                result.ok = true;
+            } else {
+                result.verdict = PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE;
+                result.ok = false;
+                result.error = "Post-install tail not boot-safe (exit code " + std::to_string(rc) + "): " + step.cmd;
+            }
+            if (use_default_runner) {
+                append_log(log_path, "=== Result: " + verdict_label(result.verdict) + " ===");
+            }
+        } else if (rc != 0) {
+            // Phase (a): the package install itself failed.
+            result.verdict = PostinstallVerdict::INSTALLATION_FAILED;
             result.ok = false;
             result.error = "Command failed (exit code " + std::to_string(rc) + "): " + step.cmd;
             if (use_default_runner) {
                 append_log(log_path, "=== Result: FAILED (step " + std::to_string(i + 1) + ": " + short_label(step.cmd)
                                  + ", exit code " + std::to_string(rc) + ") ===");
             }
-            return result;
+            return result;  // the tail never runs; graceful, never a crash
         }
-    }
-
-    result.ok = true;
-
-    // Post-install verification (the real runner only): one read-only
-    // compound command whose full output lands in the log —
-    //   1. dkms status       (were the modules built for the new kernel?)
-    //   2. boot entries      (bootctl list for systemd-boot; ls /boot otherwise)
-    //   3. NVIDIA modules    (what /lib/modules holds — what the initramfs packages)
-    // The tail steps' `|| true` guards and the final `; true` keep every
-    // section from ever failing the verification: the install steps
-    // above already succeeded, this is diagnosis, not part of the
-    // install — and each missing tool's own "command not found" line is
-    // exactly the diagnostic data the log exists to keep.
-    if (use_default_runner) {
-        std::string verify = "echo '=== Post-Install Verification ==='";
-        verify += "; echo; echo 'DKMS Status:'; dkms status 2>&1 || true";
-        verify += (bl == Bootloader::SYSTEMD_BOOT)
-                      ? "; echo; echo 'Boot Entries:'; bootctl list 2>&1 || ls -l /boot 2>&1 || true"
-                      : "; echo; echo 'Boot Entries:'; ls -l /boot 2>&1 || true";
-        verify += "; echo; echo 'NVIDIA kernel modules:'; ls /lib/modules/*/kernel/drivers/video/nvidia* 2>/dev/null || true";
-        verify += "; true";
-        const std::string label = "Post-Install Verification";
-        const std::string vcmd = KM_HELPER_DIR "/install_logger.sh " + shell_quote(log_path) + " " + shell_quote(label) + " " + shell_quote(verify);
-        (void) runner(vcmd, false);  // read-only; the rc is logged, never judged
-        append_log(log_path, "=== Result: SUCCESS ===");
     }
 
     return result;
