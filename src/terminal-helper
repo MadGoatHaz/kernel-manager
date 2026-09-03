@@ -81,90 +81,100 @@ if [ -z "$terminal" ]; then
     exit 1
 fi
 
-# Content build — the file the terminal's shell runs:
-#   line 1 (non-escalated only): the shell records its own PID in $pidfile
-#                                (the launch marker the helper waits on)
-#   then:                         the command itself
-#   then (kgx only):              kgx does not exit on command completion,
-#                                so kill the window manually — kept BEFORE
-#                                the self-cleanup, as before
-#   last:                         SELF-CLEANUP — the terminal's own shell
-#                                removes the temp files after the command,
-#                                so no launcher-side `rm` can ever race the
-#                                first read of the file (the old :80 race).
+# Sentinel launch/rc protocol (chunk D — closes H3): the terminal runs a
+# wrapper ($file) that drops filesystem sentinels in a world-readable run
+# dir; the helper polls them. Konsole/ptyxis are D-Bus singletons —
+# `konsole -e <cmd>` returns 0 the moment the window is requested, so the
+# launcher's rc never carries the command's rc (the old escalated path was
+# a fire-and-forget `exit 0`: the app saw 0 for a failed command and
+# reported a false SUCCESS). With the sentinel, helper-lifetime ==
+# command-lifetime for EVERY launch (blocking or non-blocking, escalated
+# or not), and the helper's exit code IS the command's real rc —
+# runCmdTerminal (utils.cpp: waitForFinished → exitCode) needs no change.
+#
+#   wrapper (run by the terminal's shell — as the user, or as root via
+#   `pkexec rootshell.sh` for an escalated launch):
+#     umask 022          root-written markers stay world-readable
+#     touch started      the window actually ran the wrapper (Polkit OK)
+#     trap INT/TERM      write rc 130/143 (the killed command's $? agrees)
+#     ( <CMD> )          the command in a SUBSHELL: a command-level `exit`
+#                        kills only the subshell, so the bookkeeping below
+#                        always runs and the real rc is always recorded
+#     echo $? > rc       the command's real rc (the single source of truth)
+#     touch done         the lifecycle is over
+#     (kgx only)         kgx does not exit on command completion — kill
+#                        the window manually (the old line, folded here)
+#   The wrapper does NOT remove the run dir — the helper owns the cleanup
+#   after it has read the rc (a wrapper-side rm would race the done poll).
+#
+#   helper poll (the KMH_* env vars exist for the test harness only; the
+#   production defaults are 120 s / 1800 s = 30 min):
+#     wait started: 0.2 s ticks, ${KMH_START_TIMEOUT:-120} s deadline ⇒
+#         never seen = Polkit rejected / window never opened ⇒ exit 126
+#     wait done:    1 s ticks,   ${KMH_DONE_TIMEOUT:-1800}  s deadline ⇒
+#         timeout = the command ran past 30 min ⇒ rc 124
+#     read rc from the sentinel ⇒ exit $rc
+
+run_dir="$(mktemp -d)"
+chmod 0755 "$run_dir"
+
 {
-    if [ "$escalated" -eq 0 ]; then
-        echo "echo \$\$ > '$pidfile'"
-    fi
-    printf '%s\n' "$1"
+    echo 'umask 022'
+    echo "touch '$run_dir/started'"
+    echo "trap 'echo 130 > $run_dir/rc' INT"
+    echo "trap 'echo 143 > $run_dir/rc' TERM"
+    printf '( %s )\n' "$1"
+    echo 'rc=$?'
+    echo "echo \$rc > '$run_dir/rc'"
+    echo "touch '$run_dir/done'"
     if [ "$terminal" = "kgx" ]; then
         echo "kill -SIGQUIT \$PPID 2>/dev/null"
     fi
-    if [ "$escalated" -eq 0 ]; then
-        echo "rm -f '$pidfile' '$file'"
-    else
-        echo "rm -f '$file'"
-    fi
+    echo 'exit $rc'
 } > "$file"
 
-# Launch. Contract: helper-lifetime == command-lifetime for every
-# non-escalated launch, so both the synchronous callers (runCmdTerminal —
-# install/repo-add/AUR) and the async caller (finished_proc) see a correct
-# completion event.
-#   non-blocking = konsole|ptyxis (D-Bus clients — they request a window
-#       and exit 0 immediately; a future fire-and-forget terminal joins
-#       this set — the marker-wait is the safe default for it):
-#     - non-escalated: request the window, wait for the PID marker
-#       (bounded launch grace: 120 s, 0.2 s ticks; never appears ⇒ the
-#       terminal failed to launch the command ⇒ clean up + exit 1), then
-#       track the shell (unbounded liveness loop — ends when the command
-#       shell exits, including window close / Ctrl-C, where the
-#       self-cleanup line never ran ⇒ the helper's rm -f safety net
-#       collects both files) ⇒ exit 0. The helper's rc is the LAUNCH
-#       contract (0 = the command ran to completion in the terminal);
-#       the command's own rc is user-visible in the terminal and is the
-#       terminal's business, NOT propagated here.
-#     - escalated: fire-and-forget — the file self-cleans inside the
-#       root shell, and the user's kill -0 on the root PID fails (EPERM)
-#       ⇒ liveness untrackable ⇒ exit 0 immediately.
-#   blocking (everything else, any escalation mode): today's
-#       rc-propagation contract for the synchronous callers.
-case "$terminal" in
-    konsole|ptyxis) blocking=0 ;;
-    *)              blocking=1 ;;
-esac
+# Launch the terminal with the wrapper. The launcher's own rc is
+# meaningless for konsole/ptyxis (D-Bus — the request returns immediately)
+# and at best a proxy elsewhere, so the sentinels are the single source of
+# truth for every launch; the eval is `|| true` — a failed launcher
+# surfaces as `started` never appearing ⇒ 126 below.
+eval "${terminals[$terminal]}" 2>/dev/null || true
 
-if [ "$blocking" -eq 0 ] && [ "$escalated" -eq 1 ]; then
-    eval "${terminals[$terminal]}" 2>/dev/null || true
-    exit 0
-fi
-
-if [ "$blocking" -eq 0 ]; then
-    eval "${terminals[$terminal]}" 2>/dev/null || true
-
-    deadline=$(( SECONDS + 120 ))
-    while [ ! -f "$pidfile" ]; do
-        if [ "$SECONDS" -ge "$deadline" ]; then
-            rm -f "$pidfile" "$file"
-            exit 1
-        fi
-        sleep 0.2
-    done
-
-    pid="$(cat "$pidfile" 2>/dev/null)" || pid=""
-    if [ -n "$pid" ]; then
-        while kill -0 "$pid" 2>/dev/null; do
-            sleep 1
-        done
+# Wait for `started`: 0.2 s ticks, ${KMH_START_TIMEOUT:-120} s deadline.
+# Never seen ⇒ Polkit rejected / the window never opened ⇒ 126.
+deadline=$(( SECONDS + ${KMH_START_TIMEOUT:-120} ))
+while [ ! -f "$run_dir/started" ]; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+        rm -rf "$run_dir"
+        rm -f "$pidfile" "$file"
+        exit 126
     fi
+    sleep 0.2
+done
 
-    # Safety net: either the self-cleanup ran or the window closed before
-    # it did — rm -f is idempotent either way.
-    rm -f "$pidfile" "$file"
-    exit 0
+# Wait for `done`: 1 s ticks, ${KMH_DONE_TIMEOUT:-1800} s (30 min) deadline.
+# Timeout ⇒ the command ran past the limit ⇒ 124.
+rc=""
+deadline=$(( SECONDS + ${KMH_DONE_TIMEOUT:-1800} ))
+while [ ! -f "$run_dir/done" ]; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+        rc=124
+        break
+    fi
+    sleep 1
+done
+
+# The sentinel's rc is the command's real rc (the wrapper wrote it; the
+# traps wrote 130/143). Guard the degenerate empty / non-numeric case.
+if [ -z "$rc" ]; then
+    rc="$(cat "$run_dir/rc" 2>/dev/null)" || rc=""
+    case "$rc" in
+        '' | *[!0-9]*) rc=124 ;;
+    esac
 fi
 
-rc=0
-eval "${terminals[$terminal]}" 2>/dev/null || rc=$?
+# Cleanup: the user owns $run_dir (0755), so the root-written markers
+# inside are unlinkable by the user's helper; $file/$pidfile never leak.
+rm -rf "$run_dir"
 rm -f "$pidfile" "$file"
-exit $rc
+exit "$rc"

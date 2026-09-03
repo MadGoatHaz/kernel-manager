@@ -143,6 +143,7 @@ int runCmdTerminal(QString cmd, bool escalate) noexcept {
     // helper's self-cleanup line (the rm -f safety net collects the temp
     // files — the k17 mid-script `exit` shape), so a blocking terminal
     // propagates the real rc back through the helper to this return.
+    // (chunk D: the helper now blocks on a filesystem sentinel for every launch, so this exitCode is the command's real rc — not a launch contract — also for the non-blocking konsole/ptyxis terminals.)
     cmd += "; __rc=$?; read -p 'Press enter to exit'; exit $__rc";
     auto paramlist = QStringList();
     if (escalate) {
