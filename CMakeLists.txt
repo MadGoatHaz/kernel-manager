@@ -134,6 +134,7 @@ qt_add_executable(${PROJECT_NAME}
     src/aur_kernel.hpp src/aur_kernel.cpp
     src/known_kernels.hpp src/known_kernels.cpp
     src/bootloader.hpp src/bootloader.cpp
+    src/distro.hpp src/distro.cpp
     src/boot_instructions.hpp src/boot_instructions.cpp
     src/install_kernel.hpp src/install_kernel.cpp
     src/km-window.hpp src/km-window.cpp
