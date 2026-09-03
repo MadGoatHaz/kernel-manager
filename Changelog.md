@@ -1,5 +1,18 @@
 # Changelog
 
+### v1.25.0 (2026-09-03)
+
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/97e505b...045feca)
+
+- 🔥 **Consolidated post-install tail (driver + initramfs + verify + honest verdict):** every pre-compiled and directory install now ends in a single escalated `postinstall_tail.sh` step that (1) rebuilds the full nvidia family for the new kernel (`nvidia`/`nvidia-open`/`nvidia-lts`/`nvidia-open-lts` via guarded `pacman -U`, plus `nvidia-dkms`/`nvidia-open-dkms` and `zfs` via `dkms autoinstall -k <KVER>` — each sub-action `pacman -Q`-guarded and a no-op when absent), (2) regenerates the initramfs **for the new KVER** (`reinstall-kernels` → `dracut --force --kver` → `mkinitcpio -k`, only the first available tool runs) and deploys it into the systemd-boot ESP machine-id layout, and (3) verifies boot safety (nvidia module probed under `extramodules/` + `updates/dkms/` — the corrected path, per-KVER non-empty initramfs, BLS entry for systemd-boot, `grub-mkconfig` for GRUB); the old fire-and-forget `|| true` steps and the unconditional "SUCCESS" banner are gone
+- ⚡ **Sentinel launch/rc protocol:** every terminal command — including the `pkexec`-escalated ones — now runs through a wrapper that records started/rc/done sentinels, so the app receives the command's *real* exit code (Polkit-rejected ⇒ 126, stuck ⇒ the done-timeout rc) instead of the old fire-and-forget "always 0" (H3 closed)
+- 💬 **Honest 3-state install verdict + dialogs:** installs now report `BOOT_SAFE` (green), `INSTALLED_NOT_BOOT_SAFE` (amber — "do NOT reboot" + the `sudo reinstall-kernels` repair directive), or `INSTALLATION_FAILED` (red) as distinct dialogs, each raised to the front before the modal (H1); a failed tail can no longer be masked as success
+- 🌐 **Distribution awareness:** a new Qt-free `distro` module reads `/etc/os-release` (`ID` + `ID_LIKE`) to classify Arch / EndeavourOS / Manjaro / CachyOS / Garuda — per-family initramfs tool preference, BLS-entries-dir probe, and a distro name for the UI — so post-install behavior is tuned to the distro rather than assuming bare Arch
+- 📦 **Release:** CMake project version bumped from 1.19.0 to 1.25.0 (M1; the build-completion modal promptness M2 and flat build-dir M3 recon-confirmed), the `v1.25.0` tag is cut at `045feca` and the PKGBUILD is re-pinned to it (`pkgver` 1.25.0, `_commit` = the tag commit, `sha256sums` refreshed from the fetched archive — byte-stability verified across two fetches)
+- 🐛 **Test robustness:** the k11 harness's `local/<name>` live-origin expectation now probes the real local DB (machine-state robust — no hard-coded row set), and the k8/k14 harnesses are re-specified to the single-tail contract with the 3-state verdict probes
+
+> Note: released — the `v1.25.0` tag is cut at `045feca` (the fully-fixed main after the A→E2 postinstall/sentinel/verdict chain + the F/G/H isolated chunks) and the PKGBUILD is re-pinned to it (`pkgver` 1.25.0). Full QA on merged main: 15/15 harnesses green (1,286 observed checks / 0 FAIL — k11 81/0, k12 264/0 ×2 + stable dump, k16 35/0, k17 46/0, k18 50/50, chunk2 129/129), zero-code-warning forced full recompile, offscreen smoke 124/0B/0B, system-state gates green (`/etc/pacman.conf` + local DB + user config untouched, every mktemp sandbox trap-cleaned), 0 defects. Known limitation (tracked follow-up, not a release defect): the app still has no visible version in the UI — `PROJECT_VERSION` has no C++ consumer (no `--version` flag or about dialog); the package/tag/PKGBUILD chain is fully versioned.
+
 ### v1.24.0 (2026-09-01)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/c8ca7c1...97e505b)
