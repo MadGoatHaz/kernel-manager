@@ -312,6 +312,83 @@ void show_boot_instructions(QWidget* parent, const std::vector<std::string>& ins
 
     dialog.exec();
 }
+
+// ── The 3-state verdict outcome dialog (D-E, chunk E2) ────────────────
+// The install result's PostinstallVerdict (chunk E) is one of three
+// states, each shown as a DISTINCT dialog (never masked as success):
+//   BOOT_SAFE               → green (Information): installed and confirmed
+//                             boot-safe — safe to reboot.
+//   INSTALLED_NOT_BOOT_SAFE → amber (Warning): installed but NOT confirmed
+//                             boot-safe — do NOT reboot; run
+//                             `sudo reinstall-kernels` to repair first.
+//   INSTALLATION_FAILED     → red (Critical): the install itself failed.
+// verdict_dialog() builds the (icon, text) for a given verdict + the
+// flow's data. It is pure and testable: the throwaway driver injects each
+// verdict and checks the text + icon without driving a blocking
+// QMessageBox. The caller raises + activates the window BEFORE the modal
+// (H1) and shows the QMessageBox with the returned icon + text.
+
+// The data the outcome dialog is built from: the verdict, the kernel's
+// display subject (the name, or "name (version)" for the directory flow),
+// the error line ("" for BOOT_SAFE), the post-install boot-selection
+// steps, the install log path ("" for the pre-compiled flow, which keeps
+// no log), the source directory ("" for the pre-compiled flow), and which
+// flow produced the result.
+struct VerdictDialogSpec {
+    PostinstallVerdict verdict = PostinstallVerdict::INSTALLATION_FAILED;
+    QString subject;  // "linux" (pre-compiled) / "linux-cachyos-custom 7.2.2-1" (dir)
+    QString error;    // the result error line ("" for BOOT_SAFE)
+    std::vector<std::string> boot_instructions;  // the post-install steps
+    QString log_path;  // "" when the flow keeps no log
+    QString dir;       // the source directory (the dir flow only)
+    bool dir_flow = false;  // true = on_install_from_directory
+};
+
+// The dialog a verdict produces: the icon (green/amber/red) + the full
+// text.
+struct VerdictDialog {
+    QMessageBox::Icon icon = QMessageBox::Critical;
+    QString text;
+};
+
+[[nodiscard]] VerdictDialog verdict_dialog(const VerdictDialogSpec& spec) {
+    // The numbered boot-selection steps (the shape the success dialog
+    // built inline before this refactor).
+    QString instructions;
+    for (std::size_t i = 0; i < spec.boot_instructions.size(); ++i) {
+        instructions += QLatin1Char('\n');
+        instructions += QStringLiteral("%1. %2").arg(static_cast<int>(i + 1)).arg(QString::fromStdString(spec.boot_instructions[i]));
+    }
+    // The install log's path line ("" for the pre-compiled flow, which
+    // keeps no log).
+    QString log_line;
+    if (!spec.log_path.isEmpty()) {
+        log_line = QStringLiteral("\n\n") + QObject::tr("Log: %1").arg(spec.log_path);
+    }
+
+    VerdictDialog d{};
+    if (spec.verdict == PostinstallVerdict::BOOT_SAFE) {
+        d.icon = QMessageBox::Information;
+        d.text = QObject::tr("Installed '%1'. Boot-safe — ready to select at the next restart:").arg(spec.subject)
+                 + instructions + log_line;
+    } else if (spec.verdict == PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE) {
+        d.icon = QMessageBox::Warning;
+        d.text = QObject::tr("Installed '%1', but it is NOT confirmed boot-safe:\n%2\n\n"
+                             "Do NOT reboot. Run `sudo reinstall-kernels` to repair it before "
+                             "relying on it to boot.")
+                     .arg(spec.subject, spec.error)
+                 + instructions + log_line;
+    } else {
+        // INSTALLATION_FAILED: the install itself failed.
+        d.icon = QMessageBox::Critical;
+        if (spec.dir_flow) {
+            d.text = QObject::tr("Failed to install from '%1':\n%2").arg(spec.dir, spec.error) + log_line;
+        } else {
+            d.text = QObject::tr("Failed to install '%1':\n%2").arg(spec.subject, spec.error) + log_line;
+        }
+    }
+    return d;
+}
 }  // namespace
 
 MainWindow::MainWindow(QWidget* parent)
@@ -702,24 +779,45 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
             return;
         }
 
-        // The K8 name-based API: plan from the table, then execute the
-        // steps through the existing pkexec terminal path. Synchronous
-        // for now (a progress dialog is a later refinement); the
-        // outcome is reported below either way.
-        const auto plan = plan_install(name);
-        std::string error;
-        if (!execute_plan(plan, error)) {
-            QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to install '%1':\n%2").arg(display, QString::fromStdString(error)));
-            return;
+        // The K8 install path (chunk E): build the table entry (the same
+        // K1-fallback shape plan_install uses) and run the install through
+        // the shared pkexec terminal path. Synchronous for now (a progress
+        // dialog is a later refinement); the 3-state PostinstallVerdict in
+        // the result decides which outcome dialog is shown below (green /
+        // amber / red — never a masked success).
+        KnownKernel kernel{};
+        if (const auto entry = km::find_kernel(name); entry.has_value()) {
+            kernel = **entry;
+        } else {
+            kernel.name = name;
+            kernel.default_source = name;
+            kernel.install_package = name;
+            kernel.install_repo = "";
+            kernel.precompiled_available = false;
+            kernel.buildable = true;
         }
+        const InstallKernelResult result = install_kernel(kernel);
 
-        QString message = tr("Installed '%1'. Select it at the next boot:").arg(display);
-        const auto instructions = boot_instructions_for(name);
-        for (std::size_t i = 0; i < instructions.size(); ++i) {
-            message += QLatin1Char('\n');
-            message += QStringLiteral("%1. %2").arg(static_cast<int>(i + 1)).arg(QString::fromStdString(instructions[i]));
-        }
-        QMessageBox::information(this, tr("Kernel Manager"), message);
+        // The pre-compiled flow shows the kernel name only (no version)
+        // and keeps no install log (that is the directory flow's).
+        VerdictDialogSpec spec{};
+        spec.verdict = result.verdict;
+        spec.subject = display;
+        spec.error = QString::fromStdString(result.error);
+        spec.boot_instructions = result.boot_instructions;
+        const auto d = verdict_dialog(spec);
+
+        // Raise + activate BEFORE the modal (H1): after the synchronous
+        // install the main window can sit buried behind the install's
+        // terminal windows, and a modal parented to a buried window is
+        // invisible to the user.
+        raise();
+        activateWindow();
+        QMessageBox box(this);
+        box.setIcon(d.icon);
+        box.setWindowTitle(tr("Kernel Manager"));
+        box.setText(d.text);
+        box.exec();
         return;
     }
 
@@ -794,39 +892,45 @@ void MainWindow::on_install_from_directory() noexcept {
 
     // The real runner: an empty CommandRunner selects run_real_command
     // (utils::runCmdTerminal, escalated). The run is logged (every step's
-    // command, real exit code and full output + the post-install
-    // verification): r.log_path names the file, shown in both dialogs
-    // below so the output of the (transient) terminal windows stays
-    // diagnosable after the fact.
+    // command, real exit code and full output + the tail's VERDICT line):
+    // r.log_path names the file, shown in the outcome dialog below so the
+    // output of the (transient) terminal windows stays diagnosable after
+    // the fact.
     const DirInstallResult r = install_from_directory(dir.toStdString());
-    if (!r.ok) {
-        QString message = tr("Failed to install from '%1':\n%2").arg(dir, QString::fromStdString(r.error));
-        if (!r.log_path.empty()) {
-            message += QLatin1Char('\n');
-            message += QLatin1Char('\n');
-            message += tr("Log: %1").arg(QString::fromStdString(r.log_path));
-        }
-        QMessageBox::critical(this, tr("Kernel Manager"), message);
-        return;
-    }
 
-    // Success: the boot-selection message in the exact shape of the
-    // pre-compiled install flow above (name + version come from the
-    // installed package's .PKGINFO), then the same-thread refresh (the C5
-    // Add-repo pattern): the kernel's row — local/… (C1) or its repo row —
-    // appears with the Installed ✓.
-    QString message = tr("Installed '%1 (%2)'. Select it at the next boot:").arg(QString::fromStdString(r.name), QString::fromStdString(r.version));
-    for (std::size_t i = 0; i < r.boot_instructions.size(); ++i) {
-        message += QLatin1Char('\n');
-        message += QStringLiteral("%1. %2").arg(static_cast<int>(i + 1)).arg(QString::fromStdString(r.boot_instructions[i]));
+    // The outcome dialog from the verdict (D-E, chunk E2): green for
+    // BOOT_SAFE, amber for INSTALLED_NOT_BOOT_SAFE (the package IS present
+    // — refresh so its row appears), red for INSTALLATION_FAILED.
+    VerdictDialogSpec spec{};
+    spec.verdict = r.verdict;
+    spec.subject = QString("%1 (%2)").arg(QString::fromStdString(r.name), QString::fromStdString(r.version));
+    spec.error = QString::fromStdString(r.error);
+    spec.boot_instructions = r.boot_instructions;
+    spec.log_path = QString::fromStdString(r.log_path);
+    spec.dir = dir;
+    spec.dir_flow = true;
+    const auto d = verdict_dialog(spec);
+
+    // Raise + activate BEFORE the modal (H1): after the synchronous
+    // install the main window can sit buried behind the install's terminal
+    // windows, and a modal parented to a buried window is invisible to the
+    // user.
+    raise();
+    activateWindow();
+    QMessageBox box(this);
+    box.setIcon(d.icon);
+    box.setWindowTitle(tr("Kernel Manager"));
+    box.setText(d.text);
+    box.exec();
+
+    // Same-thread refresh (the C5 Add-repo pattern) so the just-installed
+    // kernel's row — local/… (C1) or its repo row — appears with the
+    // Installed ✓. The package is present for BOOT_SAFE and
+    // INSTALLED_NOT_BOOT_SAFE (phase a succeeded); only INSTALLATION_FAILED
+    // (phase a failed) leaves the list unchanged.
+    if (r.verdict != PostinstallVerdict::INSTALLATION_FAILED) {
+        init_kernels();
     }
-    if (!r.log_path.empty()) {
-        message += QLatin1Char('\n');
-        message += QLatin1Char('\n');
-        message += tr("Log: %1").arg(QString::fromStdString(r.log_path));
-    }
-    QMessageBox::information(this, tr("Kernel Manager"), message);
-    init_kernels();
 }
 
 // D6 (plan v1.24.0): the "Browse…" flow — a folder picker whose default
