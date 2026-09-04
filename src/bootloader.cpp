@@ -62,6 +62,7 @@ bool real_dir_has_uki(std::string_view dir) noexcept {
 // the standalone unit-test harness alone.
 bool real_command_exists(std::string_view command) noexcept {
     const std::string shell_command{"command -v " + std::string{command} + " >/dev/null 2>&1"};
+    // NOLINTNEXTLINE(bugprone-command-processor) — by design: a `command -v` PATH probe needs a shell; the command is a fixed literal + a command name (no user input reaches the shell).
     if (FILE* const pipe = popen(shell_command.c_str(), "r")) {
         const int status = pclose(pipe);
         return status != -1 && WIFEXITED(status) && WEXITSTATUS(status) == 0;

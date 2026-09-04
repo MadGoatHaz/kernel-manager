@@ -127,7 +127,7 @@ std::string short_label(std::string_view cmd) {
     }
     int words = 0;
     for (std::size_t i = 0; i < inner.size(); ++i) {
-        if (inner[i] == ' ' && ++words == 2) {
+        if (inner.at(i) == ' ' && ++words == 2) {
             return std::string{inner.substr(0, i)};
         }
     }
@@ -198,14 +198,14 @@ std::vector<InstallStep> plan_steps(const KnownKernel& kernel) {
             // privileged (an AUR build runs as the user). No makepkg
             // fallback step is emitted here — install_kernel() resolves
             // a missing paru at run time (see below).
-            steps.push_back({"paru -S --needed " + kernel.install_package, false});
+            steps.push_back({.cmd = "paru -S --needed " + kernel.install_package, .escalate = false});
         } else {
             // Every documented pacman repo (core/extra/cachyos/
             // chaotic-aur/liquorix, or a third-party one the user
             // added) installs through pacman. The distro's ALPM hooks
             // (70-dkms-install, 90-kernel-install) do the post-install
             // work inside the transaction — there is no app-side tail.
-            steps.push_back({"pacman -S --needed " + kernel.install_package, true});
+            steps.push_back({.cmd = "pacman -S --needed " + kernel.install_package, .escalate = true});
         }
         return steps;
     }
@@ -217,7 +217,7 @@ std::vector<InstallStep> plan_steps(const KnownKernel& kernel) {
         // see detail::install_aur_kernels / the Configure flow), wrapped
         // in build_helper.sh (auto-imports a missing GPG key on
         // "unknown public key" and retries).
-        steps.push_back({KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild", false});
+        steps.push_back({.cmd = KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild", .escalate = false});
     }
     return steps;
 }
@@ -467,7 +467,7 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
         // the paths as found under `dir`, which may itself be relative.
         pacman_cmd += " '" + std::filesystem::absolute(pkg).string() + "'";
     }
-    steps.push_back({pacman_cmd, true});
+    steps.push_back({.cmd = pacman_cmd, .escalate = true});
 
     // The install log (the real runner only — an injected test runner
     // records the raw commands and never touches the filesystem, so it
@@ -491,7 +491,7 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
                                  "Packages: "
             + package_identity(pkgs.front()) + "\n";
         for (std::size_t i = 1; i < pkgs.size(); ++i) {
-            header += ", " + package_identity(pkgs[i]);
+            header += ", " + package_identity(pkgs.at(i));
         }
         header += "\nBootloader: " + bootloader_name(bl) + "\n";
         utils::write_to_file(log_path, header);
@@ -504,7 +504,7 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
     // (via install_logger.sh) AND is the result: 0 = INSTALL_SUCCESS,
     // != 0 = INSTALL_FAILED.
     for (std::size_t i = 0; i < steps.size(); ++i) {
-        const auto& step = steps[i];
+        const auto& step = steps.at(i);
         // Real runner: run the step through the installed
         // install_logger.sh — its output streams to the terminal in
         // real time AND is appended to the log (the command, the start

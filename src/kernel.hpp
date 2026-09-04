@@ -45,7 +45,7 @@ class Kernel {
     explicit Kernel(alpm_handle_t* handle, alpm_pkg_t* pkg, alpm_pkg_t* headers, const std::string_view& repo) : m_name(alpm_pkg_get_name(pkg)), m_repo(repo), m_pkg(pkg), m_headers(headers), m_handle(handle) { }
     explicit Kernel(alpm_handle_t* handle, alpm_pkg_t* pkg, alpm_pkg_t* headers, const std::string_view& repo, const std::string_view& raw) : m_name(alpm_pkg_get_name(pkg)), m_repo(repo), m_raw(raw), m_pkg(pkg), m_headers(headers), m_handle(handle) { }
 
-    constexpr std::string_view category() const noexcept {
+    [[nodiscard]] constexpr std::string_view category() const noexcept {
         using namespace std::string_view_literals;
         constexpr std::string_view lto{"lto"};
         constexpr std::string_view lts{"lts"};
@@ -103,23 +103,23 @@ class Kernel {
     }
     std::string version() noexcept;
 
-    bool is_installed() const noexcept;
-    bool install() const noexcept;
-    bool remove() const noexcept;
+    [[nodiscard]] bool is_installed() const noexcept;
+    [[nodiscard]] bool install() const noexcept;
+    [[nodiscard]] bool remove() const noexcept;
     /* clang-format off */
-    constexpr bool is_update_available() const noexcept
+    [[nodiscard]] constexpr bool is_update_available() const noexcept
     { return m_update; }
 
-    constexpr bool has_pkg() const noexcept { return m_pkg != nullptr; }
+    [[nodiscard]] constexpr bool has_pkg() const noexcept { return m_pkg != nullptr; }
 
-    inline const char* get_raw() const noexcept
+    [[nodiscard]] const char* get_raw() const noexcept
     { return m_raw.c_str(); }
 
-    inline std::string_view get_repo() const noexcept
-    { return m_repo.c_str(); }
+    [[nodiscard]] std::string_view get_repo() const noexcept
+    { return m_repo; }
 
-    inline std::string_view get_installed_db() const noexcept
-    { return m_installed_db.c_str(); }
+    [[nodiscard]] std::string_view get_installed_db() const noexcept
+    { return m_installed_db; }
     /* clang-format on */
 
     static void commit_transaction() noexcept;
@@ -132,10 +132,10 @@ class Kernel {
  private:
     bool m_update{};
 
-    std::string m_name{};
+    std::string m_name;
     std::string m_repo{"local"};
-    std::string m_raw{};
-    std::string m_installed_db{};
+    std::string m_raw;
+    std::string m_installed_db;
 #ifdef ENABLE_AUR_KERNELS
     std::string m_version{};
     std::string m_name_headers{};

@@ -19,7 +19,7 @@
 #ifndef MAINWINDOW_HPP_
 #define MAINWINDOW_HPP_
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic ignored "-Wfloat-conversion"
@@ -27,7 +27,7 @@
 #pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
 #pragma clang diagnostic ignored "-Wdeprecated-enum-enum-conversion"
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuseless-cast"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -50,6 +50,7 @@
 
 #include <array>
 #include <condition_variable>
+#include <cstdint>
 #include <memory>
 #include <thread>
 #include <utility>
@@ -65,36 +66,36 @@
 #include <QThread>
 #include <QTimer>
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
 
 class Work final : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(Work)
 
  public:
     using function_t = std::function<void()>;
     explicit Work(function_t&& func)
       : m_func(std::move(func)) { }
-    ~Work() = default;
+    ~Work() override = default;
 
- public:
     void doHeavyCalculations();
 
  private:
     function_t m_func;
 };
 
-namespace TreeCol {
-enum { Check,
+// Column indices of the kernel tree (a scoped enum: the Qt APIs take
+// int columns, so call sites pass static_cast<int>(TreeCol::…)).
+enum class TreeCol : std::uint8_t { Check,
     PkgName,
     Version,
     Category,
     Install,  // K10: installed-on-system indicator ("✓" / "—") from the alpm local DB, read-only; availability is the context-menu's concern
     Immutable };
-}
 
 class KernelTreeWidgetItem : public QTreeWidgetItem {
  public:
@@ -108,7 +109,7 @@ class MainWindow final : public QMainWindow {
     Q_DISABLE_COPY_MOVE(MainWindow)
  public:
     explicit MainWindow(QWidget* parent = nullptr);
-    ~MainWindow();
+    ~MainWindow() override;
 
  protected:
     void closeEvent(QCloseEvent* event) override;
@@ -142,16 +143,16 @@ class MainWindow final : public QMainWindow {
 
     void init_kernels() noexcept;
 
-    std::atomic_bool m_running{};
+    std::atomic_bool m_running;
     std::atomic_bool m_thread_running{true};
-    std::mutex m_mutex{};
-    std::condition_variable m_cv{};
+    std::mutex m_mutex;
+    std::condition_variable m_cv;
 
-    QStringList m_change_list{};
+    QStringList m_change_list;
 
     QProgressDialog* m_conf_progress_dialog{nullptr};
     QProgressBar* m_conf_progress_bar{nullptr};
-    QFutureWatcher<void> m_future_watcher{};
+    QFutureWatcher<void> m_future_watcher;
 
     QThread* m_worker_th = new QThread(this);
     Work* m_worker{nullptr};

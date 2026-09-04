@@ -19,7 +19,7 @@
 #ifndef CONFOPTIONSPAGE_HPP_
 #define CONFOPTIONSPAGE_HPP_
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic ignored "-Wfloat-conversion"
@@ -27,7 +27,7 @@
 #pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
 #pragma clang diagnostic ignored "-Wdeprecated-enum-enum-conversion"
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuseless-cast"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -43,9 +43,9 @@
 
 #include <QObject>
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
 
@@ -66,7 +66,7 @@ class ConfOptionsPage final : public QWidget {
         m_ui->scroll_area_widgets->setStyleSheet(
             QStringLiteral("#scroll_area_widgets > QWidget:hover { background-color: palette(midlight); border-radius: 4px; }"));
     }
-    ~ConfOptionsPage() = default;
+    ~ConfOptionsPage() override = default;
 
     Ui::ConfOptionsPage* get_ui_obj() noexcept { return m_ui.get(); }
 

@@ -86,10 +86,10 @@
 // (km-window.cpp) routes it to the same MainWindow::on_kernel_context_menu
 // handler a real right-click would trigger, so the probed flow is
 // byte-identical to the user's — with no access-control acrobatics.
-#include "km-window.hpp"     // MainWindow (driven offscreen), TreeCol
-#include "kernel.hpp"        // Kernel::get_kernels (own ground truth)
-#include "known_kernels.hpp" // km::kernel_name_from_raw (row text -> name)
-#include "utils.hpp"         // parse_alpm, release_alpm, alpm_root, alpm_libdir
+#include "kernel.hpp"         // Kernel::get_kernels (own ground truth)
+#include "km-window.hpp"      // MainWindow (driven offscreen), TreeCol
+#include "known_kernels.hpp"  // km::kernel_name_from_raw (row text -> name)
+#include "utils.hpp"          // parse_alpm, release_alpm, alpm_root, alpm_libdir
 
 #include <alpm.h>  // for alpm_*
 
@@ -120,7 +120,7 @@ namespace {
 // window renders equals this literal.
 const QString kDirectoryRow = QStringLiteral("Install from directory…");
 
-int g_failures = 0;
+int g_failures       = 0;
 std::size_t g_checks = 0;
 
 void check(bool condition, const char* what) {
@@ -136,13 +136,13 @@ void check(bool condition, const char* what) {
 // The ground-truth view of one expected kernel row, derived from the
 // harness's own handle (never from the window's internals).
 struct Expected {
-    std::string raw{};         // "repo/name" — must equal the row's PkgName text
-    std::string name{};        // bare kernel name (repo prefix stripped)
-    std::string repo{};        // the row's repo (live: sync-DB name; info: curated install_repo)
-    bool has_pkg = false;      // live (pkg present in a sync DB) vs curated info-row
-    std::string version{};     // Kernel::version() (data layer — asserted on live cell text)
-    bool installed = false;    // direct local-DB probe (the k11 relation)
-    bool repo_enabled = false; // the repo is registered in the own handle's sync DBs
+    std::string raw{};          // "repo/name" — must equal the row's PkgName text
+    std::string name{};         // bare kernel name (repo prefix stripped)
+    std::string repo{};         // the row's repo (live: sync-DB name; info: curated install_repo)
+    bool has_pkg = false;       // live (pkg present in a sync DB) vs curated info-row
+    std::string version{};      // Kernel::version() (data layer — asserted on live cell text)
+    bool installed    = false;  // direct local-DB probe (the k11 relation)
+    bool repo_enabled = false;  // the repo is registered in the own handle's sync DBs
 };
 
 // The km-window.cpp file-local is_repo_in_syncdbs walk, independently
@@ -152,7 +152,7 @@ bool repo_in_syncdbs(alpm_handle_t* handle, std::string_view repo) {
         return false;
     }
     for (alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
-        auto* db = reinterpret_cast<alpm_db_t*>(i->data);
+        auto* db            = reinterpret_cast<alpm_db_t*>(i->data);
         const char* db_name = alpm_db_get_name(db);
         if (db_name != nullptr && repo == db_name) {
             return true;
@@ -186,13 +186,13 @@ int main(int argc, char** argv) {
         auto kernels = Kernel::get_kernels(handle);
         for (auto& k : kernels) {  // version() is non-const (it marks m_update)
             Expected e{};
-            e.raw          = k.get_raw();
-            e.name         = std::string{km::kernel_name_from_raw(k.get_raw())};
-            e.repo         = std::string{k.get_repo()};
-            e.has_pkg      = k.has_pkg();
-            e.version      = k.version();
-            e.installed    = localdb != nullptr && alpm_db_get_pkg(localdb, e.name.c_str()) != nullptr;
-            e.repo_enabled = repo_in_syncdbs(handle, k.get_repo());
+            e.raw                 = k.get_raw();
+            e.name                = std::string{km::kernel_name_from_raw(k.get_raw())};
+            e.repo                = std::string{k.get_repo()};
+            e.has_pkg             = k.has_pkg();
+            e.version             = k.version();
+            e.installed           = localdb != nullptr && alpm_db_get_pkg(localdb, e.name.c_str()) != nullptr;
+            e.repo_enabled        = repo_in_syncdbs(handle, k.get_repo());
             const std::string key = e.name;  // copied before the move below (argument evaluation order)
             std::string dup_msg   = "ground truth: no duplicate kernel name " + key;
             const bool inserted   = expected.emplace(key, std::move(e)).second;
@@ -229,16 +229,16 @@ int main(int argc, char** argv) {
     // ------------------------------------------------------------------
     std::set<std::string> seen_raw{};
     std::set<std::string> covered{};  // expected names with a matching tree row
-    int live_rows     = 0;
-    int info_disabled = 0;
-    int info_enabled  = 0;
-    int directory_rows = 0;
+    int live_rows                    = 0;
+    int info_disabled                = 0;
+    int info_enabled                 = 0;
+    int directory_rows               = 0;
     QTreeWidgetItem* dir_item        = nullptr;  // the directory row (menu probe target)
     QTreeWidgetItem* first_live_item = nullptr;  // first live data row (no-regression menu probe)
 
     for (int r = 0; r < tree->topLevelItemCount(); ++r) {
-        auto* item = tree->topLevelItem(r);
-        const QString pkg_raw = item->text(TreeCol::PkgName);
+        auto* item             = tree->topLevelItem(r);
+        const QString pkg_raw  = item->text(static_cast<int>(TreeCol::PkgName));
         const std::string name = std::string{km::kernel_name_from_raw(pkg_raw.toStdString())};
 
         check(seen_raw.insert(pkg_raw.toStdString()).second, (std::string{"no duplicate PkgName " + pkg_raw.toStdString()}).c_str());
@@ -251,11 +251,11 @@ int main(int argc, char** argv) {
         if (pkg_raw == kDirectoryRow) {
             ++directory_rows;
             check((item->flags() & Qt::ItemIsUserCheckable) != Qt::ItemIsUserCheckable,
-                  "directory row: no ItemIsUserCheckable (no checkbox)");
+                "directory row: no ItemIsUserCheckable (no checkbox)");
             check(!pkg_raw.isEmpty(), "directory row: PkgName non-empty");
-            check(item->toolTip(TreeCol::PkgName).contains(QStringLiteral("right-click")),
-                  "directory row: PkgName tooltip names the right-click flow");
-            auto* dir_widget = tree->itemWidget(item, TreeCol::Check);
+            check(item->toolTip(static_cast<int>(TreeCol::PkgName)).contains(QStringLiteral("right-click")),
+                "directory row: PkgName tooltip names the right-click flow");
+            auto* dir_widget = tree->itemWidget(item, static_cast<int>(TreeCol::Check));
             check(dir_widget != nullptr, "directory row: Check cell has an item widget");
             if (dir_widget != nullptr) {
                 auto* dir_label = qobject_cast<QLabel*>(dir_widget);
@@ -267,12 +267,12 @@ int main(int argc, char** argv) {
                     const bool dir_glyph_visible = !dir_label->pixmap().isNull() || dir_label->text().contains(QStringLiteral("📁"));
                     check(dir_glyph_visible, "directory row: folder glyph visible (pixmap or 📁)");
                     check(dir_label->toolTip().contains(QStringLiteral("right-click")),
-                          "directory row: Check tooltip names the right-click flow");
+                        "directory row: Check tooltip names the right-click flow");
                 }
             }
-            check(item->text(TreeCol::Version) == QStringLiteral("—"), "directory row: Version == —");
-            check(item->text(TreeCol::Category) == QStringLiteral("Local"), "directory row: Category == Local");
-            check(item->text(TreeCol::Install) == QStringLiteral("—"), "directory row: Install == —");
+            check(item->text(static_cast<int>(TreeCol::Version)) == QStringLiteral("—"), "directory row: Version == —");
+            check(item->text(static_cast<int>(TreeCol::Category)) == QStringLiteral("Local"), "directory row: Category == Local");
+            check(item->text(static_cast<int>(TreeCol::Install)) == QStringLiteral("—"), "directory row: Install == —");
             if (dir_item == nullptr) {
                 dir_item = item;
             }
@@ -288,15 +288,15 @@ int main(int argc, char** argv) {
         const Expected& e = it->second;
 
         check(pkg_raw == QString::fromStdString(e.raw), (std::string{"PkgName text == expected raw " + e.raw}).c_str());
-        check(!item->toolTip(TreeCol::PkgName).isEmpty(), (std::string{"PkgName tooltip non-empty on " + e.raw}).c_str());
+        check(!item->toolTip(static_cast<int>(TreeCol::PkgName)).isEmpty(), (std::string{"PkgName tooltip non-empty on " + e.raw}).c_str());
 
         // Regression (the k11 relation): the Installed column is "✓" iff
         // the name is in the local DB (live and info rows alike).
-        const bool installed_cell = item->text(TreeCol::Install) == QStringLiteral("✓");
+        const bool installed_cell = item->text(static_cast<int>(TreeCol::Install)) == QStringLiteral("✓");
         check(installed_cell == e.installed,
-              (std::string{"Installed column "} + (e.installed ? "✓" : "—") + " iff in local DB (" + e.name + ")").c_str());
+            (std::string{"Installed column "} + (e.installed ? "✓" : "—") + " iff in local DB (" + e.name + ")").c_str());
 
-        auto* check_widget = tree->itemWidget(item, TreeCol::Check);
+        auto* check_widget = tree->itemWidget(item, static_cast<int>(TreeCol::Check));
 
         if (e.has_pkg) {
             ++live_rows;
@@ -308,14 +308,14 @@ int main(int argc, char** argv) {
             check((item->flags() & Qt::ItemIsUserCheckable) == Qt::ItemIsUserCheckable, (std::string{"live row: ItemIsUserCheckable (" + e.name + ")"}).c_str());
             // The Version text is kernel.version() (∨/∧ update prefixes
             // tolerated — the data layer itself emits them).
-            QString bare = item->text(TreeCol::Version);
+            QString bare = item->text(static_cast<int>(TreeCol::Version));
             if (bare.startsWith(QStringLiteral("∨"))) {
                 bare = bare.mid(1);
             } else if (bare.startsWith(QStringLiteral("∧"))) {
                 bare = bare.mid(1);
             }
             check(bare == QString::fromStdString(e.version),
-                  (std::string{"live row: Version text == kernel.version() (" + e.name + ": cell " + item->text(TreeCol::Version).toStdString() + ", data " + e.version + ")"}).c_str());
+                (std::string{"live row: Version text == kernel.version() (" + e.name + ": cell " + item->text(static_cast<int>(TreeCol::Version)).toStdString() + ", data " + e.version + ")"}).c_str());
         } else {
             // Info-row: the non-interactive lock QLabel in the Check cell (D3).
             check(check_widget != nullptr, (std::string{"info row: Check cell has an item widget (" + e.name + ")"}).c_str());
@@ -339,14 +339,14 @@ int main(int argc, char** argv) {
             // The Version cell per the D4 annotation.
             if (e.repo_enabled) {
                 ++info_enabled;
-                check(item->text(TreeCol::Version) == QStringLiteral("—"), (std::string{"info row (repo enabled): Version text == bare — (" + e.name + ")"}).c_str());
-                check(item->toolTip(TreeCol::Version).isEmpty(), (std::string{"info row (repo enabled): no Version tooltip (" + e.name + ")"}).c_str());
+                check(item->text(static_cast<int>(TreeCol::Version)) == QStringLiteral("—"), (std::string{"info row (repo enabled): Version text == bare — (" + e.name + ")"}).c_str());
+                check(item->toolTip(static_cast<int>(TreeCol::Version)).isEmpty(), (std::string{"info row (repo enabled): no Version tooltip (" + e.name + ")"}).c_str());
             } else {
                 ++info_disabled;
-                check(item->text(TreeCol::Version) == QStringLiteral("— (repo not enabled)"),
-                      (std::string{"info row (repo disabled): Version text == '— (repo not enabled)' (" + e.name + ")"}).c_str());
+                check(item->text(static_cast<int>(TreeCol::Version)) == QStringLiteral("— (repo not enabled)"),
+                    (std::string{"info row (repo disabled): Version text == '— (repo not enabled)' (" + e.name + ")"}).c_str());
                 const QString expected_ver_tip = QStringLiteral("Version unavailable — repo '%1' is not enabled. Right-click the row to add it.").arg(QString::fromStdString(e.repo));
-                check(item->toolTip(TreeCol::Version) == expected_ver_tip, (std::string{"info row (repo disabled): Version tooltip == D4 text (" + e.name + ")"}).c_str());
+                check(item->toolTip(static_cast<int>(TreeCol::Version)) == expected_ver_tip, (std::string{"info row (repo disabled): Version tooltip == D4 text (" + e.name + ")"}).c_str());
             }
         }
     }
@@ -354,7 +354,7 @@ int main(int argc, char** argv) {
     // Bidirectional coverage: every expected kernel has exactly one data
     // row (the directory row is not a kernel — it was excluded above).
     check(covered.size() == expected.size(),
-          (std::string{"every expected kernel has a tree row (" + std::to_string(covered.size()) + " of " + std::to_string(expected.size()) + ")"}).c_str());
+        (std::string{"every expected kernel has a tree row (" + std::to_string(covered.size()) + " of " + std::to_string(expected.size()) + ")"}).c_str());
 
     // C3: exactly one directory row (the per-row duplicate check above
     // catches a second occurrence — this pins the count).
@@ -363,7 +363,7 @@ int main(int argc, char** argv) {
     // Row count == the data total + the directory row (25 on this machine:
     // 24 data (17 live + 7 info) + 1 directory).
     check(static_cast<std::size_t>(tree->topLevelItemCount()) == expected.size() + std::size_t{1},
-          (std::string{"row count == data rows + directory row (" + std::to_string(tree->topLevelItemCount()) + " = " + std::to_string(expected.size()) + " + 1)"}).c_str());
+        (std::string{"row count == data rows + directory row (" + std::to_string(tree->topLevelItemCount()) + " = " + std::to_string(expected.size()) + " + 1)"}).c_str());
 
     std::printf("INFO: rows=%d total = %d live + %d info disabled-repo + %d info enabled-repo + %d directory\n", tree->topLevelItemCount(), live_rows, info_disabled, info_enabled, directory_rows);
 
@@ -434,7 +434,7 @@ int main(int argc, char** argv) {
         check(dir_probe.actions.size() == std::size_t{1}, "directory row: exactly one context-menu action");
         if (dir_probe.actions.size() == std::size_t{1}) {
             check(dir_probe.actions[0].first == kDirectoryRow.toStdString(),
-                  "directory row: the one action is 'Install from directory…'");
+                "directory row: the one action is 'Install from directory…'");
             check(dir_probe.actions[0].second, "directory row: the one action is enabled");
         }
     }
@@ -448,7 +448,7 @@ int main(int argc, char** argv) {
         if (live_probe.found) {
             const std::size_t live_n = live_probe.actions.size();
             check(live_n >= std::size_t{3} && live_n <= std::size_t{4},
-                  (std::string{"live row: pre-C3 menu shape (3 or 4 actions, got " + std::to_string(live_n) + ")"}).c_str());
+                (std::string{"live row: pre-C3 menu shape (3 or 4 actions, got " + std::to_string(live_n) + ")"}).c_str());
             bool has_dir_action = false;
             for (const auto& a : live_probe.actions) {
                 has_dir_action = has_dir_action || (a.first == kDirectoryRow.toStdString());
@@ -463,15 +463,15 @@ int main(int argc, char** argv) {
     //    "folder" marker).
     // ------------------------------------------------------------------
     for (int r = 0; r < tree->topLevelItemCount(); ++r) {
-        auto* item = tree->topLevelItem(r);
+        auto* item           = tree->topLevelItem(r);
         const bool checkable = (item->flags() & Qt::ItemIsUserCheckable) == Qt::ItemIsUserCheckable;
-        const bool directory = item->text(TreeCol::PkgName) == kDirectoryRow;
+        const bool directory = item->text(static_cast<int>(TreeCol::PkgName)) == kDirectoryRow;
         std::printf("K12-DUMP: %s | %s | %s | %s | %s\n",
-                    item->text(TreeCol::PkgName).toUtf8().constData(),
-                    item->text(TreeCol::Version).toUtf8().constData(),
-                    item->text(TreeCol::Install).toUtf8().constData(),
-                    item->text(TreeCol::Category).toUtf8().constData(),
-                    checkable ? "checkbox" : (directory ? "folder" : "lock"));
+            item->text(static_cast<int>(TreeCol::PkgName)).toUtf8().constData(),
+            item->text(static_cast<int>(TreeCol::Version)).toUtf8().constData(),
+            item->text(static_cast<int>(TreeCol::Install)).toUtf8().constData(),
+            item->text(static_cast<int>(TreeCol::Category)).toUtf8().constData(),
+            checkable ? "checkbox" : (directory ? "folder" : "lock"));
     }
 
     utils::release_alpm(handle, &err);

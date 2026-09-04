@@ -48,7 +48,19 @@ Checks: '-*,
          -readability-magic-numbers,
          -readability-named-parameter,
          -readability-uppercase-literal-suffix,
-         -readability-use-anyofallof'
+          -readability-use-anyofallof'
+# By default clang-tidy reports diagnostics from ALL non-system headers in
+# a translation unit, which drowns the run in third-party and machine
+# output this repo does not own: the CPM/FetchContent deps under
+# build/_deps (fmt, frozen), the Rust cxxbridge header under
+# build/corrosion_generated, build/compile_options.hpp (generated from
+# compile_options.json by mkoptions.py at configure time), and the Qt
+# AUTOUT ui_*.h headers under build/kernel-manager_autogen. Exclude those
+# header paths. The vendored src/ini.hpp is excluded on the same grounds
+# as its clang-format treatment (checks.yml's exclude-regex 'src/ini.hpp'
+# — never reformatted, so never tidied either). Project headers under
+# src/ and the main .cpp files keep their default reporting.
+ExcludeHeaderFilterRegex: '(autogen|_deps|corrosion_generated|compile_options\.hpp|ini\.hpp)'
 FormatStyle: 'file'
 
 WarningsAsErrors: '*'

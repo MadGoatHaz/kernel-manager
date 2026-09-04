@@ -67,8 +67,8 @@ bool read_os_release_key(std::string_view content, std::string_view key, std::st
         const std::string_view line = (end == std::string_view::npos) ? content.substr(pos)
                                                                       : content.substr(pos, end - pos);
         if (line.size() > key.size() + 1
-            && line.compare(0, key.size(), key) == 0
-            && line[key.size()] == '=') {
+            && line.starts_with(key)
+            && line.at(key.size()) == '=') {
             out.assign(clean_value(line.substr(key.size() + 1)));
             return true;
         }
@@ -186,7 +186,7 @@ std::string bls_entries_dir(const std::function<bool(std::string_view)>& path_ex
 }
 
 std::string bls_entries_dir() {
-    std::function<bool(std::string_view)> is_dir = [](std::string_view path) noexcept {
+    const std::function<bool(std::string_view)> is_dir = [](std::string_view path) noexcept {
         std::error_code ec{};
         return std::filesystem::is_directory(path, ec) && !ec;
     };

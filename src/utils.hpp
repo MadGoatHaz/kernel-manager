@@ -27,11 +27,11 @@
 #include <string_view>  // for string_view
 #include <vector>       // for vector
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic ignored "-Wold-style-cast"
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuseless-cast"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -42,9 +42,9 @@
 
 #include <QString>
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
 
@@ -90,8 +90,8 @@ void prepare_build_environment() noexcept;
 // error message explains the failure and the file must be left untouched.
 struct PkgbuildRenameResult {
     bool ok{};
-    std::string error{};
-    std::string new_content{};
+    std::string error;
+    std::string new_content;
 };
 
 // Generic PKGBUILD custom-name handling (no vendor-specific anchors):

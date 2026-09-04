@@ -22,13 +22,14 @@
 #include <QIcon>
 #include <QSharedMemory>
 #include <QTranslator>
-#include <cstdio>
 
-#if defined(__clang__)
+#include <fmt/core.h>
+
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic ignored "-Wimplicit-int-conversion"
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 #pragma GCC diagnostic ignored "-Wconversion"
@@ -36,9 +37,9 @@
 
 #include <QLibraryInfo>
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
 
@@ -129,7 +130,7 @@ auto main(int argc, char** argv) -> std::int32_t {
     QApplication::setDesktopFileName("org.archlinux.KernelManager");
 
     // Set application attributes
-    QApplication app(argc, argv);
+    const QApplication app(argc, argv);
 
     // Window icon from the bundled resource (src/km_icons.qrc): works when
     // running from the build directory, where the .ui <iconset theme=...>
@@ -139,9 +140,9 @@ auto main(int argc, char** argv) -> std::int32_t {
         window_icon.addFile(QStringLiteral(":/km-icons/48x48.png"));
         window_icon.addFile(QStringLiteral(":/km-icons/256x256.png"));
         if (window_icon.isNull()) {
-            std::fprintf(stderr, "[kernel-manager] warning: bundled app icon resource is missing\n");
+            fmt::print(stderr, "[kernel-manager] warning: bundled app icon resource is missing\n");
         }
-        app.setWindowIcon(window_icon);
+        QApplication::setWindowIcon(window_icon);  // Qt6: the icon setter is a static QGuiApplication API
     }
 
     /// 3. Initialization of translations

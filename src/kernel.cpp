@@ -24,6 +24,7 @@
 #include <cstdio>
 
 #include <algorithm>         // for any_of, find_if
+#include <cstdint>           // for uint8_t
 #include <filesystem>        // for exists
 #include <initializer_list>  // for initializer_list
 #include <ranges>            // for ranges::*
@@ -82,7 +83,7 @@ static const bool is_nvidia_card_prebuild_open_module = [] {
 // lookups (sync-DB pairing and installed-family queries) derive from this
 // table; no per-distro package name patterns exist outside of it.
 // ---------------------------------------------------------------------------
-enum class ModuleKind { Zfs,
+enum class ModuleKind : std::uint8_t { Zfs,
     Nvidia,
     NvidiaOpen };
 
@@ -93,19 +94,19 @@ struct KernelModuleSpec {
     ModuleKind kind;
 };
 
-static constexpr KernelModuleSpec kKernelModuleTable[] = {
+constexpr KernelModuleSpec kKernelModuleTable[] = {
     // family-based kernels: modules are suffixed onto the full kernel name
-    {"linux-cachyos", "linux-cachyos", "-zfs", ModuleKind::Zfs},
-    {"linux-cachyos", "linux-cachyos", "-nvidia", ModuleKind::Nvidia},
-    {"linux-cachyos", "linux-cachyos", "-nvidia-open", ModuleKind::NvidiaOpen},
+    {.kernel_base = "linux-cachyos", .module_stem = "linux-cachyos", .module_suffix = "-zfs", .kind = ModuleKind::Zfs},
+    {.kernel_base = "linux-cachyos", .module_stem = "linux-cachyos", .module_suffix = "-nvidia", .kind = ModuleKind::Nvidia},
+    {.kernel_base = "linux-cachyos", .module_stem = "linux-cachyos", .module_suffix = "-nvidia-open", .kind = ModuleKind::NvidiaOpen},
     // generic "linux" family kernels: modules are the stem plus the kernel's
     // suffix (linux -> nvidia, linux-lts -> nvidia-lts, ...)
-    {"linux", "nvidia", "", ModuleKind::Nvidia},
-    {"linux", "nvidia-open", "", ModuleKind::NvidiaOpen},
+    {.kernel_base = "linux", .module_stem = "nvidia", .module_suffix = "", .kind = ModuleKind::Nvidia},
+    {.kernel_base = "linux", .module_stem = "nvidia-open", .module_suffix = "", .kind = ModuleKind::NvidiaOpen},
 };
 
 // Resolve the module package for a kernel name and kind (nullptr when absent).
-static alpm_pkg_t* find_module_pkg(alpm_db_t* db, const std::string& kernel_name, ModuleKind kind) {
+alpm_pkg_t* find_module_pkg(alpm_db_t* db, const std::string& kernel_name, ModuleKind kind) {
     for (const auto& spec : kKernelModuleTable) {
         if (spec.kind != kind || !kernel_name.starts_with(spec.kernel_base)) {
             continue;
@@ -120,7 +121,7 @@ static alpm_pkg_t* find_module_pkg(alpm_db_t* db, const std::string& kernel_name
 
 // Installed-module family regex for a kind, derived from the first (most
 // specific) table row: "^<stem>.*<suffix>$".
-static auto module_family_query(ModuleKind kind) {
+auto module_family_query(ModuleKind kind) {
     for (const auto& spec : kKernelModuleTable) {
         if (spec.kind == kind) {
             return fmt::format(FMT_COMPILE("^{}.*{}$"), spec.module_stem, spec.module_suffix);
@@ -186,12 +187,12 @@ bool Kernel::install() const noexcept {
     }
 
     const bool is_nvidia_dkms_installed = [handle = m_handle] {
-        static constexpr std::string_view NVIDIA_DKMS_PKG = "nvidia-dkms";
-        return alpm_db_get_pkg(alpm_get_localdb(handle), NVIDIA_DKMS_PKG.data()) != nullptr;
+        static constexpr const char* NVIDIA_DKMS_PKG = "nvidia-dkms";
+        return alpm_db_get_pkg(alpm_get_localdb(handle), NVIDIA_DKMS_PKG) != nullptr;
     }();
     const bool is_nvidia_open_dkms_installed = [handle = m_handle] {
-        static constexpr std::string_view NVIDIA_OPEN_DKMS_PKG = "nvidia-open-dkms";
-        return alpm_db_get_pkg(alpm_get_localdb(handle), NVIDIA_OPEN_DKMS_PKG.data()) != nullptr;
+        static constexpr const char* NVIDIA_OPEN_DKMS_PKG = "nvidia-open-dkms";
+        return alpm_db_get_pkg(alpm_get_localdb(handle), NVIDIA_OPEN_DKMS_PKG) != nullptr;
     }();
     const bool dkms_modules_not_installed = (!is_nvidia_dkms_installed && !is_nvidia_open_dkms_installed);
 
@@ -278,7 +279,7 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
 
     auto* dbs      = alpm_get_syncdbs(handle);
     auto* local_db = alpm_get_localdb(handle);
-    for (alpm_list_t* i = dbs; i != nullptr; i = i->next) {
+    for (const alpm_list_t* i = dbs; i != nullptr; i = i->next) {
         static constexpr auto needle = "linux[^ ]*-headers";
         alpm_list_t* needles         = nullptr;
         alpm_list_t* ret_list        = nullptr;
@@ -290,7 +291,7 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
         const char* db_name = alpm_db_get_name(db);
         alpm_db_search(db, needles, &ret_list);
 
-        for (alpm_list_t* j = ret_list; j != nullptr; j = j->next) {
+        for (const alpm_list_t* j = ret_list; j != nullptr; j = j->next) {
             auto* pkg            = reinterpret_cast<alpm_pkg_t*>(j->data);
             std::string pkg_name = alpm_pkg_get_name(pkg);
             const auto& found    = std::ranges::search(pkg_name, ignored_pkg);
@@ -424,7 +425,7 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
         needles = alpm_list_add(needles, const_cast<void*>(reinterpret_cast<const void*>(needle)));
         alpm_db_search(local_db, needles, &ret_list);
 
-        for (alpm_list_t* j = ret_list; j != nullptr; j = j->next) {
+        for (const alpm_list_t* j = ret_list; j != nullptr; j = j->next) {
             auto* pkg         = reinterpret_cast<alpm_pkg_t*>(j->data);
             std::string name  = alpm_pkg_get_name(pkg);
             const auto& found = std::ranges::search(name, ignored_pkg);
@@ -452,7 +453,7 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
             }
 
             auto* local_headers = alpm_db_get_pkg(local_db, name.c_str());
-            kernels.emplace_back(Kernel{handle, local_pkg, local_headers, "local", fmt::format("local/{}", base)});
+            kernels.emplace_back(handle, local_pkg, local_headers, "local", fmt::format("local/{}", base));
         }
 
         alpm_list_free(needles);

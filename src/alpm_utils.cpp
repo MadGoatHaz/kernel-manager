@@ -46,7 +46,7 @@ namespace {
     // guard is the last wall.
     [[gnu::pure]] [[nodiscard]] bool valid_repo_chars(std::string_view repo) noexcept {
         for (const char c : repo) {
-            if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) {
+            if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-') {
                 return false;
             }
         }
@@ -70,7 +70,7 @@ namespace {
 
 alpm_handle_t* parse_alpm(std::string_view root, std::string_view dbpath, alpm_errno_t* err) noexcept {
     // Initialize alpm.
-    alpm_handle_t* alpm_handle = alpm_initialize(root.data(), dbpath.data(), err);
+    alpm_handle_t* alpm_handle = alpm_initialize(std::string{root}.c_str(), std::string{dbpath}.c_str(), err);
     if (alpm_handle == nullptr) {
         return nullptr;
     }
@@ -128,13 +128,13 @@ bool is_package_in_sync_db(alpm_handle_t* handle, std::string_view repo, std::st
     // Locate the sync DB registered under `repo` (parse_alpm registers
     // every non-ignored /etc/pacman.conf section); a missing section means
     // the repo is not added on this system.
-    for (alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
+    for (const alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
         auto* db            = reinterpret_cast<alpm_db_t*>(i->data);
         const char* db_name = alpm_db_get_name(db);
         if (db_name == nullptr || std::string_view{db_name} != repo) {
             continue;
         }
-        return alpm_db_get_pkg(db, pkg.data()) != nullptr;
+        return alpm_db_get_pkg(db, std::string{pkg}.c_str()) != nullptr;
     }
     return false;
 }
