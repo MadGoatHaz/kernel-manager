@@ -18,11 +18,11 @@
 
 #include "distro.hpp"
 
-#include <cctype>       // for tolower
-#include <filesystem>   // for is_directory
-#include <fstream>      // for ifstream
-#include <iterator>     // for istreambuf_iterator
-#include <system_error> // for error_code
+#include <cctype>        // for tolower
+#include <filesystem>    // for is_directory
+#include <fstream>       // for ifstream
+#include <iterator>      // for istreambuf_iterator
+#include <system_error>  // for error_code
 
 namespace {
 
@@ -63,10 +63,9 @@ std::string lower(std::string_view value) {
 bool read_os_release_key(std::string_view content, std::string_view key, std::string& out) {
     size_t pos = 0;
     while (pos <= content.size()) {
-        const size_t end = content.find('\n', pos);
-        const std::string_view line =
-            (end == std::string_view::npos) ? content.substr(pos)
-                                            : content.substr(pos, end - pos);
+        const size_t end            = content.find('\n', pos);
+        const std::string_view line = (end == std::string_view::npos) ? content.substr(pos)
+                                                                      : content.substr(pos, end - pos);
         if (line.size() > key.size() + 1
             && line.compare(0, key.size(), key) == 0
             && line[key.size()] == '=') {
@@ -85,18 +84,18 @@ bool read_os_release_key(std::string_view content, std::string_view key, std::st
 
 std::string distro_name(DistroFamily family) {
     switch (family) {
-        case DistroFamily::ARCH:
-            return "Arch";
-        case DistroFamily::ENDEAVOUROS:
-            return "EndeavourOS";
-        case DistroFamily::MANJARO:
-            return "Manjaro";
-        case DistroFamily::CACHYOS:
-            return "CachyOS";
-        case DistroFamily::GARUDA:
-            return "Garuda";
-        case DistroFamily::UNKNOWN:
-            break;
+    case DistroFamily::ARCH:
+        return "Arch";
+    case DistroFamily::ENDEAVOUROS:
+        return "EndeavourOS";
+    case DistroFamily::MANJARO:
+        return "Manjaro";
+    case DistroFamily::CACHYOS:
+        return "CachyOS";
+    case DistroFamily::GARUDA:
+        return "Garuda";
+    case DistroFamily::UNKNOWN:
+        break;
     }
     return "Unknown";
 }
@@ -134,9 +133,8 @@ DistroFamily detect_distro(const DistroProbe& probe) {
     if (read_os_release_key(content, "ID_LIKE", id_like)) {
         std::string_view rest = id_like;
         while (!rest.empty()) {
-            const size_t space = rest.find(' ');
-            const std::string_view token =
-                (space == std::string_view::npos) ? rest : rest.substr(0, space);
+            const size_t space           = rest.find(' ');
+            const std::string_view token = (space == std::string_view::npos) ? rest : rest.substr(0, space);
             if (lower(token) == "arch") {
                 return DistroFamily::ARCH;
             }

@@ -88,10 +88,10 @@ class ConfWindow final : public QMainWindow {
     // preserved while the user stays on that kernel.
     void apply_source_for_kernel(std::string_view kernel_name) noexcept;
 
-    protected:
+ protected:
     void closeEvent(QCloseEvent* event) override;
 
-    private:
+ private:
     void on_cancel() noexcept;
     void on_execute() noexcept;
     void on_save() noexcept;

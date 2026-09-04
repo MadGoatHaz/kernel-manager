@@ -28,7 +28,10 @@
 // the injected BootloaderProbe, so unit tests drive it with fakes (no
 // filesystem, no command probes); detect_bootloader() wires the real
 // std::filesystem + `command -v` probes.
-enum class Bootloader { UKI, SYSTEMD_BOOT, GRUB, UNKNOWN };
+enum class Bootloader { UKI,
+    SYSTEMD_BOOT,
+    GRUB,
+    UNKNOWN };
 
 // Human-readable name of a detected bootloader (UI-facing text).
 [[gnu::pure]] std::string bootloader_name(Bootloader bl);
@@ -37,9 +40,9 @@ enum class Bootloader { UKI, SYSTEMD_BOOT, GRUB, UNKNOWN };
 // one question the heuristics ask; an unbound (empty) predicate
 // contributes no signal, so a partially populated probe is safe.
 struct BootloaderProbe {
-    std::function<bool(std::string_view path)> path_exists;     // file or directory exists
-    std::function<bool(std::string_view cmd)> command_exists;   // command on PATH (`command -v`)
-    std::function<bool(std::string_view dir)> dir_has_uki;      // a regular *.efi file in dir
+    std::function<bool(std::string_view path)> path_exists;    // file or directory exists
+    std::function<bool(std::string_view cmd)> command_exists;  // command on PATH (`command -v`)
+    std::function<bool(std::string_view dir)> dir_has_uki;     // a regular *.efi file in dir
 };
 
 // Pure detection (first match wins): UKI > systemd-boot > GRUB > UNKNOWN.

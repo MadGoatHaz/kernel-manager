@@ -48,9 +48,9 @@
 #include <QShortcut>
 #include <QStatusBar>
 #include <QTextEdit>
-#include <QVBoxLayout>
 #include <QTimer>
 #include <QTreeWidgetItem>
+#include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrent>
 
 namespace fs = std::filesystem;
@@ -116,7 +116,7 @@ bool is_repo_in_syncdbs(alpm_handle_t* handle, std::string_view repo) {
         return false;
     }
     for (alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
-        auto* db = reinterpret_cast<alpm_db_t*>(i->data);
+        auto* db            = reinterpret_cast<alpm_db_t*>(i->data);
         const char* db_name = alpm_db_get_name(db);
         if (db_name == nullptr) {
             continue;
@@ -161,11 +161,7 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         // the PkgName tooltip below and the Version annotation (no second
         // is_repo_in_syncdbs call per row).
         const bool repo_enabled = is_repo_in_syncdbs(handle, kernel.get_repo());
-        widget_item->setToolTip(TreeCol::PkgName, kernel.has_pkg()
-                ? base_tooltip
-                : base_tooltip + (repo_enabled
-                        ? QStringLiteral(" — not in the '%1' DB (pacman -Sy)").arg(QString::fromStdString(std::string{kernel.get_repo()}))
-                        : QStringLiteral(" — repo '%1' not enabled (add it to /etc/pacman.conf)").arg(QString::fromStdString(std::string{kernel.get_repo()}))));
+        widget_item->setToolTip(TreeCol::PkgName, kernel.has_pkg() ? base_tooltip : base_tooltip + (repo_enabled ? QStringLiteral(" — not in the '%1' DB (pacman -Sy)").arg(QString::fromStdString(std::string{kernel.get_repo()})) : QStringLiteral(" — repo '%1' not enabled (add it to /etc/pacman.conf)").arg(QString::fromStdString(std::string{kernel.get_repo()}))));
         // D4 (plan v1.23.0): widget-level Version annotation. An info-row
         // (m_pkg == nullptr) whose repo is absent from the handle's sync DBs
         // — i.e. not enabled — shows "— (repo not enabled)" plus a
@@ -180,13 +176,9 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         // the bare "—"; the annotation only appears on rows that were
         // already "—", so relative row order is unchanged and the
         // comparator stays untouched.
-        widget_item->setText(TreeCol::Version, kernel.has_pkg()
-                ? QString::fromStdString(kernel.version())
-                : (repo_enabled ? QStringLiteral("—") : QStringLiteral("— (repo not enabled)")));
+        widget_item->setText(TreeCol::Version, kernel.has_pkg() ? QString::fromStdString(kernel.version()) : (repo_enabled ? QStringLiteral("—") : QStringLiteral("— (repo not enabled)")));
         if (!kernel.has_pkg() && !repo_enabled) {
-            widget_item->setToolTip(TreeCol::Version, QStringLiteral(
-                        "Version unavailable — repo '%1' is not enabled. Right-click the row to add it.")
-                        .arg(QString::fromStdString(std::string{kernel.get_repo()})));
+            widget_item->setToolTip(TreeCol::Version, QStringLiteral("Version unavailable — repo '%1' is not enabled. Right-click the row to add it.").arg(QString::fromStdString(std::string{kernel.get_repo()})));
         }
         widget_item->setText(TreeCol::Category, QString::fromStdString(std::string{kernel.category()}));
         // E14: installed-on-system indicator (D4): "✓" when the package is
@@ -231,7 +223,7 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
             lock->setToolTip((repo_enabled
                     ? QStringLiteral("Not in the '%1' DB — run `pacman -Sy`")
                     : QStringLiteral("Repo '%1' not enabled — right-click the row to add it"))
-                    .arg(QString::fromStdString(std::string{kernel.get_repo()})));
+                                 .arg(QString::fromStdString(std::string{kernel.get_repo()})));
             tree_kernels->setItemWidget(widget_item, TreeCol::Check, lock);
         }
         if (kernel.is_installed()) {
@@ -275,7 +267,7 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
     // theme icon resolves; offscreen has no icon theme, so the emoji is the
     // common case there).
     auto* dir_check = new QLabel(tree_kernels);
-    auto dir_icon = QIcon::fromTheme(QStringLiteral("folder-open"));
+    auto dir_icon   = QIcon::fromTheme(QStringLiteral("folder-open"));
     if (dir_icon.isNull()) {
         dir_icon = QIcon::fromTheme(QStringLiteral("folder"));
     }
@@ -336,7 +328,7 @@ void show_boot_instructions(QWidget* parent, const std::vector<std::string>& ins
 // build-only graceful failure — the reason is in the result's `error`).
 struct VerdictDialogSpec {
     InstallVerdict verdict = InstallVerdict::INSTALL_FAILED;
-    int rc = -1;
+    int rc                 = -1;
 };
 
 // The dialog a verdict produces: the icon (green/red) + the full text.
@@ -730,7 +722,7 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
     if (auto e = km::find_kernel(name)) {
         const KnownKernel* k = *e;
         if (utils::classify_repo(k->install_repo) == utils::PackageSource::PACMAN_REPO && !utils::is_repo_enabled(k->install_repo)) {
-            repo_to_add = k->install_repo;
+            repo_to_add     = k->install_repo;
             add_repo_action = menu.addAction(tr("Add repo '%1'").arg(QString::fromStdString(repo_to_add)));
         }
     }
@@ -764,18 +756,18 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
         if (const auto entry = km::find_kernel(name); entry.has_value()) {
             kernel = **entry;
         } else {
-            kernel.name = name;
-            kernel.default_source = name;
-            kernel.install_package = name;
-            kernel.install_repo = "";
+            kernel.name                  = name;
+            kernel.default_source        = name;
+            kernel.install_package       = name;
+            kernel.install_repo          = "";
             kernel.precompiled_available = false;
-            kernel.buildable = true;
+            kernel.buildable             = true;
         }
         const InstallKernelResult result = install_kernel(kernel);
 
         VerdictDialogSpec spec{};
         spec.verdict = result.verdict;
-        spec.rc = result.rc;
+        spec.rc      = result.rc;
         const auto d = verdict_dialog(spec);
 
         // Raise + activate BEFORE the modal (H1): after the synchronous
@@ -830,7 +822,8 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
             // /etc/pacman.conf.
             QMessageBox::critical(this, tr("Failed"),
                 tr("Failed to enable repository '%1' (exit code %2). Check the terminal output.")
-                    .arg(repo).arg(rc));
+                    .arg(repo)
+                    .arg(rc));
         }
         return;
     }
@@ -874,7 +867,7 @@ void MainWindow::on_install_from_directory() noexcept {
     // text; the terminal output is the detail record).
     VerdictDialogSpec spec{};
     spec.verdict = r.verdict;
-    spec.rc = r.rc;
+    spec.rc      = r.rc;
     const auto d = verdict_dialog(spec);
 
     // Raise + activate BEFORE the modal (H1): after the synchronous

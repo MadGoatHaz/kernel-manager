@@ -208,8 +208,8 @@ inline void set_checkstate(QCheckBox* checkbox, bool is_checked) noexcept {
 }
 
 struct CheckboxBinding {
-    QCheckBox* Ui::ConfOptionsPage::* widget;
-    bool ConfigOptions::* config_field;
+    QCheckBox* Ui::ConfOptionsPage::*widget;
+    bool ConfigOptions::*config_field;
     std::string_view build_var;
 };
 
@@ -229,7 +229,7 @@ inline constexpr std::array<CheckboxBinding, 11> checkbox_bindings{{
 
 // Option rows of the Configure page mapped to their per-repo option key, so
 // the visible option set can follow the selected build source.
-inline constexpr std::array<std::pair<std::string_view, QWidget* Ui::ConfOptionsPage::*>, 17> option_row_bindings{{
+inline constexpr std::array<std::pair<std::string_view, QWidget * Ui::ConfOptionsPage::*>, 17> option_row_bindings{{
     {"hardly", &Ui::ConfOptionsPage::hardly_widget},
     {"per_gov", &Ui::ConfOptionsPage::perfgovern_widget},
     {"tcp_bbr3", &Ui::ConfOptionsPage::tcpbbr_widget},
@@ -686,7 +686,7 @@ void ConfWindow::run_cmd_async(std::string cmd, const std::string& working_path,
     // done-status poll is running (the post-build pacman -U) must not leave
     // a stale timer aimed at the old build dir.
     m_done_status_timer.stop();
-    m_expect_done = expect_done;
+    m_expect_done    = expect_done;
     m_last_helper_rc = 0;
 
     using namespace std::string_literals;
@@ -721,7 +721,7 @@ void ConfWindow::run_cmd_async(std::string cmd, const std::string& working_path,
 }
 
 void ConfWindow::finished_proc(int exit_code, QProcess::ExitStatus) noexcept {
-    m_running = false;
+    m_running        = false;
     m_last_helper_rc = exit_code;
 
     // The terminal-helper's lifetime equals the launched command's lifetime
@@ -769,9 +769,9 @@ void ConfWindow::handle_build_done() noexcept {
     // notify-send — the same tool the terminal-helper uses for its own
     // notifications.
     QProcess::startDetached("notify-send",
-                            {"--app-name=Kernel Manager",
-                             "Kernel build finished",
-                             "Do you want to install build packages?"});
+        {"--app-name=Kernel Manager",
+            "Kernel build finished",
+            "Do you want to install build packages?"});
 
     auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Do you want to install build packages?"));
     if (res == QMessageBox::Yes) {
@@ -781,10 +781,10 @@ void ConfWindow::handle_build_done() noexcept {
         // Absolute paths: the pkexec'd root shell (escalate=true) starts in $HOME, so a
         // bare glob would expand against the wrong directory and match nothing.
         auto pkg_globs = pkg_glob_list
-                         | std::ranges::views::transform(
-                               [d = m_build_conf_path](const auto& g) { return d + "/" + g; })
-                         | std::ranges::views::join_with(' ')
-                         | std::ranges::to<std::string>();
+            | std::ranges::views::transform(
+                [d = m_build_conf_path](const auto& g) { return d + "/" + g; })
+            | std::ranges::views::join_with(' ')
+            | std::ranges::to<std::string>();
         auto pacman_cmd = fmt::format(FMT_COMPILE("pacman -U {}"), pkg_globs);
 
         fmt::print("pacman_cmd := {}\n", pacman_cmd);
@@ -838,7 +838,7 @@ std::string ConfWindow::get_all_set_values() const noexcept {
     // entirely; emitted values pass through the generated value translation
     // (xformed_value), which may also withhold an unbuildable value.
     const std::string repo_key = normalize_repo_key(utils::build_source_repo());
-    const auto map = detail::resolve_option_map(repo_key);
+    const auto map             = detail::resolve_option_map(repo_key);
 
     // checkboxes values,
     // which becomes enabled with any value passed,
@@ -933,7 +933,7 @@ void ConfWindow::sync_build_source() noexcept {
 // source field (unknown sources fall back to the generic reduced set).
 void ConfWindow::update_option_set() noexcept {
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    const auto map = detail::resolve_option_map(normalize_repo_key(effective_build_source()));
+    const auto map            = detail::resolve_option_map(normalize_repo_key(effective_build_source()));
     for (const auto& [option_key, row] : option_row_bindings) {
         (options_page_ui_obj->*row)->setVisible(option_build_var(map, option_key).has_value());
     }

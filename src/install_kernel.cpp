@@ -18,19 +18,19 @@
 
 #include "install_kernel.hpp"
 
-#include "aur_kernel.hpp"        // for detail::install_aur_kernels (the AUR build path)
-#include "boot_instructions.hpp" // for instructions_for
-#include "utils.hpp"             // for runCmdTerminal (default runner), exec (paru probe + .PKGINFO)
+#include "aur_kernel.hpp"         // for detail::install_aur_kernels (the AUR build path)
+#include "boot_instructions.hpp"  // for instructions_for
+#include "utils.hpp"              // for runCmdTerminal (default runner), exec (paru probe + .PKGINFO)
 
-#include <algorithm>    // for ranges::sort
-#include <ctime>        // for time, localtime_r, strftime (install log timestamps)
-#include <filesystem>   // for directory_iterator, path, absolute
-#include <fstream>      // for ofstream (install log appends)
-#include <string>       // for string, to_string
-#include <string_view>  // for string_view
-#include <system_error> // for error_code
-#include <utility>      // for move
-#include <vector>       // for vector
+#include <algorithm>     // for ranges::sort
+#include <ctime>         // for time, localtime_r, strftime (install log timestamps)
+#include <filesystem>    // for directory_iterator, path, absolute
+#include <fstream>       // for ofstream (install log appends)
+#include <string>        // for string, to_string
+#include <string_view>   // for string_view
+#include <system_error>  // for error_code
+#include <utility>       // for move
+#include <vector>        // for vector
 
 #include <fmt/compile.h>
 #include <fmt/core.h>
@@ -50,7 +50,7 @@ int run_real_command(const std::string& cmd, bool escalate) noexcept {
 // tail), so this classifies all of them.
 [[gnu::pure]] bool is_package_install_step(const std::string& cmd) {
     return cmd.starts_with("pacman ") || cmd.starts_with("paru ") || cmd.starts_with("makepkg ")
-           || cmd.starts_with(KM_HELPER_DIR "/build_helper.sh");
+        || cmd.starts_with(KM_HELPER_DIR "/build_helper.sh");
 }
 
 // Shell-quote a string for embedding in the terminal command line: wrap
@@ -120,7 +120,7 @@ std::string pkginfo_field(std::string_view content, std::string_view key) {
 // first so the label names the inner command ("pacman -Q",
 // "command -v"), not the wrapper.
 std::string short_label(std::string_view cmd) {
-    std::string_view inner = cmd;
+    std::string_view inner                 = cmd;
     constexpr std::string_view kShcWrapper = "sh -c '";
     if (inner.starts_with(kShcWrapper) && inner.ends_with('\'') && inner.size() > kShcWrapper.size() + 1) {
         inner = inner.substr(kShcWrapper.size(), inner.size() - kShcWrapper.size() - 1);
@@ -148,10 +148,10 @@ LogTimestamps format_log_times(std::time_t t) {
     std::tm tm{};
     localtime_r(&t, &tm);
     char buf[64]{};
-    const std::size_t n_file = std::strftime(buf, sizeof buf, "%Y%m%d-%H%M%S", &tm);
-    ts.file = {buf, n_file};
+    const std::size_t n_file  = std::strftime(buf, sizeof buf, "%Y%m%d-%H%M%S", &tm);
+    ts.file                   = {buf, n_file};
     const std::size_t n_human = std::strftime(buf, sizeof buf, "%Y-%m-%d %H:%M:%S", &tm);
-    ts.human = {buf, n_human};
+    ts.human                  = {buf, n_human};
     return ts;
 }
 
@@ -233,9 +233,8 @@ InstallKernelResult install_kernel(const KnownKernel& kernel, CommandRunner runn
         // A buildable-only kernel: there is no precompiled package to
         // install; the Build-custom (Configure) flow is the install
         // path (fail gracefully, run nothing).
-        result.ok = false;
-        result.error = "No precompiled package for '" + kernel.name +
-                       "'; use the Build-custom (Configure) flow to build it";
+        result.ok    = false;
+        result.error = "No precompiled package for '" + kernel.name + "'; use the Build-custom (Configure) flow to build it";
         return result;
     }
 
@@ -268,8 +267,8 @@ InstallKernelResult install_kernel(const KnownKernel& kernel, CommandRunner runn
             // improvement — it would need an rc-returning
             // install_aur_kernels.)
             result.verdict = InstallVerdict::INSTALL_FAILED;
-            result.ok = false;
-            result.error = "AUR build + install ran via the build path (makepkg -sicf); this flow does not capture its exit code — check the terminal output";
+            result.ok      = false;
+            result.error   = "AUR build + install ran via the build path (makepkg -sicf); this flow does not capture its exit code — check the terminal output";
             return result;
         }
     }
@@ -282,16 +281,16 @@ InstallKernelResult install_kernel(const KnownKernel& kernel, CommandRunner runn
     // it does not verify.
     for (const auto& step : steps) {
         const int rc = runner(step.cmd, step.escalate);
-        result.rc = rc;
+        result.rc    = rc;
         if (rc == 0) {
             result.verdict = InstallVerdict::INSTALL_SUCCESS;
-            result.ok = true;
+            result.ok      = true;
         } else {
             // The install command itself failed (a missing/disabled
             // repo, an unresolved conflict, a Polkit denial).
             result.verdict = InstallVerdict::INSTALL_FAILED;
-            result.ok = false;
-            result.error = "Command failed (exit code " + std::to_string(rc) + "): " + step.cmd;
+            result.ok      = false;
+            result.error   = "Command failed (exit code " + std::to_string(rc) + "): " + step.cmd;
             return result;  // the remaining steps are skipped; graceful, never a crash
         }
     }
@@ -309,25 +308,24 @@ InstallPlan plan_install(std::string_view kernel_name) {
     if (const auto entry = km::find_kernel(name); entry.has_value()) {
         kernel = **entry;  // find_kernel hands out optional<const KnownKernel*>
     } else {
-        kernel.name = name;
-        kernel.default_source = name;
-        kernel.install_package = name;
-        kernel.install_repo = "";
+        kernel.name                  = name;
+        kernel.default_source        = name;
+        kernel.install_package       = name;
+        kernel.install_repo          = "";
         kernel.precompiled_available = false;
-        kernel.buildable = true;
+        kernel.buildable             = true;
     }
 
     InstallPlan plan{};
-    plan.kernel = name;
-    plan.package = kernel.install_package;
-    plan.repo = kernel.install_repo;
+    plan.kernel      = name;
+    plan.package     = kernel.install_package;
+    plan.repo        = kernel.install_repo;
     plan.precompiled = kernel.precompiled_available && !kernel.install_package.empty();
 
     if (!plan.precompiled) {
         // No precompiled package: the plan carries no commands, only the
         // note pointing at the Build-custom flow.
-        plan.note = "No precompiled package for '" + name +
-                    "'; use the Build-custom (Configure) flow to build it";
+        plan.note = "No precompiled package for '" + name + "'; use the Build-custom (Configure) flow to build it";
         return plan;
     }
 
@@ -350,15 +348,15 @@ bool execute_plan(const InstallPlan& plan, std::string& error_out, CommandRunner
     // data) and delegate to install_kernel() — one execution path,
     // per-step escalation flags and the AUR parity included.
     KnownKernel kernel{};
-    kernel.name = plan.kernel;
-    kernel.default_source = plan.kernel;
-    kernel.install_package = plan.package;
-    kernel.install_repo = plan.repo;
+    kernel.name                  = plan.kernel;
+    kernel.default_source        = plan.kernel;
+    kernel.install_package       = plan.package;
+    kernel.install_repo          = plan.repo;
     kernel.precompiled_available = plan.precompiled;
-    kernel.buildable = true;
+    kernel.buildable             = true;
 
     const InstallKernelResult result = install_kernel(kernel, std::move(runner));
-    error_out = result.error;
+    error_out                        = result.error;
     return result.ok;
 }
 
@@ -401,8 +399,8 @@ bool read_pkginfo(const std::filesystem::path& pkg, std::string& name_out, std::
     }
     const auto pkgver = pkginfo_field(content, "pkgver");
     const auto pkgrel = pkginfo_field(content, "pkgrel");  // optional in the format: a missing one degrades to the bare pkgver
-    name_out = name;
-    version_out = pkgver + (pkgrel.empty() ? "" : "-" + pkgrel);
+    name_out          = name;
+    version_out       = pkgver + (pkgrel.empty() ? "" : "-" + pkgrel);
     return true;
 }
 
@@ -413,7 +411,7 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
     // and the runner is never called (zero commands, no terminal).
     const auto pkgs = list_local_packages(dir);
     if (pkgs.empty()) {
-        result.ok = false;
+        result.ok    = false;
         result.error = "no *.pkg.tar.zst packages found in '" + std::string{dir} + "'";
         return result;  // boot_instructions stays empty: there is no kernel to point at
     }
@@ -431,14 +429,14 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
         std::string pkg_name{};
         std::string pkg_version{};
         if (read_pkginfo(pkg, pkg_name, pkg_version) && !pkg_name.ends_with("-headers")) {
-            name = pkg_name;
+            name    = pkg_name;
             version = pkg_version;
             break;
         }
     }
     if (name.empty()) {
         const auto filename = pkgs.front().filename().string();
-        name = filename.substr(0, filename.size() - kPkgSuffix.size());
+        name                = filename.substr(0, filename.size() - kPkgSuffix.size());
     }
 
     // The boot-selection steps describe the detected bootloader + the
@@ -446,8 +444,8 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
     // (the install_kernel pattern) so the caller can show them even
     // after a failure.
     result.boot_instructions = instructions_for(bl, name);
-    result.name = name;
-    result.version = version;
+    result.name              = name;
+    result.version           = version;
 
     const bool use_default_runner = !runner;
     if (!runner) {
@@ -483,12 +481,15 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
         const auto log_dir = utils::fix_path("~/.cache/kernel-manager");
         std::error_code ec{};
         std::filesystem::create_directories(log_dir, ec);
-        const auto ts = format_log_times(std::time(nullptr));
-        log_path = (std::filesystem::path{log_dir} / ("install-" + ts.file + ".log")).string();
+        const auto ts      = format_log_times(std::time(nullptr));
+        log_path           = (std::filesystem::path{log_dir} / ("install-" + ts.file + ".log")).string();
         std::string header = "=== Kernel Manager Install Log ===\n"
-                             "Date: " + ts.human + "\n"
-                             "Source: " + std::string{dir} + "\n"
-                             "Packages: " + package_identity(pkgs.front()) + "\n";
+                             "Date: "
+            + ts.human + "\n"
+                         "Source: "
+            + std::string{dir} + "\n"
+                                 "Packages: "
+            + package_identity(pkgs.front()) + "\n";
         for (std::size_t i = 1; i < pkgs.size(); ++i) {
             header += ", " + package_identity(pkgs[i]);
         }
@@ -516,10 +517,10 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
         std::string cmd = step.cmd;
         if (use_default_runner) {
             const std::string label = "Step " + std::to_string(i + 1) + "/" + std::to_string(steps.size()) + ": " + short_label(cmd);
-            cmd = KM_HELPER_DIR "/install_logger.sh " + shell_quote(log_path) + " " + shell_quote(label) + " " + shell_quote(cmd);
+            cmd                     = KM_HELPER_DIR "/install_logger.sh " + shell_quote(log_path) + " " + shell_quote(label) + " " + shell_quote(cmd);
         }
         const int rc = runner(cmd, step.escalate);
-        result.rc = rc;
+        result.rc    = rc;
         if (rc == 0) {
             // Installed: the package is in the local DB and the
             // distro's ALPM hooks did the post-install work inside the
@@ -527,7 +528,7 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
             // sentinel-captured real exit code (H3 closed by the
             // sentinel, chunk D).
             result.verdict = InstallVerdict::INSTALL_SUCCESS;
-            result.ok = true;
+            result.ok      = true;
             if (use_default_runner) {
                 append_log(log_path, "=== Result: SUCCESS ===");
             }
@@ -535,11 +536,10 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
             // The pacman -U itself failed (a broken package, an
             // unresolved conflict, a Polkit denial).
             result.verdict = InstallVerdict::INSTALL_FAILED;
-            result.ok = false;
-            result.error = "Command failed (exit code " + std::to_string(rc) + "): " + step.cmd;
+            result.ok      = false;
+            result.error   = "Command failed (exit code " + std::to_string(rc) + "): " + step.cmd;
             if (use_default_runner) {
-                append_log(log_path, "=== Result: FAILED (step " + std::to_string(i + 1) + ": " + short_label(step.cmd)
-                                     + ", exit code " + std::to_string(rc) + ") ===");
+                append_log(log_path, "=== Result: FAILED (step " + std::to_string(i + 1) + ": " + short_label(step.cmd) + ", exit code " + std::to_string(rc) + ") ===");
             }
             return result;  // the remaining steps are skipped; graceful, never a crash
         }

@@ -28,7 +28,12 @@
 // ID_LIKE). kernel-manager's domain is the pacman/libalpm family, so
 // non-Arch distributions (fedora, debian, gentoo, ...) are UNKNOWN —
 // correctly out of scope, not a detection failure.
-enum class DistroFamily { ARCH, ENDEAVOUROS, MANJARO, CACHYOS, GARUDA, UNKNOWN };
+enum class DistroFamily { ARCH,
+    ENDEAVOUROS,
+    MANJARO,
+    CACHYOS,
+    GARUDA,
+    UNKNOWN };
 
 // Human-readable name of a detected family (UI-facing text, the
 // bootloader_name() analog).
