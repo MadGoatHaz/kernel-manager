@@ -167,6 +167,10 @@ if(WITH_SCX_MANAGER)
     target_compile_definitions(${PROJECT_NAME} PRIVATE WITH_SCX_MANAGER=1)
 endif()
 
+# Expose the project version to the app for the UI version display (window
+# title + status bar), so the running build is easy to identify.
+target_compile_definitions(${PROJECT_NAME} PRIVATE APP_VERSION="${PROJECT_VERSION}")
+
 # Link this 'library' to use the warnings specified in CompilerWarnings.cmake
 add_library(project_warnings INTERFACE)
 set_project_warnings(project_warnings)

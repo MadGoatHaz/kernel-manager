@@ -65,10 +65,21 @@ if [[ -z "${MOC_KM_WINDOW}" || -z "${MOC_CONF_WINDOW}" || -z "${MOC_CONF_OPTIONS
     exit 1
 fi
 
+# The app reads its version from the APP_VERSION compile definition (CMake
+# exposes project VERSION to km-window.cpp). Derive the same value from
+# CMakeLists.txt (the single source of truth) so the standalone compile
+# matches the CMake build.
+APP_VERSION="$(sed -n 's/^ *VERSION \([0-9][0-9.]*\).*$/\1/p' "$ROOT/CMakeLists.txt" | head -n1)"
+if [[ -z "$APP_VERSION" ]]; then
+    echo "error: could not derive APP_VERSION from CMakeLists.txt (project VERSION line)" >&2
+    exit 1
+fi
+
 OUT="/tmp/km-test-k12"
 LOG="/tmp/km-test-k12-build.log"
 
 /usr/bin/c++ \
+    -DAPP_VERSION=\"$APP_VERSION\" \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_DISABLE_DEPRECATED_BEFORE=0x050F00 -DQT_GUI_LIB -DQT_NO_DEBUG -DQT_WIDGETS_LIB \
