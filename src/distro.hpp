@@ -19,6 +19,7 @@
 #ifndef DISTRO_HPP
 #define DISTRO_HPP
 
+#include <cstdint>      // for uint8_t
 #include <functional>   // for function
 #include <string>       // for string
 #include <string_view>  // for string_view
@@ -28,7 +29,7 @@
 // ID_LIKE). kernel-manager's domain is the pacman/libalpm family, so
 // non-Arch distributions (fedora, debian, gentoo, ...) are UNKNOWN —
 // correctly out of scope, not a detection failure.
-enum class DistroFamily { ARCH,
+enum class DistroFamily : std::uint8_t { ARCH,
     ENDEAVOUROS,
     MANJARO,
     CACHYOS,

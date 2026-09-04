@@ -53,8 +53,6 @@
 #include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrent>
 
-namespace fs = std::filesystem;
-
 namespace {
 // D1 (plan v1.24.0): the single identity constant for the "Install from
 // directory…" pseudo-row — file-scope (visible to init_kernels_tree_widget
@@ -115,7 +113,7 @@ bool is_repo_in_syncdbs(alpm_handle_t* handle, std::string_view repo) {
     if (handle == nullptr) {
         return false;
     }
-    for (alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
+    for (const alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
         auto* db            = reinterpret_cast<alpm_db_t*>(i->data);
         const char* db_name = alpm_db_get_name(db);
         if (db_name == nullptr) {
@@ -144,8 +142,8 @@ bool is_precompiled_available_live(const std::string& name) {
 void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kernels, alpm_handle_t* handle) noexcept {
     for (auto& kernel : kernels) {
         auto* widget_item = new KernelTreeWidgetItem(tree_kernels);
-        widget_item->setCheckState(TreeCol::Check, Qt::Unchecked);
-        widget_item->setText(TreeCol::PkgName, kernel.get_raw());
+        widget_item->setCheckState(static_cast<int>(TreeCol::Check), Qt::Unchecked);
+        widget_item->setText(static_cast<int>(TreeCol::PkgName), kernel.get_raw());
         // Hover tooltip on the PkgName: what this kernel is and who it's
         // for. description_for() accepts the repo-prefixed raw name and
         // always returns a non-empty string (curated entry or a synthesized
@@ -161,7 +159,7 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         // the PkgName tooltip below and the Version annotation (no second
         // is_repo_in_syncdbs call per row).
         const bool repo_enabled = is_repo_in_syncdbs(handle, kernel.get_repo());
-        widget_item->setToolTip(TreeCol::PkgName, kernel.has_pkg() ? base_tooltip : base_tooltip + (repo_enabled ? QStringLiteral(" — not in the '%1' DB (pacman -Sy)").arg(QString::fromStdString(std::string{kernel.get_repo()})) : QStringLiteral(" — repo '%1' not enabled (add it to /etc/pacman.conf)").arg(QString::fromStdString(std::string{kernel.get_repo()}))));
+        widget_item->setToolTip(static_cast<int>(TreeCol::PkgName), kernel.has_pkg() ? base_tooltip : base_tooltip + (repo_enabled ? QStringLiteral(" — not in the '%1' DB (pacman -Sy)").arg(QString::fromStdString(std::string{kernel.get_repo()})) : QStringLiteral(" — repo '%1' not enabled (add it to /etc/pacman.conf)").arg(QString::fromStdString(std::string{kernel.get_repo()}))));
         // D4 (plan v1.23.0): widget-level Version annotation. An info-row
         // (m_pkg == nullptr) whose repo is absent from the handle's sync DBs
         // — i.e. not enabled — shows "— (repo not enabled)" plus a
@@ -176,11 +174,23 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         // the bare "—"; the annotation only appears on rows that were
         // already "—", so relative row order is unchanged and the
         // comparator stays untouched.
-        widget_item->setText(TreeCol::Version, kernel.has_pkg() ? QString::fromStdString(kernel.version()) : (repo_enabled ? QStringLiteral("—") : QStringLiteral("— (repo not enabled)")));
-        if (!kernel.has_pkg() && !repo_enabled) {
-            widget_item->setToolTip(TreeCol::Version, QStringLiteral("Version unavailable — repo '%1' is not enabled. Right-click the row to add it.").arg(QString::fromStdString(std::string{kernel.get_repo()})));
+        // The Version cell: the real version for a live row; for an
+        // info-row, the bare "—" when its repo is enabled but the package
+        // is not in its DB (the E14 `pacman -Sy` case), and the annotated
+        // "— (repo not enabled)" when the repo itself is not enabled.
+        QString version_cell;
+        if (kernel.has_pkg()) {
+            version_cell = QString::fromStdString(kernel.version());
+        } else if (repo_enabled) {
+            version_cell = QStringLiteral("—");
+        } else {
+            version_cell = QStringLiteral("— (repo not enabled)");
         }
-        widget_item->setText(TreeCol::Category, QString::fromStdString(std::string{kernel.category()}));
+        widget_item->setText(static_cast<int>(TreeCol::Version), version_cell);
+        if (!kernel.has_pkg() && !repo_enabled) {
+            widget_item->setToolTip(static_cast<int>(TreeCol::Version), QStringLiteral("Version unavailable — repo '%1' is not enabled. Right-click the row to add it.").arg(QString::fromStdString(std::string{kernel.get_repo()})));
+        }
+        widget_item->setText(static_cast<int>(TreeCol::Category), QString::fromStdString(std::string{kernel.category()}));
         // E14: installed-on-system indicator (D4): "✓" when the package is
         // in the alpm local DB (kernel.is_installed(), name-based lookup —
         // valid for live and info rows alike), "—" otherwise. Availability
@@ -191,7 +201,7 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         // checkbox (ItemIsUserCheckable) stays live for installable rows but
         // is dropped for info-rows (m_pkg == nullptr) whose Choose cell must
         // be disabled — they cannot be selected for install/remove.
-        widget_item->setText(TreeCol::Install, kernel.is_installed() ? QStringLiteral("✓") : QStringLiteral("—"));
+        widget_item->setText(static_cast<int>(TreeCol::Install), kernel.is_installed() ? QStringLiteral("✓") : QStringLiteral("—"));
         widget_item->setFlags(kernel.has_pkg()
                 ? Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable
                 : Qt::ItemIsEnabled | Qt::ItemIsSelectable);
@@ -224,15 +234,15 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
                     ? QStringLiteral("Not in the '%1' DB — run `pacman -Sy`")
                     : QStringLiteral("Repo '%1' not enabled — right-click the row to add it"))
                                  .arg(QString::fromStdString(std::string{kernel.get_repo()})));
-            tree_kernels->setItemWidget(widget_item, TreeCol::Check, lock);
+            tree_kernels->setItemWidget(widget_item, static_cast<int>(TreeCol::Check), lock);
         }
         if (kernel.is_installed()) {
             const std::string_view kernel_installed_db = kernel.get_installed_db();
             if (!kernel_installed_db.empty() && kernel_installed_db != kernel.get_repo()) {
                 continue;
             }
-            widget_item->setText(TreeCol::Immutable, QStringLiteral("true"));
-            widget_item->setCheckState(TreeCol::Check, Qt::Checked);
+            widget_item->setText(static_cast<int>(TreeCol::Immutable), QStringLiteral("true"));
+            widget_item->setCheckState(static_cast<int>(TreeCol::Check), Qt::Checked);
         }
     }
 
@@ -251,16 +261,16 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
     // QObject::tr (public static — this is a free function, not a
     // MainWindow member): the single identity constant, locale-consistent
     // with the on_kernel_context_menu comparison below.
-    dir_item->setText(TreeCol::PkgName, QObject::tr(kDirectoryRowRaw));
-    dir_item->setText(TreeCol::Version, QStringLiteral("—"));
-    dir_item->setText(TreeCol::Category, QStringLiteral("Local"));
-    dir_item->setText(TreeCol::Install, QStringLiteral("—"));
+    dir_item->setText(static_cast<int>(TreeCol::PkgName), QObject::tr(kDirectoryRowRaw));
+    dir_item->setText(static_cast<int>(TreeCol::Version), QStringLiteral("—"));
+    dir_item->setText(static_cast<int>(TreeCol::Category), QStringLiteral("Local"));
+    dir_item->setText(static_cast<int>(TreeCol::Install), QStringLiteral("—"));
     // One shared tooltip text (the D1 string, QStringLiteral per the
     // deferred-lupdate precedent) on both the PkgName cell and the Check
     // cell: what the row is + the right-click remediation.
     const auto dir_tooltip = QStringLiteral(
         "Install a locally built kernel package from a folder: right-click to choose the folder containing the built *.pkg.tar.zst package(s).");
-    dir_item->setToolTip(TreeCol::PkgName, dir_tooltip);
+    dir_item->setToolTip(static_cast<int>(TreeCol::PkgName), dir_tooltip);
     // The Check cell: the D3 lock-label recipe with the glyph swapped —
     // a non-interactive QLabel showing a folder-open icon (theme
     // "folder-open" → "folder" → centered "📁" text fallback, 16x16 when a
@@ -278,7 +288,7 @@ void init_kernels_tree_widget(QTreeWidget* tree_kernels, std::span<Kernel> kerne
         dir_check->setPixmap(dir_icon.pixmap(16, 16));
     }
     dir_check->setToolTip(dir_tooltip);
-    tree_kernels->setItemWidget(dir_item, TreeCol::Check, dir_check);
+    tree_kernels->setItemWidget(dir_item, static_cast<int>(TreeCol::Check), dir_check);
 }
 
 // Show the ordered boot-selection steps (boot_instructions_for output) in a
@@ -294,7 +304,7 @@ void show_boot_instructions(QWidget* parent, const std::vector<std::string>& ins
     text->setReadOnly(true);
     QStringList lines;
     for (std::size_t i = 0; i < instructions.size(); ++i) {
-        lines << QStringLiteral("%1. %2").arg(static_cast<int>(i + 1)).arg(QString::fromStdString(instructions[i]));
+        lines << QStringLiteral("%1. %2").arg(static_cast<int>(i + 1)).arg(QString::fromStdString(instructions.at(i)));
     }
     text->setPlainText(lines.join(QLatin1Char('\n')));
     layout->addWidget(text);
@@ -379,7 +389,7 @@ MainWindow::MainWindow(QWidget* parent)
 
                 std::vector<std::string> change_list(static_cast<std::size_t>(m_change_list.size()));
                 for (int i = 0; i < m_change_list.size(); ++i) {
-                    change_list[static_cast<std::size_t>(i)] = m_change_list[i].toStdString();
+                    change_list.at(static_cast<std::size_t>(i)) = m_change_list.at(i).toStdString();
                 }
 
                 install_packages(m_handle, m_kernels, change_list);
@@ -444,7 +454,7 @@ MainWindow::MainWindow(QWidget* parent)
     // Hide sched-ext button in case we are not on kernel with sched-ext, or
     // scx-manager support is not compiled in at all (WU-5).
 #ifdef WITH_SCX_MANAGER
-    if (!fs::exists("/sys/kernel/sched_ext/state")) {
+    if (!std::filesystem::exists("/sys/kernel/sched_ext/state")) {
         m_ui->schedext->setHidden(true);
     }
 #else
@@ -476,7 +486,7 @@ MainWindow::MainWindow(QWidget* parent)
     auto* tree_kernels = m_ui->treeKernels;
     // The Install indicator column (K10) stays visible; only the internal
     // Immutable status column is hidden.
-    tree_kernels->hideColumn(TreeCol::Immutable);  // Immutable status true/false
+    tree_kernels->hideColumn(static_cast<int>(TreeCol::Immutable));  // Immutable status true/false
     tree_kernels->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
 
     // Set context menu policy and wire the per-kernel actions
@@ -488,7 +498,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     // TODO(vnepogodin): parallelize it
     auto a2 = std::async(std::launch::deferred, [&] {
-        const std::lock_guard<std::mutex> guard(m_mutex);
+        const std::scoped_lock guard(m_mutex);
         init_kernels_tree_widget(tree_kernels, std::span{m_kernels}, m_handle);
     });
 
@@ -532,7 +542,7 @@ MainWindow::MainWindow(QWidget* parent)
     // build_change_list retains authority to disable on an empty change list.
     connect(m_ui->treeKernels, &QTreeWidget::currentItemChanged, this,
         [this](QTreeWidgetItem* current, QTreeWidgetItem*) {
-            if (current != nullptr && current->text(TreeCol::PkgName) == tr(kDirectoryRowRaw)) {
+            if (current != nullptr && current->text(static_cast<int>(TreeCol::PkgName)) == tr(kDirectoryRowRaw)) {
                 m_ui->ok->setEnabled(true);
             }
         });
@@ -576,14 +586,14 @@ void MainWindow::check_uncheck_item() noexcept {
         if (t_widget->currentItem() == nullptr || t_widget->currentItem()->childCount() > 0) {
             return;
         }
-        auto new_state = (t_widget->currentItem()->checkState(TreeCol::Check) == Qt::Checked) ? Qt::Unchecked : Qt::Checked;
-        t_widget->currentItem()->setCheckState(TreeCol::Check, new_state);
+        auto new_state = (t_widget->currentItem()->checkState(static_cast<int>(TreeCol::Check)) == Qt::Checked) ? Qt::Unchecked : Qt::Checked;
+        t_widget->currentItem()->setCheckState(static_cast<int>(TreeCol::Check), new_state);
     }
 }
 
 // When selecting on item in the list
 void MainWindow::item_changed(QTreeWidgetItem* item, int /*unused*/) noexcept {
-    if (item->checkState(TreeCol::Check) == Qt::Checked) {
+    if (item->checkState(static_cast<int>(TreeCol::Check)) == Qt::Checked) {
         m_ui->treeKernels->setCurrentItem(item);
     }
     build_change_list(item);
@@ -591,19 +601,24 @@ void MainWindow::item_changed(QTreeWidgetItem* item, int /*unused*/) noexcept {
 
 // Build the change_list when selecting on item in the tree
 void MainWindow::build_change_list(QTreeWidgetItem* item) noexcept {
-    auto item_text = item->text(TreeCol::PkgName);
-    auto immutable = item->text(TreeCol::Immutable);
+    auto item_text = item->text(static_cast<int>(TreeCol::PkgName));
+    auto immutable = item->text(static_cast<int>(TreeCol::Immutable));
     if (immutable == "true" && item->checkState(0) == Qt::Unchecked) {
         m_ui->ok->setEnabled(true);
         m_change_list.append(item_text);
         return;
     }
 
-    if (immutable == "true" && item->checkState(0) == Qt::Checked) {
-        m_change_list.removeOne(item_text);
-    } else if (item->checkState(0) == Qt::Checked) {
-        m_ui->ok->setEnabled(true);
-        m_change_list.append(item_text);
+    // Checked rows: an immutable one is unselected (removed from the
+    // change list), a regular one is selected; unchecked rows (the
+    // immutable+unchecked case early-returned above) are always dropped.
+    if (item->checkState(0) == Qt::Checked) {
+        if (immutable == "true") {
+            m_change_list.removeOne(item_text);
+        } else {
+            m_ui->ok->setEnabled(true);
+            m_change_list.append(item_text);
+        }
     } else {
         m_change_list.removeOne(item_text);
     }
@@ -640,11 +655,11 @@ void MainWindow::on_configure() noexcept {
         // dialog was already shown above, so hide it first (no leftover
         // spinner), then return before apply_source_for_kernel would
         // prefill a nonsense source from the row text.
-        if (current->text(TreeCol::PkgName) == tr(kDirectoryRowRaw)) {
+        if (current->text(static_cast<int>(TreeCol::PkgName)) == tr(kDirectoryRowRaw)) {
             m_conf_progress_dialog->hide();
             return;
         }
-        m_conf_window->apply_source_for_kernel(current->text(TreeCol::PkgName).toStdString());
+        m_conf_window->apply_source_for_kernel(current->text(static_cast<int>(TreeCol::PkgName)).toStdString());
     }
 
     // Apply the user-selected build source before the background prepare.
@@ -685,7 +700,7 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
     // dedicated one-action menu — the generic action build below never runs
     // for it (no km::find_kernel("…") fallback oddities). Selecting the
     // action opens the folder picker + install flow (the slot below).
-    if (item->text(TreeCol::PkgName) == tr(kDirectoryRowRaw)) {
+    if (item->text(static_cast<int>(TreeCol::PkgName)) == tr(kDirectoryRowRaw)) {
         QMenu dmenu(this);
         auto* dir_action = dmenu.addAction(tr("Install from directory…"));
         if (dmenu.exec(tree_kernels->viewport()->mapToGlobal(pos)) == dir_action) {
@@ -697,7 +712,7 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
     // The tree PkgName is "repo/name"; the table and the install lookups
     // key on the bare kernel name (prefix stripped by the shared helper —
     // the same one the row tooltip uses).
-    const QString pkg_raw = item->text(TreeCol::PkgName);
+    const QString pkg_raw = item->text(static_cast<int>(TreeCol::PkgName));
     const std::string name{km::kernel_name_from_raw(pkg_raw.toStdString())};
     const QString display = QString::fromStdString(name);
 
@@ -717,7 +732,7 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
     // alpm handle, which predates the add). Already-enabled repos get no
     // action. The click flow (confirm → add_repo_to_pacman_conf → list
     // refresh) is handled after the install block below.
-    QAction* add_repo_action = nullptr;
+    const QAction* add_repo_action = nullptr;
     std::string repo_to_add{};
     if (auto e = km::find_kernel(name)) {
         const KnownKernel* k = *e;
@@ -943,7 +958,7 @@ void MainWindow::init_kernels() noexcept {
     // the worker's own pre-swap parse stays untouched, the double parse is
     // harmless).
     {
-        const std::lock_guard<std::mutex> guard(m_mutex);
+        const std::scoped_lock guard(m_mutex);
         if (m_handle != nullptr) {
             utils::release_alpm(m_handle, &m_err);
         }
@@ -955,7 +970,7 @@ void MainWindow::init_kernels() noexcept {
         return;
     }
     {
-        const std::lock_guard<std::mutex> guard(m_mutex);
+        const std::scoped_lock guard(m_mutex);
         m_kernels = Kernel::get_kernels(m_handle);
     }
 
@@ -977,7 +992,7 @@ void MainWindow::on_execute() noexcept {
     // A checked kernel + selected pseudo-row ⇒ the directory flow wins (documented);
     // the checked kernel stays in m_change_list for a later Execute.
     if (auto* current = m_ui->treeKernels->currentItem()) {
-        if (current->text(TreeCol::PkgName) == tr(kDirectoryRowRaw)) {
+        if (current->text(static_cast<int>(TreeCol::PkgName)) == tr(kDirectoryRowRaw)) {
             on_install_from_directory();
             if (m_change_list.isEmpty()) {
                 m_ui->ok->setEnabled(false);
@@ -1011,7 +1026,7 @@ void MainWindow::on_schedext_config() noexcept {
 
 bool KernelTreeWidgetItem::operator<(const QTreeWidgetItem& other) const {
     const auto sort_col = treeWidget()->sortColumn();
-    if (sort_col != TreeCol::Version) {
+    if (sort_col != static_cast<int>(TreeCol::Version)) {
         return QTreeWidgetItem::operator<(other);
     }
 

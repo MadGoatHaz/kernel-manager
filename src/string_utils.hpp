@@ -45,7 +45,7 @@ constexpr auto make_split_view(std::string_view str, char delim = '\n') noexcept
         | std::ranges::views::filter(second);
 }
 
-inline constexpr std::size_t replace_all(std::string& inout, std::string_view what, std::string_view with) noexcept {
+constexpr std::size_t replace_all(std::string& inout, std::string_view what, std::string_view with) noexcept {
     std::size_t count{};
     std::size_t pos{};
     while (std::string::npos != (pos = inout.find(what.data(), pos, what.length()))) {
@@ -55,7 +55,7 @@ inline constexpr std::size_t replace_all(std::string& inout, std::string_view wh
     return count;
 }
 
-inline constexpr std::size_t remove_all(std::string& inout, std::string_view what) noexcept {
+constexpr std::size_t remove_all(std::string& inout, std::string_view what) noexcept {
     return replace_all(inout, what, "");
 }
 

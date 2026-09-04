@@ -19,7 +19,7 @@
 #ifndef CONFPATCHESPAGE_HPP_
 #define CONFPATCHESPAGE_HPP_
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic ignored "-Wfloat-conversion"
@@ -27,7 +27,7 @@
 #pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
 #pragma clang diagnostic ignored "-Wdeprecated-enum-enum-conversion"
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuseless-cast"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -44,9 +44,9 @@
 
 #include <QObject>
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
 
@@ -56,7 +56,7 @@ class ConfPatchesPage final : public QWidget {
  public:
     explicit ConfPatchesPage(QWidget* parent = nullptr)
       : QWidget(parent) { m_ui->setupUi(this); }
-    ~ConfPatchesPage() = default;
+    ~ConfPatchesPage() override = default;
 
     Ui::ConfPatchesPage* get_ui_obj() noexcept { return m_ui.get(); }
 

@@ -29,12 +29,12 @@
 #include <fmt/compile.h>
 #include <fmt/core.h>
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic ignored "-Wdouble-promotion"
 #pragma clang diagnostic ignored "-Wold-style-cast"
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuseless-cast"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -48,9 +48,9 @@
 #include <QProcess>
 #include <QSettings>
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
 
@@ -60,7 +60,7 @@ namespace utils {
 
 auto read_whole_file(std::string_view filepath) noexcept -> std::string {
     // Use std::fopen because it's faster than std::ifstream
-    auto* file = std::fopen(filepath.data(), "rb");
+    auto* file = std::fopen(std::string{filepath}.c_str(), "rb");
     if (file == nullptr) {
         fmt::print(stderr, "[READWHOLEFILE] '{}' read failed: {}\n", filepath, std::strerror(errno));
         return {};
@@ -99,20 +99,23 @@ bool write_to_file(std::string_view filepath, std::string_view data) noexcept {
 // https://github.com/arun11299/cpp-subprocess/blob/master/subprocess.hpp#L1218
 // https://stackoverflow.com/questions/11342868/c-interface-for-interactive-bash
 // https://github.com/hniksic/rust-subprocess
-// The popen pipe's RAII deleter (a struct — `decltype(&pclose)` as a
-// template argument trips GCC's -Wignored-attributes on the function
-// type's attributes; the struct form is the warning-free equivalent,
-// behavior-identical: pclose runs iff the pointer is non-null).
-struct pipe_deleter {
-    void operator()(FILE* f) const noexcept {
-        if (f != nullptr) {
-            pclose(f);
+namespace {
+    // The popen pipe's RAII deleter (a struct — `decltype(&pclose)` as a
+    // template argument trips GCC's -Wignored-attributes on the function
+    // type's attributes; the struct form is the warning-free equivalent,
+    // behavior-identical: pclose runs iff the pointer is non-null).
+    struct pipe_deleter {
+        void operator()(FILE* f) const noexcept {
+            if (f != nullptr) {
+                pclose(f);
+            }
         }
-    }
-};
+    };
+}  // namespace
 
 std::string exec(std::string_view command) noexcept {
-    std::unique_ptr<FILE, pipe_deleter> pipe(popen(command.data(), "r"));
+    // NOLINTNEXTLINE(bugprone-command-processor) — by design: this is the app's single command-execution primitive (pacman/makepkg/git through a shell); the command strings are built from vetted, single-quoted, charset-guarded inputs, never raw user text.
+    const std::unique_ptr<FILE, pipe_deleter> pipe(popen(std::string{command}.c_str(), "r"));
     if (!pipe) {
         fmt::print(stderr, "popen failed! '{}'\n", command);
         return "-1";
@@ -175,33 +178,35 @@ int run_process(std::string_view program, const std::vector<std::string>& args) 
 
 std::string fix_path(std::string&& path) noexcept {
     /* clang-format off */
-    if (path[0] != '~') { return std::move(path); }
+    if (path.empty() || path.at(0) != '~') { return std::move(path); }
     /* clang-format on */
     utils::replace_all(path, "~", g_get_home_dir());
     return std::move(path);
 }
 
-// Normalize a clone URL for comparison (drop a trailing '/' and '.git').
-inline auto normalize_clone_url(std::string_view url) noexcept -> std::string {
-    std::string result{url};
-    while (result.ends_with('/')) {
-        result.pop_back();
+namespace {
+    // Normalize a clone URL for comparison (drop a trailing '/' and '.git').
+    auto normalize_clone_url(std::string_view url) noexcept -> std::string {
+        std::string result{url};
+        while (result.ends_with('/')) {
+            result.pop_back();
+        }
+        if (result.ends_with(".git")) {
+            result.erase(result.size() - 4);
+        }
+        return result;
     }
-    if (result.ends_with(".git")) {
-        result.erase(result.size() - 4);
-    }
-    return result;
-}
 
-// A build source typed by the user: anything containing a scheme
-// ("https://", "git://", "ssh://", ...) is a git URL used as-is, a bare name
-// is resolved as an AUR package. No vendor URL is hard-coded.
-inline auto build_source_clone_url(std::string_view source) noexcept -> std::string {
-    if (source.find("://") != std::string_view::npos) {
+    // A build source typed by the user: anything containing a scheme
+    // ("https://", "git://", "ssh://", ...) is a git URL used as-is, a bare name
+    // is resolved as an AUR package. No vendor URL is hard-coded.
+    auto build_source_clone_url(std::string_view source) noexcept -> std::string {
+        if (!source.contains("://")) {
+            return fmt::format(FMT_COMPILE("https://aur.archlinux.org/{}.git"), source);
+        }
         return std::string{source};
     }
-    return fmt::format(FMT_COMPILE("https://aur.archlinux.org/{}.git"), source);
-}
+}  // namespace
 
 void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std::string_view clone_url) noexcept {
     std::error_code ec{};
@@ -214,6 +219,12 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
     const auto entry_cwd = fs::current_path(cwd_ec);
 
     struct CwdGuard {
+        explicit CwdGuard(fs::path in_cwd) : cwd{std::move(in_cwd)} { }
+        CwdGuard(const CwdGuard&)            = delete;
+        CwdGuard& operator=(const CwdGuard&) = delete;
+        CwdGuard(CwdGuard&&)                 = delete;
+        CwdGuard& operator=(CwdGuard&&)      = delete;
+
         const fs::path cwd;
         ~CwdGuard() {
             if (cwd.empty()) {
@@ -228,7 +239,7 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
                 fmt::print(stderr, "prepare_git_repo: cannot restore cwd '{}': {}\n", cwd.string(), restore_ec.message());
             }
         }
-    } cwd_guard{entry_cwd};
+    } const cwd_guard{entry_cwd};
 
     const auto enter = [&ec](const fs::path& dir) {
         fs::current_path(dir, ec);
@@ -332,11 +343,17 @@ void set_build_dir(std::string dir) noexcept {
 // runtime), not a hard-coded vendor clone URL.
 namespace {
     constexpr std::string_view kDefaultBuildSource = "linux-cachyos";
-    std::string g_build_source                     = std::string{kDefaultBuildSource};
+    // Function-local (magic) static: the std::string's allocation happens on
+    // first use, not during static initialization (where an uncatchable
+    // throw would be a bugprone-throwing-static-initialization).
+    std::string& g_build_source() {
+        static std::string source{kDefaultBuildSource};
+        return source;
+    }
 }  // namespace
 
 const std::string& build_source_repo() noexcept {
-    return g_build_source;
+    return g_build_source();
 }
 
 void set_build_source_repo(std::string source) noexcept {
@@ -350,7 +367,7 @@ void set_build_source_repo(std::string source) noexcept {
     if (source.empty()) {
         return;  // keep the current/default source
     }
-    g_build_source = std::move(source);
+    g_build_source() = std::move(source);
 }
 
 void prepare_build_environment() noexcept {
@@ -370,9 +387,9 @@ void restore_clean_environment(std::vector<std::string>& previously_set_options,
     auto set_values_list = utils::make_split_view(all_set_values, '\n');
     for (auto&& expr : set_values_list) {
         auto expr_split = utils::make_multiline(std::move(expr), '=');
-        auto var_name   = expr_split[0];
+        auto var_name   = expr_split.at(0);
 
-        const auto& var_val = expr_split[1];
+        const auto& var_val = expr_split.at(1);
         if (::setenv(var_name.c_str(), var_val.c_str(), 1) != 0) {
             fmt::print(stderr, "Cannot set environment variable!: {}\n", std::strerror(errno));
             continue;
@@ -428,10 +445,10 @@ namespace {
         const std::string assign      = std::string{var} + "=";
         const std::string true_assign = "true && " + assign;
         for (std::size_t i = 0; i < lines.size(); ++i) {
-            if (lines[i].starts_with(assign)) {
+            if (lines.at(i).starts_with(assign)) {
                 return {i, std::string{}};
             }
-            if (lines[i].starts_with(true_assign)) {
+            if (lines.at(i).starts_with(true_assign)) {
                 return {i, "true && "};
             }
         }
@@ -508,14 +525,14 @@ namespace {
             }
             // The layout is fixed: the first X sits right after segments[0].
             const std::size_t x_len  = (value.size() - literal) / placeholder_count;
-            const std::string_view x = std::string_view{value}.substr(segments[0].size(), x_len);
+            const std::string_view x = std::string_view{value}.substr(segments.at(0).size(), x_len);
             if (x.size() >= value.size()) {
                 break;  // pure-placeholder name: the peel is the identity and cannot
                         // shrink the value — stop, or the loop would spin forever
             }
             std::string candidate{};
             for (std::size_t i = 0; i < segments.size(); ++i) {
-                candidate.append(segments[i]);
+                candidate.append(segments.at(i));
                 if (i + 1 < segments.size()) {
                     candidate.append(x);
                 }
@@ -539,7 +556,7 @@ auto apply_pkgbuild_custom_name(std::string content, std::string_view custom_nam
     // form alone used to slip past this guard and spin the peel loop in
     // unapply_pkgbuild_custom_name forever.
     if (custom_name.empty() || custom_name == "$pkgbase" || custom_name == "${pkgbase}") {
-        return PkgbuildRenameResult{.ok = true, .new_content = std::move(content)};
+        return PkgbuildRenameResult{.ok = true, .error = "", .new_content = std::move(content)};
     }
 
     // Only package-name characters plus the $pkgbase placeholder are allowed;
@@ -549,7 +566,7 @@ auto apply_pkgbuild_custom_name(std::string content, std::string_view custom_nam
         const bool allowed = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
             || c == '_' || c == '.' || c == '+' || c == '-' || c == '$' || c == '{' || c == '}';
         if (!allowed) {
-            return PkgbuildRenameResult{.ok = false, .error = fmt::format(FMT_COMPILE("custom package name '{}' contains invalid characters"), std::string{custom_name})};
+            return PkgbuildRenameResult{.ok = false, .error = fmt::format(FMT_COMPILE("custom package name '{}' contains invalid characters"), std::string{custom_name}), .new_content = ""};
         }
     }
 
@@ -558,18 +575,18 @@ auto apply_pkgbuild_custom_name(std::string content, std::string_view custom_nam
     // Structural sanity: a recognizable PKGBUILD declares its version
     // top-level (pkgver= assignment or pkgver() function).
     if (!has_top_level_pkgver(lines)) {
-        return PkgbuildRenameResult{.ok = false, .error = "no top-level pkgver= (or pkgver()) line: not a recognized PKGBUILD; file left untouched"};
+        return PkgbuildRenameResult{.ok = false, .error = "no top-level pkgver= (or pkgver()) line: not a recognized PKGBUILD; file left untouched", .new_content = ""};
     }
 
     // A custom package name binds to the first top-level pkgbase= line.
     const auto [pkgbase_index, pkgbase_prefix] = find_top_level_var_line(lines, "pkgbase");
     if (pkgbase_index == std::numeric_limits<std::size_t>::max()) {
-        return PkgbuildRenameResult{.ok = false, .error = "no top-level pkgbase= assignment: cannot set a custom package name; file left untouched"};
+        return PkgbuildRenameResult{.ok = false, .error = "no top-level pkgbase= assignment: cannot set a custom package name; file left untouched", .new_content = ""};
     }
 
     // The original pkgbase value (right-hand side, quotes stripped) is what
     // a "$pkgbase" placeholder in the requested name expands to.
-    const auto rhs      = std::string_view{lines[pkgbase_index]}.substr(pkgbase_prefix.size() + 8);  // "pkgbase="
+    const auto rhs      = std::string_view{lines.at(pkgbase_index)}.substr(pkgbase_prefix.size() + 8);  // "pkgbase="
     const auto original = strip_pkgbuild_value(rhs);
 
     // Idempotency: the file's pkgbase may already carry a previous
@@ -584,11 +601,11 @@ auto apply_pkgbuild_custom_name(std::string content, std::string_view custom_nam
     utils::replace_all(new_value, "${pkgbase}", base);
     utils::replace_all(new_value, "$pkgbase", base);
     if (new_value.empty()) {
-        return PkgbuildRenameResult{.ok = false, .error = "custom package name expands to an empty value"};
+        return PkgbuildRenameResult{.ok = false, .error = "custom package name expands to an empty value", .new_content = ""};
     }
 
-    lines[pkgbase_index] = pkgbase_prefix + "pkgbase=\"" + new_value + "\"";
-    return PkgbuildRenameResult{.ok = true, .new_content = utils::join_vec(lines, "\n")};
+    lines.at(pkgbase_index) = pkgbase_prefix + "pkgbase=\"" + new_value + "\"";
+    return PkgbuildRenameResult{.ok = true, .error = "", .new_content = utils::join_vec(lines, "\n")};
 }
 
 }  // namespace utils

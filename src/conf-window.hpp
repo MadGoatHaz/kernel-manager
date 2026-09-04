@@ -19,7 +19,7 @@
 #ifndef CONFWINDOW_HPP_
 #define CONFWINDOW_HPP_
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic ignored "-Wfloat-conversion"
@@ -27,7 +27,7 @@
 #pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
 #pragma clang diagnostic ignored "-Wdeprecated-enum-enum-conversion"
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuseless-cast"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -59,9 +59,9 @@ struct KernelFlavor {
     std::string path;
 };
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
 
@@ -70,7 +70,7 @@ class ConfWindow final : public QMainWindow {
     Q_DISABLE_COPY_MOVE(ConfWindow)
  public:
     explicit ConfWindow(QWidget* parent = nullptr);
-    ~ConfWindow() = default;
+    ~ConfWindow() override = default;
 
     void reset_patches_data_tab() noexcept;
     void refresh_flavors() noexcept;
@@ -103,7 +103,7 @@ class ConfWindow final : public QMainWindow {
     void handle_build_done() noexcept;
     void on_done_status_tick() noexcept;
 
-    auto kernel_path_for_index(std::int32_t index) const noexcept -> std::string;
+    [[nodiscard]] auto kernel_path_for_index(std::int32_t index) const noexcept -> std::string;
     void update_option_set() noexcept;
 
     // Source dropdown plumbing: show/hide the custom URL edit per selection
@@ -112,17 +112,17 @@ class ConfWindow final : public QMainWindow {
     // user currently has selected.
     void update_build_source_ui() noexcept;
     void set_build_source(const std::string& source) noexcept;
-    auto effective_build_source() const noexcept -> std::string;
+    [[nodiscard]] auto effective_build_source() const noexcept -> std::string;
 
     bool m_running{};
-    QProcess m_cmd{};
-    std::string m_build_conf_path{};
-    std::vector<std::string> m_previously_set_options{};
-    std::vector<KernelFlavor> m_flavors{};
+    QProcess m_cmd;
+    std::string m_build_conf_path;
+    std::vector<std::string> m_previously_set_options;
+    std::vector<KernelFlavor> m_flavors;
 
     // Last kernel name (repo prefix stripped) auto-populated via
     // apply_source_for_kernel; a repeat for the same kernel is a no-op.
-    std::string m_last_applied_kernel{};
+    std::string m_last_applied_kernel;
 
     // Build completion tracking (cycle-7 C3/D3): the terminal-helper's
     // lifetime equals the launched command's lifetime (the D2 contract), so
@@ -140,7 +140,7 @@ class ConfWindow final : public QMainWindow {
     std::unique_ptr<Ui::ConfWindow> m_ui = std::make_unique<Ui::ConfWindow>();
 
     void run_cmd_async(std::string cmd, const std::string& working_path, bool escalate = false, bool expect_done = true) noexcept;
-    auto get_all_set_values() const noexcept -> std::string;
+    [[nodiscard]] auto get_all_set_values() const noexcept -> std::string;
     void clear_patches_data_tab() noexcept;
     void connect_all_checkboxes() noexcept;
 };

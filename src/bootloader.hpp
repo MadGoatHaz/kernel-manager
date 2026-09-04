@@ -19,6 +19,7 @@
 #ifndef BOOTLOADER_HPP
 #define BOOTLOADER_HPP
 
+#include <cstdint>      // for uint8_t
 #include <functional>   // for function
 #include <string>       // for string
 #include <string_view>  // for string_view
@@ -28,7 +29,7 @@
 // the injected BootloaderProbe, so unit tests drive it with fakes (no
 // filesystem, no command probes); detect_bootloader() wires the real
 // std::filesystem + `command -v` probes.
-enum class Bootloader { UKI,
+enum class Bootloader : std::uint8_t { UKI,
     SYSTEMD_BOOT,
     GRUB,
     UNKNOWN };

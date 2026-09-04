@@ -36,16 +36,16 @@ constexpr const char* final_note = "The kernel is installed and ready to boot. S
 }  // namespace
 
 std::vector<std::string> instructions_for(Bootloader bl, const std::string& kernel_pkgbase) {
-    const std::string pkg{kernel_pkgbase};
+    const std::string& pkg = kernel_pkgbase;
     std::vector<std::string> steps{};
 
     switch (bl) {
     case Bootloader::GRUB:
         // Regenerate the config so the new /boot/vmlinuz-<pkg> shows
         // up, pick it from the menu, and optionally make it default.
-        steps.push_back("Re-run the GRUB config: `sudo grub-mkconfig -o /boot/grub/grub.cfg`");
-        steps.push_back("Reboot and select '" + pkg + "' from the GRUB menu");
-        steps.push_back("To make it the default: set `GRUB_DEFAULT` in `/etc/default/grub`, then re-run `grub-mkconfig`");
+        steps.emplace_back("Re-run the GRUB config: `sudo grub-mkconfig -o /boot/grub/grub.cfg`");
+        steps.emplace_back("Reboot and select '" + pkg + "' from the GRUB menu");
+        steps.emplace_back("To make it the default: set `GRUB_DEFAULT` in `/etc/default/grub`, then re-run `grub-mkconfig`");
         break;
     case Bootloader::SYSTEMD_BOOT:
         // The ALPM loader hook already created the BLS entry, and
@@ -54,23 +54,23 @@ std::vector<std::string> instructions_for(Bootloader bl, const std::string& kern
         // here): the user only selects the kernel from the boot
         // menu; `bootctl list` verifies if it is missing, and the
         // default is optionally pinned.
-        steps.push_back("Reboot and select '" + pkg + "' from the systemd-boot menu");
-        steps.push_back("If it does not appear, verify the loader entry with `bootctl list`");
-        steps.push_back("To set the default: `sudo bootctl set-default " + pkg + "`");
+        steps.emplace_back("Reboot and select '" + pkg + "' from the systemd-boot menu");
+        steps.emplace_back("If it does not appear, verify the loader entry with `bootctl list`");
+        steps.emplace_back("To set the default: `sudo bootctl set-default " + pkg + "`");
         break;
     case Bootloader::UKI:
         // The firmware/systemd-boot picks the .efi up by itself.
-        steps.push_back("The Unified Kernel Image is auto-detected by the firmware/systemd-boot — reboot and select '" + pkg + "'");
+        steps.emplace_back("The Unified Kernel Image is auto-detected by the firmware/systemd-boot — reboot and select '" + pkg + "'");
         break;
     case Bootloader::UNKNOWN:
         // Generic guidance: try the boot menu, and if the kernel is
         // missing, name both common regenerator paths.
-        steps.push_back("Reboot and choose '" + pkg + "' from your boot menu");
-        steps.push_back("If it does not appear, regenerate your bootloader config (GRUB: `sudo grub-mkconfig -o /boot/grub/grub.cfg`; systemd-boot: ensure a loader entry or UKI exists)");
+        steps.emplace_back("Reboot and choose '" + pkg + "' from your boot menu");
+        steps.emplace_back("If it does not appear, regenerate your bootloader config (GRUB: `sudo grub-mkconfig -o /boot/grub/grub.cfg`; systemd-boot: ensure a loader entry or UKI exists)");
         break;
     }
 
     // Invariant: every bootloader's list ends with the same note.
-    steps.push_back(final_note);
+    steps.emplace_back(final_note);
     return steps;
 }

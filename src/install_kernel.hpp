@@ -22,6 +22,7 @@
 #include "bootloader.hpp"     // for Bootloader, detect_bootloader
 #include "known_kernels.hpp"  // for KnownKernel
 
+#include <cstdint>      // for uint8_t
 #include <filesystem>   // for path
 #include <functional>   // for function
 #include <string>       // for string
@@ -88,7 +89,7 @@ using CommandRunner = std::function<int(const std::string& cmd, bool escalate)>;
 //   INSTALL_FAILED  — the install command exited non-zero, or no install
 //                     command could run / its rc is not captured (the
 //                     reason is in the result's `error` text).
-enum class InstallVerdict { INSTALL_SUCCESS,
+enum class InstallVerdict : std::uint8_t { INSTALL_SUCCESS,
     INSTALL_FAILED };
 
 // Result of one install_kernel() run: the outcome flag + error text, the

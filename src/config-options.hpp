@@ -37,14 +37,14 @@ struct ConfigOptions {
     bool builtin_nvidia_open_check{};
     bool build_debug_check{};
 
-    std::string hz_ticks_combo{};
-    std::string tickrate_combo{};
-    std::string preempt_combo{};
-    std::string hugepage_combo{};
-    std::string lto_combo{};
-    std::string cpu_opt_combo{};
+    std::string hz_ticks_combo;
+    std::string tickrate_combo;
+    std::string preempt_combo;
+    std::string hugepage_combo;
+    std::string lto_combo;
+    std::string cpu_opt_combo;
 
-    std::string custom_name_edit{};
+    std::string custom_name_edit;
 
     static auto parse_from_file(std::string_view filepath) noexcept -> std::optional<ConfigOptions>;
     static auto write_config_file(const ConfigOptions& config_options, std::string_view filepath) noexcept -> bool;

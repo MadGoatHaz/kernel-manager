@@ -31,10 +31,10 @@
 #include <ranges>       // for ranges::*
 #include <string_view>  // for string_view
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wold-style-cast"
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnull-dereference"
 #pragma GCC diagnostic ignored "-Wuseless-cast"
@@ -53,9 +53,9 @@
 #include <QSignalBlocker>
 #include <QStringList>
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
 
@@ -74,7 +74,7 @@ namespace fs = std::filesystem;
 #define GENERATE_CONST_OPTION_VALUES(name, ...)                             \
     [[gnu::pure]] constexpr const char* get_##name(size_t index) noexcept { \
         constexpr std::array list_##name{__VA_ARGS__};                      \
-        return list_##name[index];                                          \
+        return list_##name.at(index);                                       \
     }
 
 /**
@@ -86,7 +86,7 @@ namespace fs = std::filesystem;
     [[gnu::pure]] constexpr ssize_t lookup_##name(std::string_view needle) noexcept { \
         constexpr std::array list_##name{__VA_ARGS__};                                \
         for (size_t i = 0; i < list_##name.size(); ++i) {                             \
-            if (std::string_view{list_##name[i]} == needle) {                         \
+            if (std::string_view{list_##name.at(i)} == needle) {                      \
                 return static_cast<ssize_t>(i);                                       \
             }                                                                         \
         }                                                                             \
@@ -155,7 +155,7 @@ auto discover_repo_flavors(const fs::path& repo_root, std::string_view fallback_
         single_package_dir = std::string{fallback_repo_name};
         dirs.push_back(single_package_dir);
     }
-    std::sort(dirs.begin(), dirs.end());
+    std::ranges::sort(dirs);
     if (dirs.empty()) {
         return {};
     }
@@ -164,7 +164,7 @@ auto discover_repo_flavors(const fs::path& repo_root, std::string_view fallback_
     std::string family{dirs.front()};
     for (const auto& dir : dirs) {
         std::size_t i = 0;
-        while (i < family.size() && i < dir.size() && family[i] == dir[i]) {
+        while (i < family.size() && i < dir.size() && family.at(i) == dir.at(i)) {
             ++i;
         }
         family = family.substr(0, i);
@@ -214,17 +214,17 @@ struct CheckboxBinding {
 };
 
 inline constexpr std::array<CheckboxBinding, 11> checkbox_bindings{{
-    {&Ui::ConfOptionsPage::hardly_check, &ConfigOptions::hardly_check, "hardly"},
-    {&Ui::ConfOptionsPage::perfgovern_check, &ConfigOptions::per_gov_check, "per_gov"},
-    {&Ui::ConfOptionsPage::tcpbbr_check, &ConfigOptions::tcp_bbr3_check, "tcp_bbr3"},
-    {&Ui::ConfOptionsPage::customconfig_check, &ConfigOptions::custom_config_check, "custom_config"},
-    {&Ui::ConfOptionsPage::nconfig_check, &ConfigOptions::nconfig_check, "nconfig"},
-    {&Ui::ConfOptionsPage::xconfig_check, &ConfigOptions::xconfig_check, "xconfig"},
-    {&Ui::ConfOptionsPage::localmodcfg_check, &ConfigOptions::localmodcfg_check, "localmodcfg"},
-    {&Ui::ConfOptionsPage::use_current_check, &ConfigOptions::use_current_check, "use_current"},
-    {&Ui::ConfOptionsPage::builtin_zfs_check, &ConfigOptions::builtin_zfs_check, "builtin_zfs"},
-    {&Ui::ConfOptionsPage::builtin_nvidia_open_check, &ConfigOptions::builtin_nvidia_open_check, "builtin_nvidia_open"},
-    {&Ui::ConfOptionsPage::build_debug_check, &ConfigOptions::build_debug_check, "build_debug"},
+    {.widget = &Ui::ConfOptionsPage::hardly_check, .config_field = &ConfigOptions::hardly_check, .build_var = "hardly"},
+    {.widget = &Ui::ConfOptionsPage::perfgovern_check, .config_field = &ConfigOptions::per_gov_check, .build_var = "per_gov"},
+    {.widget = &Ui::ConfOptionsPage::tcpbbr_check, .config_field = &ConfigOptions::tcp_bbr3_check, .build_var = "tcp_bbr3"},
+    {.widget = &Ui::ConfOptionsPage::customconfig_check, .config_field = &ConfigOptions::custom_config_check, .build_var = "custom_config"},
+    {.widget = &Ui::ConfOptionsPage::nconfig_check, .config_field = &ConfigOptions::nconfig_check, .build_var = "nconfig"},
+    {.widget = &Ui::ConfOptionsPage::xconfig_check, .config_field = &ConfigOptions::xconfig_check, .build_var = "xconfig"},
+    {.widget = &Ui::ConfOptionsPage::localmodcfg_check, .config_field = &ConfigOptions::localmodcfg_check, .build_var = "localmodcfg"},
+    {.widget = &Ui::ConfOptionsPage::use_current_check, .config_field = &ConfigOptions::use_current_check, .build_var = "use_current"},
+    {.widget = &Ui::ConfOptionsPage::builtin_zfs_check, .config_field = &ConfigOptions::builtin_zfs_check, .build_var = "builtin_zfs"},
+    {.widget = &Ui::ConfOptionsPage::builtin_nvidia_open_check, .config_field = &ConfigOptions::builtin_nvidia_open_check, .build_var = "builtin_nvidia_open"},
+    {.widget = &Ui::ConfOptionsPage::build_debug_check, .config_field = &ConfigOptions::build_debug_check, .build_var = "build_debug"},
 }};
 
 // Option rows of the Configure page mapped to their per-repo option key, so
@@ -322,7 +322,7 @@ auto has_value_xform_table(std::string_view repo, std::string_view option) noexc
 // or the value itself when the option carries no table (plain pass-through).
 auto xformed_value(std::string_view repo, std::string_view option, std::string_view value) noexcept -> std::optional<std::string> {
     const std::string key{std::string{repo} + "|" + std::string{option} + "|" + std::string{value}};
-    if (const auto it = detail::value_xforms.find(frozen::string{key}); it != detail::value_xforms.end()) {
+    if (const auto* const it = detail::value_xforms.find(frozen::string{key}); it != detail::value_xforms.end()) {
         if (it->second.empty()) {
             fmt::print(stderr, "option {}={} has no build value for repo {}; not emitted\n", option, value, repo);
             return std::nullopt;
@@ -470,10 +470,10 @@ auto get_package_names_glob_from_pkgbuild(std::string_view kernel_name_path) noe
 auto is_source_block_bottom(std::string_view line) noexcept -> bool {
     std::size_t begin = 0;
     std::size_t end   = line.size();
-    while (begin < end && (line[begin] == ' ' || line[begin] == '\t')) {
+    while (begin < end && (line.at(begin) == ' ' || line.at(begin) == '\t')) {
         ++begin;
     }
-    while (end > begin && (line[end - 1] == ' ' || line[end - 1] == '\t')) {
+    while (end > begin && (line.at(end - 1) == ' ' || line.at(end - 1) == '\t')) {
         --end;
     }
     if (begin == end) {
@@ -877,10 +877,10 @@ void ConfWindow::clear_patches_data_tab() noexcept {
 }
 
 auto ConfWindow::kernel_path_for_index(std::int32_t index) const noexcept -> std::string {
-    if (index < 0 || index >= static_cast<std::int32_t>(m_flavors.size())) {
+    if (index < 0 || static_cast<std::size_t>(index) >= m_flavors.size()) {
         return {};
     }
-    return m_flavors[static_cast<std::size_t>(index)].path;
+    return m_flavors.at(static_cast<std::size_t>(index)).path;
 }
 
 // (Re)discover the build flavors from the kernel source repo and repopulate
@@ -891,8 +891,8 @@ void ConfWindow::refresh_flavors() noexcept {
 
     // remember the currently selected flavor key (if any) to restore it
     std::string previous_key{};
-    if (const std::int32_t cur = combo->currentIndex(); cur >= 0 && cur < static_cast<std::int32_t>(m_flavors.size())) {
-        previous_key = m_flavors[static_cast<std::size_t>(cur)].key;
+    if (const std::int32_t cur = combo->currentIndex(); cur >= 0 && static_cast<std::size_t>(cur) < m_flavors.size()) {
+        previous_key = m_flavors.at(static_cast<std::size_t>(cur)).key;
     }
 
     m_flavors = discover_repo_flavors(utils::build_repo_path(), repo_basename(utils::build_source_repo()));
@@ -912,8 +912,8 @@ void ConfWindow::refresh_flavors() noexcept {
 
     // restore the previous selection, falling back to the base flavor
     std::int32_t target_index = 0;
-    for (std::int32_t i = 0; i < static_cast<std::int32_t>(m_flavors.size()); ++i) {
-        if (m_flavors[static_cast<std::size_t>(i)].key == previous_key) {
+    for (std::int32_t i = 0; static_cast<std::size_t>(i) < m_flavors.size(); ++i) {
+        if (m_flavors.at(static_cast<std::size_t>(i)).key == previous_key) {
             target_index = i;
             break;
         }
@@ -1120,11 +1120,11 @@ ConfWindow::ConfWindow(QWidget* parent)
     connect(options_page_ui_obj->save_button, &QPushButton::clicked, this, &ConfWindow::on_save);
     connect(options_page_ui_obj->load_button, &QPushButton::clicked, this, &ConfWindow::on_load);
     connect(options_page_ui_obj->main_combo_box, &QComboBox::currentIndexChanged, this, [this, options_page_ui_obj](std::int32_t main_combo_index) {
-        if (main_combo_index < 0 || main_combo_index >= static_cast<std::int32_t>(m_flavors.size())) {
+        if (main_combo_index < 0 || static_cast<std::size_t>(main_combo_index) >= m_flavors.size()) {
             return;
         }
         using namespace std::string_view_literals;
-        const std::string_view kernel_name = m_flavors[static_cast<std::size_t>(main_combo_index)].key;
+        const std::string_view kernel_name = m_flavors.at(static_cast<std::size_t>(main_combo_index)).key;
         const std::string_view base_key    = m_flavors.front().key;
 
         // Block signals to prevent cascading combo box updates
