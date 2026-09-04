@@ -19,7 +19,7 @@
 #include "alpm_utils.hpp"
 #include "ini.hpp"
 #include "known_kernels.hpp"  // for km::known_kernels (the curated install_repo set)
-#include "utils.hpp"  // for utils::exec (AUR probe executor)
+#include "utils.hpp"          // for utils::exec (AUR probe executor)
 
 namespace utils {
 
@@ -40,31 +40,31 @@ namespace utils {
 
 namespace {
 
-// Character set of a valid pacman repo name: lowercase alphanumerics and
-// dashes. Enforced before the name is embedded in the repo_add.sh command
-// line — the single quote makes any violation inert, and the curated-table
-// guard is the last wall.
-[[gnu::pure]] [[nodiscard]] bool valid_repo_chars(std::string_view repo) noexcept {
-    for (const char c : repo) {
-        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) {
-            return false;
+    // Character set of a valid pacman repo name: lowercase alphanumerics and
+    // dashes. Enforced before the name is embedded in the repo_add.sh command
+    // line — the single quote makes any violation inert, and the curated-table
+    // guard is the last wall.
+    [[gnu::pure]] [[nodiscard]] bool valid_repo_chars(std::string_view repo) noexcept {
+        for (const char c : repo) {
+            if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) {
+                return false;
+            }
         }
+        return true;
     }
-    return true;
-}
 
-// Whether the repo appears as an install_repo value in the curated kernel
-// table — the set of repos kernels are pre-compiled against. core/extra
-// pass this guard (they are table repos) but are base-install repos that
-// the repo_add.sh allowlist rejects; the script is the final wall.
-[[nodiscard]] bool is_known_repo(std::string_view repo) noexcept {
-    for (const auto& k : km::known_kernels()) {
-        if (k.install_repo == repo) {
-            return true;
+    // Whether the repo appears as an install_repo value in the curated kernel
+    // table — the set of repos kernels are pre-compiled against. core/extra
+    // pass this guard (they are table repos) but are base-install repos that
+    // the repo_add.sh allowlist rejects; the script is the final wall.
+    [[nodiscard]] bool is_known_repo(std::string_view repo) noexcept {
+        for (const auto& k : km::known_kernels()) {
+            if (k.install_repo == repo) {
+                return true;
+            }
         }
+        return false;
     }
-    return false;
-}
 
 }  // namespace
 
@@ -129,7 +129,7 @@ bool is_package_in_sync_db(alpm_handle_t* handle, std::string_view repo, std::st
     // every non-ignored /etc/pacman.conf section); a missing section means
     // the repo is not added on this system.
     for (alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
-        auto* db = reinterpret_cast<alpm_db_t*>(i->data);
+        auto* db            = reinterpret_cast<alpm_db_t*>(i->data);
         const char* db_name = alpm_db_get_name(db);
         if (db_name == nullptr || std::string_view{db_name} != repo) {
             continue;

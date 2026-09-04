@@ -23,12 +23,12 @@
 
 #include <cstdio>
 
-#include <algorithm>        // for any_of, find_if
-#include <filesystem>       // for exists
-#include <initializer_list> // for initializer_list
-#include <ranges>           // for ranges::*
-#include <string>           // for string
-#include <utility>          // for move
+#include <algorithm>         // for any_of, find_if
+#include <filesystem>        // for exists
+#include <initializer_list>  // for initializer_list
+#include <ranges>            // for ranges::*
+#include <string>            // for string
+#include <utility>           // for move
 
 #include <fmt/compile.h>
 #include <fmt/core.h>
@@ -82,7 +82,9 @@ static const bool is_nvidia_card_prebuild_open_module = [] {
 // lookups (sync-DB pairing and installed-family queries) derive from this
 // table; no per-distro package name patterns exist outside of it.
 // ---------------------------------------------------------------------------
-enum class ModuleKind { Zfs, Nvidia, NvidiaOpen };
+enum class ModuleKind { Zfs,
+    Nvidia,
+    NvidiaOpen };
 
 struct KernelModuleSpec {
     std::string_view kernel_base;
@@ -136,7 +138,9 @@ std::string Kernel::version() noexcept {
     /* clang-format on */
 #endif
     // Curated info-row (m_pkg == nullptr): display-only, no sync-DB version.
-    if (m_pkg == nullptr) { return "—"; }
+    if (m_pkg == nullptr) {
+        return "—";
+    }
     const char* sync_pkg_ver = alpm_pkg_get_version(m_pkg);
     /* clang-format off */
     if (!is_installed()) { return sync_pkg_ver; }
@@ -194,9 +198,9 @@ bool Kernel::install() const noexcept {
     // if we have any of the modules already installed,
     // then just use whatever is installed. skipping chwd detection
     // (queries derived from the module pairing table, not hard-coded regexes)
-    const auto nvidia_family_query      = module_family_query(ModuleKind::Nvidia);
-    const bool is_nvidia_modules_installed = !nvidia_family_query.empty() && !utils::exec(fmt::format(FMT_COMPILE("pacman -Qqs '{}' 2>/dev/null"), nvidia_family_query)).empty();
-    const auto nvidia_open_family_query = module_family_query(ModuleKind::NvidiaOpen);
+    const auto nvidia_family_query              = module_family_query(ModuleKind::Nvidia);
+    const bool is_nvidia_modules_installed      = !nvidia_family_query.empty() && !utils::exec(fmt::format(FMT_COMPILE("pacman -Qqs '{}' 2>/dev/null"), nvidia_family_query)).empty();
+    const auto nvidia_open_family_query         = module_family_query(ModuleKind::NvidiaOpen);
     const bool is_nvidia_open_modules_installed = !nvidia_open_family_query.empty() && !utils::exec(fmt::format(FMT_COMPILE("pacman -Qqs '{}' 2>/dev/null"), nvidia_open_family_query)).empty();
 
     bool should_install_nvidia      = (is_nvidia_card_prebuild_module && m_nvidia_module != nullptr);
@@ -348,9 +352,9 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
         for (auto&& aur_kernel_header : aur_kernels_headers) {
             // Each line is "name version"; a version-less line degrades to
             // "name " ⇒ empty version ⇒ the unknown-version fallback below.
-            const auto space_pos = aur_kernel_header.find(' ');
-            auto&& aur_kernel    = std::string{space_pos == std::string::npos ? aur_kernel_header : aur_kernel_header.substr(0, space_pos)};
-            auto&& aur_version   = std::string{space_pos == std::string::npos ? "" : aur_kernel_header.substr(space_pos + 1)};
+            const auto space_pos          = aur_kernel_header.find(' ');
+            auto&& aur_kernel             = std::string{space_pos == std::string::npos ? aur_kernel_header : aur_kernel_header.substr(0, space_pos)};
+            auto&& aur_version            = std::string{space_pos == std::string::npos ? "" : aur_kernel_header.substr(space_pos + 1)};
             const auto aur_kernel_headers = std::string{aur_kernel};  // name, pre-strip (m_name_headers semantics kept)
             utils::replace_all(aur_kernel, "-headers", "");
             if (std::ranges::find_if(kernels, [&](auto& kernel) { return kernel.m_name == aur_kernel; }) != kernels.end()) {
@@ -365,7 +369,7 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
             /* clang-format off */
             kernel_obj.m_version = aur_version.empty() ? "unknown-version" : aur_version;
             /* clang-format on */
-            kernel_obj.m_raw          = fmt::format("aur/{}", aur_kernel);
+            kernel_obj.m_raw = fmt::format("aur/{}", aur_kernel);
 
             kernels.emplace_back(std::move(kernel_obj));
         }

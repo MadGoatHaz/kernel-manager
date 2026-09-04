@@ -288,10 +288,10 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
 // mid-session set_build_dir() is visible immediately.
 namespace {
 
-QSettings& app_settings() {
-    static QSettings settings{"ArchLinux", "KernelManager"};
-    return settings;
-}
+    QSettings& app_settings() {
+        static QSettings settings{"ArchLinux", "KernelManager"};
+        return settings;
+    }
 
 }  // namespace
 
@@ -331,8 +331,8 @@ void set_build_dir(std::string dir) noexcept {
 // Default build source: an AUR package name (resolves to the AUR git URL at
 // runtime), not a hard-coded vendor clone URL.
 namespace {
-constexpr std::string_view kDefaultBuildSource = "linux-cachyos";
-std::string g_build_source = std::string{kDefaultBuildSource};
+    constexpr std::string_view kDefaultBuildSource = "linux-cachyos";
+    std::string g_build_source                     = std::string{kDefaultBuildSource};
 }  // namespace
 
 const std::string& build_source_repo() noexcept {
@@ -385,151 +385,151 @@ void restore_clean_environment(std::vector<std::string>& previously_set_options,
 
 namespace {
 
-// Split content into lines, preserving empty lines (unlike
-// utils::make_multiline, which drops them).
-auto split_lines_preserving(std::string_view content) noexcept -> std::vector<std::string> {
-    std::vector<std::string> lines{};
-    std::size_t start = 0;
-    while (start <= content.size()) {
-        const auto pos = content.find('\n', start);
-        if (pos == std::string_view::npos) {
-            lines.emplace_back(content.substr(start));
-            break;
+    // Split content into lines, preserving empty lines (unlike
+    // utils::make_multiline, which drops them).
+    auto split_lines_preserving(std::string_view content) noexcept -> std::vector<std::string> {
+        std::vector<std::string> lines{};
+        std::size_t start = 0;
+        while (start <= content.size()) {
+            const auto pos = content.find('\n', start);
+            if (pos == std::string_view::npos) {
+                lines.emplace_back(content.substr(start));
+                break;
+            }
+            lines.emplace_back(content.substr(start, pos - start));
+            start = pos + 1;
         }
-        lines.emplace_back(content.substr(start, pos - start));
-        start = pos + 1;
-    }
-    return lines;
-}
-
-// Trim surrounding whitespace and one pair of surrounding quotes from a
-// makepkg variable value (the right-hand side of an assignment line).
-auto strip_pkgbuild_value(std::string_view value) noexcept -> std::string {
-    const auto left  = value.find_first_not_of(" \t");
-    const auto right = value.find_last_not_of(" \t");
-    if (left == std::string_view::npos) {
-        return std::string{};
-    }
-    value = value.substr(left, right - left + 1);
-    if (value.size() >= 2) {
-        const auto first = value.front();
-        if ((first == '"' || first == '\'') && value.back() == first) {
-            value = value.substr(1, value.size() - 2);
-        }
-    }
-    return std::string{value};
-}
-
-// Locate the first top-level `var=` assignment line: either the plain
-// column-0 form or the common AUR `true && var=` form. Returns the line
-// index and the prefix (text before "var="); index == npos when absent.
-auto find_top_level_var_line(const std::vector<std::string>& lines, std::string_view var) noexcept
-    -> std::pair<std::size_t, std::string> {
-    const std::string assign      = std::string{var} + "=";
-    const std::string true_assign = "true && " + assign;
-    for (std::size_t i = 0; i < lines.size(); ++i) {
-        if (lines[i].starts_with(assign)) {
-            return {i, std::string{}};
-        }
-        if (lines[i].starts_with(true_assign)) {
-            return {i, "true && "};
-        }
-    }
-    return {std::numeric_limits<std::size_t>::max(), std::string{}};
-}
-
-auto has_top_level_pkgver(const std::vector<std::string>& lines) noexcept -> bool {
-    for (const auto& line : lines) {
-        if (line.starts_with("pkgver=") || line.starts_with("pkgver()") || line.starts_with("true && pkgver=")
-            || line.starts_with("true && pkgver()")) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// Split a custom name into the literal segments surrounding each
-// "$pkgbase" / "${pkgbase}" placeholder: segments.size() == 1 + the
-// placeholder count, and the name reassembles as
-// seg0 + PH + seg1 + PH + ... + segN. The two needle forms are
-// independent (the "${" of the braced form never matches "$pkgbase").
-auto split_on_pkgbase_placeholder(std::string_view name) noexcept -> std::vector<std::string_view> {
-    std::vector<std::string_view> segments{};
-    std::size_t pos = 0;
-    for (;;) {
-        const auto braced = name.find("${pkgbase}", pos);
-        const auto bare   = name.find("$pkgbase", pos);
-        if (braced == std::string_view::npos && bare == std::string_view::npos) {
-            segments.push_back(name.substr(pos));
-            return segments;
-        }
-        const bool take_braced = (braced != std::string_view::npos) && (bare == std::string_view::npos || braced < bare);
-        const auto hit_pos     = take_braced ? braced : bare;
-        const auto hit_len     = take_braced ? std::size_t{10} : std::size_t{8};
-        segments.push_back(name.substr(pos, hit_pos - pos));
-        pos = hit_pos + hit_len;
-    }
-}
-
-// The inverse of the placeholder expansion: peel the wrapper layers off
-// `current`. Each previous run wrapped the then-current value as
-// seg0 + X + seg1 + X + ... + X + segN; if `current` matches, the inner X
-// is recovered and peeling continues (the user's …-custom-custom state is
-// two layers deep). Peeling stops at the first layer that does not match —
-// that value is the pre-rename base to expand against. With zero matching
-// layers, `current` is returned unchanged (a first-time application).
-// The rewrite therefore never grows the value: it lands on the same value
-// it started from, once every layer is peeled back.
-//
-// Termination is structural: a matching peel strictly shrinks the value
-// (the recovered X is a strict sub-part of it — its length is
-// (size − literal) / placeholder_count, which is < size whenever the
-// name carries any literal), so the loop cannot run more than
-// size / min(1, placeholder_count) peels. The only non-shrinking shape
-// is a name made of pure placeholder(s) (literal == 0 and a single
-// placeholder, e.g. the braced form "${pkgbase}"): there X == the whole
-// value and the peel is the identity, so the guard below breaks out and
-// `current` is returned unchanged — without it the loop would spin
-// forever (the pre-fix main-thread hang).
-auto unapply_pkgbuild_custom_name(std::string_view current, const std::vector<std::string_view>& segments) noexcept -> std::string {
-    const std::size_t placeholder_count = segments.size() - 1;
-    if (placeholder_count == 0) {
-        return std::string{current};  // no placeholder: the rewrite is a pure line replacement, already idempotent
-    }
-    std::size_t literal = 0;
-    for (const auto& segment : segments) {
-        literal += segment.size();
+        return lines;
     }
 
-    std::string value{current};
-    for (;;) {
-        if (value.size() < literal || (value.size() - literal) % placeholder_count != 0) {
-            break;
+    // Trim surrounding whitespace and one pair of surrounding quotes from a
+    // makepkg variable value (the right-hand side of an assignment line).
+    auto strip_pkgbuild_value(std::string_view value) noexcept -> std::string {
+        const auto left  = value.find_first_not_of(" \t");
+        const auto right = value.find_last_not_of(" \t");
+        if (left == std::string_view::npos) {
+            return std::string{};
         }
-        // The layout is fixed: the first X sits right after segments[0].
-        const std::size_t x_len = (value.size() - literal) / placeholder_count;
-        const std::string_view x = std::string_view{value}.substr(segments[0].size(), x_len);
-        if (x.size() >= value.size()) {
-            break;  // pure-placeholder name: the peel is the identity and cannot
-                    // shrink the value — stop, or the loop would spin forever
-        }
-        std::string candidate{};
-        for (std::size_t i = 0; i < segments.size(); ++i) {
-            candidate.append(segments[i]);
-            if (i + 1 < segments.size()) {
-                candidate.append(x);
+        value = value.substr(left, right - left + 1);
+        if (value.size() >= 2) {
+            const auto first = value.front();
+            if ((first == '"' || first == '\'') && value.back() == first) {
+                value = value.substr(1, value.size() - 2);
             }
         }
-        if (candidate != value) {
-            break;  // not a previous application of this name
+        return std::string{value};
+    }
+
+    // Locate the first top-level `var=` assignment line: either the plain
+    // column-0 form or the common AUR `true && var=` form. Returns the line
+    // index and the prefix (text before "var="); index == npos when absent.
+    auto find_top_level_var_line(const std::vector<std::string>& lines, std::string_view var) noexcept
+        -> std::pair<std::size_t, std::string> {
+        const std::string assign      = std::string{var} + "=";
+        const std::string true_assign = "true && " + assign;
+        for (std::size_t i = 0; i < lines.size(); ++i) {
+            if (lines[i].starts_with(assign)) {
+                return {i, std::string{}};
+            }
+            if (lines[i].starts_with(true_assign)) {
+                return {i, "true && "};
+            }
         }
-        value = std::string{x};
-        if (x.empty()) {
-            break;  // peeled down to nothing: the empty-value guard below flags it
+        return {std::numeric_limits<std::size_t>::max(), std::string{}};
+    }
+
+    auto has_top_level_pkgver(const std::vector<std::string>& lines) noexcept -> bool {
+        for (const auto& line : lines) {
+            if (line.starts_with("pkgver=") || line.starts_with("pkgver()") || line.starts_with("true && pkgver=")
+                || line.starts_with("true && pkgver()")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Split a custom name into the literal segments surrounding each
+    // "$pkgbase" / "${pkgbase}" placeholder: segments.size() == 1 + the
+    // placeholder count, and the name reassembles as
+    // seg0 + PH + seg1 + PH + ... + segN. The two needle forms are
+    // independent (the "${" of the braced form never matches "$pkgbase").
+    auto split_on_pkgbase_placeholder(std::string_view name) noexcept -> std::vector<std::string_view> {
+        std::vector<std::string_view> segments{};
+        std::size_t pos = 0;
+        for (;;) {
+            const auto braced = name.find("${pkgbase}", pos);
+            const auto bare   = name.find("$pkgbase", pos);
+            if (braced == std::string_view::npos && bare == std::string_view::npos) {
+                segments.push_back(name.substr(pos));
+                return segments;
+            }
+            const bool take_braced = (braced != std::string_view::npos) && (bare == std::string_view::npos || braced < bare);
+            const auto hit_pos     = take_braced ? braced : bare;
+            const auto hit_len     = take_braced ? std::size_t{10} : std::size_t{8};
+            segments.push_back(name.substr(pos, hit_pos - pos));
+            pos = hit_pos + hit_len;
         }
     }
-    return value;
-}
+
+    // The inverse of the placeholder expansion: peel the wrapper layers off
+    // `current`. Each previous run wrapped the then-current value as
+    // seg0 + X + seg1 + X + ... + X + segN; if `current` matches, the inner X
+    // is recovered and peeling continues (the user's …-custom-custom state is
+    // two layers deep). Peeling stops at the first layer that does not match —
+    // that value is the pre-rename base to expand against. With zero matching
+    // layers, `current` is returned unchanged (a first-time application).
+    // The rewrite therefore never grows the value: it lands on the same value
+    // it started from, once every layer is peeled back.
+    //
+    // Termination is structural: a matching peel strictly shrinks the value
+    // (the recovered X is a strict sub-part of it — its length is
+    // (size − literal) / placeholder_count, which is < size whenever the
+    // name carries any literal), so the loop cannot run more than
+    // size / min(1, placeholder_count) peels. The only non-shrinking shape
+    // is a name made of pure placeholder(s) (literal == 0 and a single
+    // placeholder, e.g. the braced form "${pkgbase}"): there X == the whole
+    // value and the peel is the identity, so the guard below breaks out and
+    // `current` is returned unchanged — without it the loop would spin
+    // forever (the pre-fix main-thread hang).
+    auto unapply_pkgbuild_custom_name(std::string_view current, const std::vector<std::string_view>& segments) noexcept -> std::string {
+        const std::size_t placeholder_count = segments.size() - 1;
+        if (placeholder_count == 0) {
+            return std::string{current};  // no placeholder: the rewrite is a pure line replacement, already idempotent
+        }
+        std::size_t literal = 0;
+        for (const auto& segment : segments) {
+            literal += segment.size();
+        }
+
+        std::string value{current};
+        for (;;) {
+            if (value.size() < literal || (value.size() - literal) % placeholder_count != 0) {
+                break;
+            }
+            // The layout is fixed: the first X sits right after segments[0].
+            const std::size_t x_len  = (value.size() - literal) / placeholder_count;
+            const std::string_view x = std::string_view{value}.substr(segments[0].size(), x_len);
+            if (x.size() >= value.size()) {
+                break;  // pure-placeholder name: the peel is the identity and cannot
+                        // shrink the value — stop, or the loop would spin forever
+            }
+            std::string candidate{};
+            for (std::size_t i = 0; i < segments.size(); ++i) {
+                candidate.append(segments[i]);
+                if (i + 1 < segments.size()) {
+                    candidate.append(x);
+                }
+            }
+            if (candidate != value) {
+                break;  // not a previous application of this name
+            }
+            value = std::string{x};
+            if (x.empty()) {
+                break;  // peeled down to nothing: the empty-value guard below flags it
+            }
+        }
+        return value;
+    }
 
 }  // namespace
 
@@ -547,7 +547,7 @@ auto apply_pkgbuild_custom_name(std::string content, std::string_view custom_nam
     // rewritten line can never break out of the double quotes.
     for (const char c : custom_name) {
         const bool allowed = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                             || c == '_' || c == '.' || c == '+' || c == '-' || c == '$' || c == '{' || c == '}';
+            || c == '_' || c == '.' || c == '+' || c == '-' || c == '$' || c == '{' || c == '}';
         if (!allowed) {
             return PkgbuildRenameResult{.ok = false, .error = fmt::format(FMT_COMPILE("custom package name '{}' contains invalid characters"), std::string{custom_name})};
         }

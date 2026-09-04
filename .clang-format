@@ -1,3 +1,10 @@
+# clang-format version pin (M1): format and check this tree with
+# clang-format 16 — the version .github/workflows/checks.yml pins for the
+# CI style check (jidicula/clang-format-action, clang-format-version '16').
+# Do NOT run a different major version on src/: v22 diverges from v16 on
+# ~3 spots (member-pointer spacing in conf-window.cpp :211-212, one .arg()
+# continuation indent in km-window.cpp :225-226) and its output FAILS the
+# CI check. Raise both the CI pin and this note together.
 BasedOnStyle: WebKit
 AccessModifierOffset: -3
 AllowShortLoopsOnASingleLine: true

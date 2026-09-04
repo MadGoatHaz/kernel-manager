@@ -19,14 +19,14 @@
 #ifndef INSTALL_KERNEL_HPP
 #define INSTALL_KERNEL_HPP
 
-#include "bootloader.hpp"      // for Bootloader, detect_bootloader
-#include "known_kernels.hpp"   // for KnownKernel
+#include "bootloader.hpp"     // for Bootloader, detect_bootloader
+#include "known_kernels.hpp"  // for KnownKernel
 
-#include <filesystem>  // for path
-#include <functional>  // for function
-#include <string>      // for string
-#include <string_view> // for string_view
-#include <vector>      // for vector
+#include <filesystem>   // for path
+#include <functional>   // for function
+#include <string>       // for string
+#include <string_view>  // for string_view
+#include <vector>       // for vector
 
 // The "install pre-compiled kernel" capability (plan chunk K8): plan the
 // install steps for a kernel (pure, table-driven), execute them gracefully
@@ -88,7 +88,8 @@ using CommandRunner = std::function<int(const std::string& cmd, bool escalate)>;
 //   INSTALL_FAILED  — the install command exited non-zero, or no install
 //                     command could run / its rc is not captured (the
 //                     reason is in the result's `error` text).
-enum class InstallVerdict { INSTALL_SUCCESS, INSTALL_FAILED };
+enum class InstallVerdict { INSTALL_SUCCESS,
+    INSTALL_FAILED };
 
 // Result of one install_kernel() run: the outcome flag + error text, the
 // 2-state install verdict, the install command's real exit code (`rc`;
@@ -103,7 +104,7 @@ struct InstallKernelResult {
     std::string error;
     std::vector<std::string> boot_instructions;
     InstallVerdict verdict = InstallVerdict::INSTALL_FAILED;
-    int rc = -1;
+    int rc                 = -1;
 };
 
 // Executes the plan for `kernel` (plan_steps above): runs each step
@@ -123,8 +124,8 @@ struct InstallKernelResult {
 // `bl` is the bootloader the boot instructions describe (default: the
 // live detection, detect_bootloader()).
 [[nodiscard]] InstallKernelResult install_kernel(const KnownKernel& kernel,
-                                                 CommandRunner runner = CommandRunner{},
-                                                 Bootloader bl = detect_bootloader());
+    CommandRunner runner = CommandRunner{},
+    Bootloader bl        = detect_bootloader());
 
 // Name-based convenience API for the "install pre-compiled <kernel>"
 // action. The curated table lookup is prefix-tolerant
@@ -132,9 +133,9 @@ struct InstallKernelResult {
 // (its own package as the build source, no precompiled path, never
 // unbuildable).
 struct InstallPlan {
-    std::string kernel;  // the kernel name (repo prefix stripped)
-    std::string package; // pre-compiled package name ("" if none)
-    std::string repo;    // pacman repo name ("aur" when AUR; "" when unknown)
+    std::string kernel;   // the kernel name (repo prefix stripped)
+    std::string package;  // pre-compiled package name ("" if none)
+    std::string repo;     // pacman repo name ("aur" when AUR; "" when unknown)
     bool precompiled = false;
     std::vector<std::string> install_cmds;      // the package install step(s)
     std::vector<std::string> postinstall_cmds;  // always empty since simplify-K1: the post-install work (nvidia DKMS, initramfs, BLS entry) is done by the distro's ALPM hooks inside the pacman transaction — there is no app-side tail
@@ -155,8 +156,8 @@ struct InstallPlan {
 // the remaining commands are skipped, no crash. A build-only plan
 // (precompiled = false) returns false with the note and runs nothing.
 [[nodiscard]] bool execute_plan(const InstallPlan& plan,
-                                std::string& error_out,
-                                CommandRunner runner = CommandRunner{});
+    std::string& error_out,
+    CommandRunner runner = CommandRunner{});
 
 // The post-install boot-selection steps for a kernel name: the live
 // bootloader detection (K5) + instructions_for (K6) with the kernel's
@@ -192,8 +193,8 @@ struct InstallPlan {
 // absent pkgname) — the caller falls back to the filename; the install
 // itself never depends on this parse.
 [[nodiscard]] bool read_pkginfo(const std::filesystem::path& pkg,
-                                std::string& name_out,
-                                std::string& version_out);
+    std::string& name_out,
+    std::string& version_out);
 
 // Result of one install_from_directory() run: the outcome flag + error
 // text, the 2-state install verdict (simplify-K1), the pacman -U's real
@@ -217,7 +218,7 @@ struct DirInstallResult {
     std::vector<std::string> boot_instructions;
     std::string log_path;  // the install log ("" for an injected runner)
     InstallVerdict verdict = InstallVerdict::INSTALL_FAILED;
-    int rc = -1;
+    int rc                 = -1;
 };
 
 // Install the built packages found in `dir` (list_local_packages): one
@@ -260,7 +261,7 @@ struct DirInstallResult {
 // the post-mortem record: the terminal windows are transient and their
 // output is otherwise lost.
 [[nodiscard]] DirInstallResult install_from_directory(std::string_view dir,
-                                                      CommandRunner runner = CommandRunner{},
-                                                      Bootloader bl = detect_bootloader());
+    CommandRunner runner = CommandRunner{},
+    Bootloader bl        = detect_bootloader());
 
 #endif  // INSTALL_KERNEL_HPP

@@ -18,31 +18,31 @@
 
 #include "known_kernels.hpp"
 
-#include <algorithm>   // for unique
-#include <ranges>      // for ranges::find_if, sort
-#include <string_view> // for string_view
+#include <algorithm>    // for unique
+#include <ranges>       // for ranges::find_if, sort
+#include <string_view>  // for string_view
 
 namespace km {
 
 namespace {
 
-// Humanize a kernel name for synthesized fallback text
-// ("linux-rc" -> "Linux Rc", "linux" -> "Linux").
-auto humanize_name(std::string_view name) -> std::string {
-    std::string label{};
-    label.reserve(name.size() + 1);
-    bool capitalize_next{true};
-    for (const char c : name) {
-        if (c == '-') {
-            label += ' ';
-            capitalize_next = true;
-        } else {
-            label += (capitalize_next && c >= 'a' && c <= 'z') ? static_cast<char>(c - 'a' + 'A') : c;
-            capitalize_next = false;
+    // Humanize a kernel name for synthesized fallback text
+    // ("linux-rc" -> "Linux Rc", "linux" -> "Linux").
+    auto humanize_name(std::string_view name) -> std::string {
+        std::string label{};
+        label.reserve(name.size() + 1);
+        bool capitalize_next{true};
+        for (const char c : name) {
+            if (c == '-') {
+                label += ' ';
+                capitalize_next = true;
+            } else {
+                label += (capitalize_next && c >= 'a' && c <= 'z') ? static_cast<char>(c - 'a' + 'A') : c;
+                capitalize_next = false;
+            }
         }
+        return label;
     }
-    return label;
-}
 
 }  // namespace
 
@@ -55,192 +55,192 @@ const std::vector<KnownKernel>& known_kernels() {
     static const std::vector<KnownKernel> table{{
         // ---- Official Arch kernels (core/extra repos) ----
         {"linux",
-         "Linux (mainline)",
-         "Arch's default kernel — upstream stable releases; the general-purpose reference for desktops and "
-              "servers.",
-         "linux",
-         "linux",
-         "core",
-         true,
-         true},
+            "Linux (mainline)",
+            "Arch's default kernel — upstream stable releases; the general-purpose reference for desktops and "
+            "servers.",
+            "linux",
+            "linux",
+            "core",
+            true,
+            true},
         {"linux-lts",
-         "Linux LTS",
-         "Long-Term-Support kernel on the designated stable LTS branch — maximum stability and hardware "
-              "compatibility.",
-         "linux-lts",
-         "linux-lts",
-         "core",
-         true,
-         true},
+            "Linux LTS",
+            "Long-Term-Support kernel on the designated stable LTS branch — maximum stability and hardware "
+            "compatibility.",
+            "linux-lts",
+            "linux-lts",
+            "core",
+            true,
+            true},
         {"linux-zen",
-         "Linux Zen",
-         "Low-latency desktop kernel with the collaborative Zen patchset (tuned schedulers, memory, "
-              "high-frequency timers) — a good daily driver.",
-         "linux-zen",
-         "linux-zen",
-         "extra",
-         true,
-         true},
+            "Linux Zen",
+            "Low-latency desktop kernel with the collaborative Zen patchset (tuned schedulers, memory, "
+            "high-frequency timers) — a good daily driver.",
+            "linux-zen",
+            "linux-zen",
+            "extra",
+            true,
+            true},
         {"linux-hardened",
-         "Linux Hardened",
-         "Security-hardened kernel with exploit-mitigation patches (dmesg restriction, strict RWX, page "
-              "poisoning) for threat-aware users.",
-         "linux-hardened",
-         "linux-hardened",
-         "extra",
-         true,
-         true},
+            "Linux Hardened",
+            "Security-hardened kernel with exploit-mitigation patches (dmesg restriction, strict RWX, page "
+            "poisoning) for threat-aware users.",
+            "linux-hardened",
+            "linux-hardened",
+            "extra",
+            true,
+            true},
         {"linux-rt",
-         "Linux RT",
-         "PREEMPT_RT real-time kernel (Molnar/Gleixner patchset) — deterministic, bounded latency for audio, "
-              "automation and control workloads.",
-         "linux-rt",
-         "linux-rt",
-         "extra",
-         true,
-         true},
+            "Linux RT",
+            "PREEMPT_RT real-time kernel (Molnar/Gleixner patchset) — deterministic, bounded latency for audio, "
+            "automation and control workloads.",
+            "linux-rt",
+            "linux-rt",
+            "extra",
+            true,
+            true},
         {"linux-rt-lts",
-         "Linux RT LTS",
-         "PREEMPT_RT on an LTS base — real-time determinism with long-term-support stability.",
-         "linux-rt-lts",
-         "linux-rt-lts",
-         "extra",
-         true,
-         true},
+            "Linux RT LTS",
+            "PREEMPT_RT on an LTS base — real-time determinism with long-term-support stability.",
+            "linux-rt-lts",
+            "linux-rt-lts",
+            "extra",
+            true,
+            true},
         // ---- CachyOS kernels (cachyos repo) ----
         {"linux-cachyos",
-         "Linux CachyOS",
-         "CachyOS's heavily optimized mainline kernel — Clang ThinLTO, AutoFDO, Propeller, BORE scheduler; "
-              "maximum desktop/gaming performance.",
-         "linux-cachyos",
-         "linux-cachyos",
-         "cachyos",
-         true,
-         true},
+            "Linux CachyOS",
+            "CachyOS's heavily optimized mainline kernel — Clang ThinLTO, AutoFDO, Propeller, BORE scheduler; "
+            "maximum desktop/gaming performance.",
+            "linux-cachyos",
+            "linux-cachyos",
+            "cachyos",
+            true,
+            true},
         {"linux-cachyos-bore",
-         "Linux CachyOS BORE",
-         "Dedicated BORE (Burst-Oriented Response Enhancer) scheduler variant for interactive latency and frame "
-              "pacing.",
-         "linux-cachyos-bore",
-         "linux-cachyos-bore",
-         "cachyos",
-         true,
-         true},
+            "Linux CachyOS BORE",
+            "Dedicated BORE (Burst-Oriented Response Enhancer) scheduler variant for interactive latency and frame "
+            "pacing.",
+            "linux-cachyos-bore",
+            "linux-cachyos-bore",
+            "cachyos",
+            true,
+            true},
         {"linux-cachyos-rt-bore",
-         "Linux CachyOS RT BORE",
-         "PREEMPT_RT + BORE — low-jitter real-time audio and simulation.",
-         "linux-cachyos-rt-bore",
-         "linux-cachyos-rt-bore",
-         "cachyos",
-         true,
-         true},
+            "Linux CachyOS RT BORE",
+            "PREEMPT_RT + BORE — low-jitter real-time audio and simulation.",
+            "linux-cachyos-rt-bore",
+            "linux-cachyos-rt-bore",
+            "cachyos",
+            true,
+            true},
         {"linux-cachyos-lts",
-         "Linux CachyOS LTS",
-         "LTS base with the CachyOS patchset — stable desktop with performance tuning.",
-         "linux-cachyos-lts",
-         "linux-cachyos-lts",
-         "cachyos",
-         true,
-         true},
+            "Linux CachyOS LTS",
+            "LTS base with the CachyOS patchset — stable desktop with performance tuning.",
+            "linux-cachyos-lts",
+            "linux-cachyos-lts",
+            "cachyos",
+            true,
+            true},
         {"linux-cachyos-server",
-         "Linux CachyOS Server",
-         "Server-oriented kernel — lazy preemption and server EEVDF tuning for high-concurrency and "
-              "virtualization nodes.",
-         "linux-cachyos-server",
-         "linux-cachyos-server",
-         "cachyos",
-         true,
-         true},
+            "Linux CachyOS Server",
+            "Server-oriented kernel — lazy preemption and server EEVDF tuning for high-concurrency and "
+            "virtualization nodes.",
+            "linux-cachyos-server",
+            "linux-cachyos-server",
+            "cachyos",
+            true,
+            true},
         {"linux-cachyos-deckify",
-         "Linux CachyOS Deckify",
-         "Optimized for handheld gaming consoles (Steam Deck, MSI Claw).",
-         "linux-cachyos-deckify",
-         "linux-cachyos-deckify",
-         "cachyos",
-         true,
-         true},
-         {"linux-cachyos-bmq",
-          "Linux CachyOS BMQ",
-          "BMQ (BitMap Queue) alternative-runqueue variant for scheduler benchmarking (no sched-ext).",
-          "linux-cachyos-bmq",
-          "linux-cachyos-bmq",
-          "cachyos",
-          true,
-          true},
+            "Linux CachyOS Deckify",
+            "Optimized for handheld gaming consoles (Steam Deck, MSI Claw).",
+            "linux-cachyos-deckify",
+            "linux-cachyos-deckify",
+            "cachyos",
+            true,
+            true},
+        {"linux-cachyos-bmq",
+            "Linux CachyOS BMQ",
+            "BMQ (BitMap Queue) alternative-runqueue variant for scheduler benchmarking (no sched-ext).",
+            "linux-cachyos-bmq",
+            "linux-cachyos-bmq",
+            "cachyos",
+            true,
+            true},
         // ---- Community kernels (chaotic-aur / liquorix repos) ----
         {"linux-mainline",
-          "Linux Mainline",
-          "Tracks Linus' master branch and weekly release candidates — newest hardware enablement, pre-stable.",
-          "linux-mainline",
-          "linux-mainline",
-          "chaotic-aur",
-          true,
-          true},
+            "Linux Mainline",
+            "Tracks Linus' master branch and weekly release candidates — newest hardware enablement, pre-stable.",
+            "linux-mainline",
+            "linux-mainline",
+            "chaotic-aur",
+            true,
+            true},
         {"linux-tkg",
-          "Linux TKG",
-          "Frogging-Family's modular custom-kernel framework — user-selected scheduler (BORE/BMQ/PDS/EEVDF), "
-               "compiler and patches; built from the tkg repo.",
-          "https://github.com/Frogging-Family/linux-tkg.git",
-          "",
-          "chaotic-aur",
-          false,
-          true},
+            "Linux TKG",
+            "Frogging-Family's modular custom-kernel framework — user-selected scheduler (BORE/BMQ/PDS/EEVDF), "
+            "compiler and patches; built from the tkg repo.",
+            "https://github.com/Frogging-Family/linux-tkg.git",
+            "",
+            "chaotic-aur",
+            false,
+            true},
         {"linux-xanmod",
-          "Linux XanMod",
-          "Performance kernel — memory-allocation tuning, high-frequency ticks, BBRv3 and CAKE queueing; for "
-               "multimedia and low latency.",
-          "linux-xanmod",
-          "linux-xanmod",
-          "chaotic-aur",
-          true,
-          true},
+            "Linux XanMod",
+            "Performance kernel — memory-allocation tuning, high-frequency ticks, BBRv3 and CAKE queueing; for "
+            "multimedia and low latency.",
+            "linux-xanmod",
+            "linux-xanmod",
+            "chaotic-aur",
+            true,
+            true},
         {"linux-xanmod-edge",
-          "Linux XanMod Edge",
-          "XanMod on a mainline (edge) base — experimental features with low-latency desktop tuning.",
-          "linux-xanmod-edge",
-          "linux-xanmod-edge",
-          "chaotic-aur",
-          true,
-          true},
+            "Linux XanMod Edge",
+            "XanMod on a mainline (edge) base — experimental features with low-latency desktop tuning.",
+            "linux-xanmod-edge",
+            "linux-xanmod-edge",
+            "chaotic-aur",
+            true,
+            true},
         {"linux-xanmod-lts",
-          "Linux XanMod LTS",
-          "XanMod on an LTS base — stable desktop with XanMod subsystems.",
-          "linux-xanmod-lts",
-          "linux-xanmod-lts",
-          "chaotic-aur",
-          true,
-          true},
+            "Linux XanMod LTS",
+            "XanMod on an LTS base — stable desktop with XanMod subsystems.",
+            "linux-xanmod-lts",
+            "linux-xanmod-lts",
+            "chaotic-aur",
+            true,
+            true},
         {"linux-xanmod-rt",
-          "Linux XanMod RT",
-          "XanMod + PREEMPT_RT — deterministic processing with XanMod enhancements.",
-          "linux-xanmod-rt",
-          "linux-xanmod-rt",
-          "chaotic-aur",
-          true,
-          true},
+            "Linux XanMod RT",
+            "XanMod + PREEMPT_RT — deterministic processing with XanMod enhancements.",
+            "linux-xanmod-rt",
+            "linux-xanmod-rt",
+            "chaotic-aur",
+            true,
+            true},
         {"linux-lqx",
-          "Linux Liquorix",
-          "Liquorix — Zen-based kernel tuned for desktop audio latency, multimedia and low-latency preemption.",
-          "linux-lqx",
-          "linux-lqx",
-          "liquorix",
-          true,
-          true},
+            "Linux Liquorix",
+            "Liquorix — Zen-based kernel tuned for desktop audio latency, multimedia and low-latency preemption.",
+            "linux-lqx",
+            "linux-lqx",
+            "liquorix",
+            true,
+            true},
         {"linux-clear",
-          "Linux Clear",
-          "Intel Clear Linux performance and power-management patchset port — optimized for Intel platforms.",
-          "linux-clear",
-          "linux-clear",
-          "chaotic-aur",
-          true,
-          true},
+            "Linux Clear",
+            "Intel Clear Linux performance and power-management patchset port — optimized for Intel platforms.",
+            "linux-clear",
+            "linux-clear",
+            "chaotic-aur",
+            true,
+            true},
     }};
     return table;
 }
 
 std::optional<const KnownKernel*> find_kernel(std::string_view name) {
     const auto key = kernel_name_from_raw(name);
-    const auto it = std::ranges::find_if(known_kernels(), [&](const auto& kernel) { return kernel.name == key; });
+    const auto it  = std::ranges::find_if(known_kernels(), [&](const auto& kernel) { return kernel.name == key; });
     if (it == known_kernels().end()) {
         return std::nullopt;
     }

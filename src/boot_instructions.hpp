@@ -35,6 +35,6 @@
 // always appended last, so any bootloader yields a non-empty,
 // ordered, display-ready list.
 [[gnu::pure]] [[nodiscard]] std::vector<std::string> instructions_for(Bootloader bl,
-                                                                      const std::string& kernel_pkgbase);
+    const std::string& kernel_pkgbase);
 
 #endif  // BOOT_INSTRUCTIONS_HPP

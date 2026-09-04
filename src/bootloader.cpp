@@ -80,14 +80,14 @@ bool ask(const Predicate& predicate, std::string_view arg) {
 
 std::string bootloader_name(Bootloader bl) {
     switch (bl) {
-        case Bootloader::UKI:
-            return "Unified Kernel Image (UKI)";
-        case Bootloader::SYSTEMD_BOOT:
-            return "systemd-boot";
-        case Bootloader::GRUB:
-            return "GRUB";
-        case Bootloader::UNKNOWN:
-            break;
+    case Bootloader::UKI:
+        return "Unified Kernel Image (UKI)";
+    case Bootloader::SYSTEMD_BOOT:
+        return "systemd-boot";
+    case Bootloader::GRUB:
+        return "GRUB";
+    case Bootloader::UNKNOWN:
+        break;
     }
     return "Unknown";
 }
@@ -104,8 +104,7 @@ Bootloader detect_bootloader(const BootloaderProbe& probe) {
     //    /etc/grub.d (commonly just fwupd's 35_fwupd) and a bare
     //    grub-editenv — are deliberately NOT signals: they exist on
     //    non-GRUB systems and caused false positives.
-    const bool strong_grub =
-        ask(probe.path_exists, "/boot/grub/grub.cfg")
+    const bool strong_grub = ask(probe.path_exists, "/boot/grub/grub.cfg")
         || (ask(probe.command_exists, "grub-mkconfig") && ask(probe.path_exists, "/etc/default/grub"));
 
     // 3. systemd-boot — bootctl is systemd-boot specific (GRUB systems
@@ -134,8 +133,8 @@ Bootloader detect_bootloader(const BootloaderProbe& probe) {
 
 Bootloader detect_bootloader() {
     BootloaderProbe probe{};
-    probe.path_exists = real_path_exists;
+    probe.path_exists    = real_path_exists;
     probe.command_exists = real_command_exists;
-    probe.dir_has_uki = real_dir_has_uki;
+    probe.dir_has_uki    = real_dir_has_uki;
     return detect_bootloader(probe);
 }

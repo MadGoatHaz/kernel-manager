@@ -39,7 +39,8 @@ std::int32_t release_alpm(alpm_handle_t* handle, alpm_errno_t* err) noexcept;
 // Where a pre-compiled package is installable from: a pacman sync repo
 // (core/extra/community/multilib or third-party such as cachyos/
 // chaotic-aur/liquorix) or the AUR.
-enum class PackageSource { PACMAN_REPO, AUR };
+enum class PackageSource { PACMAN_REPO,
+    AUR };
 
 // Classify a repo name: "aur" → AUR, everything else → a pacman sync repo.
 // A repo section missing from /etc/pacman.conf is not an error here — it

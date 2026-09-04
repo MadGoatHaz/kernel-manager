@@ -92,7 +92,7 @@ enum { Check,
     PkgName,
     Version,
     Category,
-    Install,   // K10: installed-on-system indicator ("✓" / "—") from the alpm local DB, read-only; availability is the context-menu's concern
+    Install,  // K10: installed-on-system indicator ("✓" / "—") from the alpm local DB, read-only; availability is the context-menu's concern
     Immutable };
 }
 
@@ -157,10 +157,10 @@ class MainWindow final : public QMainWindow {
     Work* m_worker{nullptr};
 
     alpm_errno_t m_err{};
-    alpm_handle_t* m_handle                                = utils::parse_alpm(utils::alpm_root, utils::alpm_libdir, &m_err);
-    std::vector<Kernel> m_kernels                          = Kernel::get_kernels(m_handle);
-    std::unique_ptr<Ui::MainWindow> m_ui                   = std::make_unique<Ui::MainWindow>();
-    std::unique_ptr<ConfWindow> m_conf_window              = std::make_unique<ConfWindow>();
+    alpm_handle_t* m_handle                   = utils::parse_alpm(utils::alpm_root, utils::alpm_libdir, &m_err);
+    std::vector<Kernel> m_kernels             = Kernel::get_kernels(m_handle);
+    std::unique_ptr<Ui::MainWindow> m_ui      = std::make_unique<Ui::MainWindow>();
+    std::unique_ptr<ConfWindow> m_conf_window = std::make_unique<ConfWindow>();
 #ifdef WITH_SCX_MANAGER
     // Optional scx-manager support (WU-5): nullable on purpose. Instantiated in
     // the ctor only when scx-manager is compiled in, so generic builds never
