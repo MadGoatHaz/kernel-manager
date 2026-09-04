@@ -1,23 +1,26 @@
 # kernel-manager
 
-A modern, polished kernel manager for Arch Linux — install, build, and switch between 21 maintained kernels, with bootloader-aware boot guidance.
+Build and install custom Arch Linux kernels from a polished Qt6 GUI — 21 kernel variants, distribution-aware, with honest exit-code-backed install results.
 
 [![Build](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/build.yml/badge.svg)](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/build.yml)
+[![Checks](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/checks.yml/badge.svg)](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/checks.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue)](LICENSE)
 
-kernel-manager is a Qt6 GUI for managing Linux kernels on Arch Linux and Arch-based systems. Browse the full landscape of maintained kernel variants, install a pre-compiled kernel with a single action, or build a custom kernel from source — and get exact, bootloader-aware instructions for selecting it at your next boot.
+kernel-manager is a Qt6 desktop app for managing Linux kernels on Arch Linux and Arch-based systems. Install a pre-compiled kernel with a single action, build a custom kernel from source with per-kernel options, or install packages straight from a directory — with bootloader-aware boot guidance and a clear pass/fail result on every install.
+
+## Screenshots
+
+_Screenshot coming soon._
 
 ## Features
 
-- **Browse 21 maintained kernel variants** — official Arch, CachyOS, and community kernels (XanMod, TKG, Liquorix, Clear, mainline) — each with a description tooltip. The list is complete: kernels whose repository is not enabled appear as clearly-marked, non-selectable info-rows with the reason, and an **Installed** column truthfully reports which kernels are installed on the system (✓/—).
-- **Install pre-compiled kernels with one action** — from `[core]`/`[extra]`, the CachyOS repositories, `chaotic-aur`, or the AUR (via `paru`). kernel-manager handles the package install, rebuilding the kernel-specific drivers for the new kernel (the pacman-based NVIDIA driver, DKMS modules), initramfs regeneration (dracut / mkinitcpio), and bootloader refresh for you.
-- **Install kernels from a directory** — right-click the "Install from directory…" row in the kernel list, pick the folder containing your built `*.pkg.tar.zst` package(s), and kernel-manager installs them (`pacman -U`) with the same initramfs + bootloader refresh. Kernels installed from local files appear in the list as `local/<name>` entries — with a real version and a remove checkbox — so you can uninstall them from the list the same way.
-- **Build custom kernels from source** — pick a known package in the source dropdown (or enter any git URL), tweak compile options and patches, and compile with `makepkg`. Build options are data-driven per kernel family: the full 17-option CachyOS suite for `linux-cachyos` and its 6 sibling flavors, CPU-optimization + modprobed-db for the 4 XanMod flavors, and modprobed-db for Liquorix — shown only where the selected source's PKGBUILD actually consumes them, so official Arch, mainline, Clear, and TKG intentionally show none.
-- **Choose where builds happen** — a bottom-left build-directory selector (path label + "Browse…") lets you point kernel-manager at any folder for its build trees; the choice persists across sessions (default: `~/.cache/kernel-manager/pkgbuilds`).
-- **Bootloader-aware boot instructions** — the app detects which boot loader is in use (Unified Kernel Image, systemd-boot, GRUB, or unknown) and shows numbered steps for selecting the new kernel at next boot, including how to make it the default.
-- **Right-click context menu on every kernel** — *Install pre-compiled* (enabled only when the kernel is actually installable from its repository), *Build custom*, or *Show boot instructions*.
-- **Unified privilege escalation via polkit** — a single `auth_admin` action (no `sudo` required).
-- **Polished desktop integration** — a dedicated app icon, reliably shown on both the window titlebar and the system taskbar (the Wayland "W" placeholder is gone), plus translation support.
+- **Build custom kernels** — from AUR PKGBUILDs with configurable, per-kernel build options (the full 17-option CachyOS suite, CPU-optimization + modprobed-db for XanMod, and more), compiled with `makepkg`.
+- **21 supported kernel variants** — official Arch, CachyOS, and community kernels (XanMod, TKG, Liquorix, Clear, mainline), each mapped to its own build source.
+- **One-click install** — the app runs a single `pacman` install and leaves the post-install work (NVIDIA DKMS, initramfs regeneration, bootloader entry) to the distro's own alpm hooks.
+- **Distribution-aware** — detects the distro family from `/etc/os-release` (Arch, EndeavourOS, Manjaro, CachyOS, Garuda, and other Arch-based systems) and adapts the initramfs tool and BLS path accordingly.
+- **Clear install feedback** — every install reports a two-state result: **Installed** (green) or **Failed** (red, with the real exit code). The terminal output is the source of truth — no silent skips.
+- **Optional scx-manager integration** — manage sched-ext (BPF) schedulers when `scx-manager` is installed.
+- **Version visible in the UI** — the running version is shown in the window title and the status bar.
 
 ## Supported kernels
 
@@ -61,22 +64,11 @@ kernel-manager tracks 21 maintained Arch kernel variants, each mapped to its own
 
 ## How it works
 
-kernel-manager offers three complementary paths:
-
-- **Install pre-compiled** — one action installs the kernel package from your configured pacman repositories (or the AUR, via `paru`), rebuilds the kernel-specific drivers for the new kernel, regenerates the initramfs (dracut / mkinitcpio), and refreshes the bootloader. The kernel list is complete: kernels whose repository is not enabled appear as clearly-marked, non-selectable info-rows with the reason (repository not enabled vs. package not in the repository), the **Installed** column truthfully reports which kernels are installed on this system (pacman local DB, ✓/—), and the context menu's *Install pre-compiled* action reflects real availability.
-- **Install from a directory** — for packages built anywhere (your own `makepkg` run, a download, another machine): right-click the "Install from directory…" row, pick the folder with the `*.pkg.tar.zst` package(s), and kernel-manager installs them with `pacman -U`, regenerates the initramfs, and refreshes the bootloader. The kernel then appears in the list as a `local/<name>` entry, removable by unchecking it.
-- **Build custom** — the configure flow clones the selected source (an AUR package or any git URL) into the build directory of your choice (bottom-left selector, persisted), lets you adjust compile options and patches, and compiles the kernel with `makepkg` (missing GPG signing keys are imported automatically).
-
-After a kernel is installed or built, kernel-manager detects your boot loader (in priority order: Unified Kernel Image → systemd-boot → GRUB → unknown) and shows numbered steps for selecting the new kernel at your next boot — including the mandatory `/boot/vmlinuz-<pkg>` / `mkinitcpio` note — and for making it the default entry.
-
-Privileged operations (kernel install and removal, custom-build installation) are escalated through a single polkit `auth_admin` action via `pkexec`; no `sudo` is required.
-
-### Note on AUR builds
-
-Kernel builds from AUR sources validate the source checksums declared in the PKGBUILD (`--skipchecksums` is *not* used). If an AUR package's source URL changes but its published checksums no longer match, the build will fail by design — the AUR package needs to be updated (re-cloned) before it can be built again.
+Pick a kernel and its build options — kernel-manager clones the AUR source, builds it with `makepkg`, and installs it with a single `pacman -U`. The distro's own post-transaction hooks (NVIDIA DKMS, `kernel-install`/dracut) then rebuild drivers, regenerate the initramfs, and create the bootloader entry. kernel-manager reports success or failure with the real exit code — no silent skips and no ambiguous "probably fine" states — and a bootloader-aware dialog walks you through selecting the new kernel at your next start.
 
 ## Requirements
 
+- A recent Arch Linux or Arch-based distribution (EndeavourOS, CachyOS, Manjaro, Garuda, and others — see the distribution-aware behavior above)
 - C++23 compiler (tested with GCC 14+ and Clang 18)
 - Qt6 (Widgets, Concurrent, LinguistTools)
 - `libalpm` (pacman) ≥ 13.0.0 and `glib` ≥ 2.72.1
@@ -159,12 +151,33 @@ cmake --build build -j$(nproc)
 
 `scx-manager` ships in the CachyOS repository and is available via the AUR on generic Arch; it is declared as an optional dependency (`optdepends`) in the package builds.
 
-## Libraries used
+## Development
 
-- [Qt](https://www.qt.io) — used for the GUI.
-- [fmt](https://github.com/fmtlib/fmt) — string formatting, output, and logging (fetched via CPM).
-- [frozen](https://github.com/serge-sans-paille/frozen) — compile-time option maps.
-- [Corrosion](https://github.com/corrosion-rs/corrosion) / [cxx](https://github.com/dtolnay/cxx) — the Rust config bridge.
+**Build from source** (see [Installing](#from-source)):
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
+./build/kernel-manager
+```
+
+**Run the tests** — the project ships a standalone unit-test suite of 15 harnesses under `tests/` (one `run_*.sh` driver each), which compile the relevant sources with the project's full warning set and assert against the real APIs. The full suite is expected to pass with zero compiler warnings:
+
+```sh
+for t in tests/run_*.sh; do bash "$t"; done
+```
+
+An offscreen smoke launch (`QT_QPA_PLATFORM=offscreen ./build/kernel-manager`) should stay alive with no output.
+
+**Project structure:**
+
+- `src/` — the C++23 / Qt6 application (main window, configure dialog, install engine, bootloader + distro detection, terminal helpers)
+- `config-option-lib/` — the Rust config-option bridge (built into the C++ app via Corrosion / cxx)
+- `tests/` — the standalone test harnesses and their `run_*.sh` drivers
+- `cmake/` — CMake modules and configuration
+- `icons/`, `lang/` — the application icon assets and translation catalogs
+
+**Libraries:** Qt (GUI), fmt (string formatting / logging, via CPM), frozen (compile-time option maps), and Corrosion / cxx (the Rust config bridge).
 
 ## Contributing
 

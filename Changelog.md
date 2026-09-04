@@ -1,5 +1,22 @@
 # Changelog
 
+### v1.26.0 (2026-09-04)
+
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/045feca...12693a4)
+
+#### Changed
+- **Install flow simplified** — the install now relies on the distro's own alpm hooks (NVIDIA DKMS, `kernel-install`/dracut) for all post-install work instead of the app's own tail script. One code path for every install.
+- **Install result simplified to two states** — an install is **Installed** (green) or **Failed** (red, with the real exit code). The terminal output is the source of truth for DKMS/initramfs details.
+
+#### Added
+- **App version displayed in the UI** — the running version now appears in the window title and a permanent status-bar label (auto-tracks the CMake project version).
+
+#### Removed
+- The app no longer invokes `postinstall_tail.sh` during install (the script is kept in the tree as a manual repair tool).
+- The 3-state boot-safety verdict is replaced by the simpler 2-state result.
+
+> Note: the distribution-awareness layer, the machine-state-robust k11 test expectation, and the CMake project-version correction (1.19.0 → 1.25.0) all shipped in v1.25.0 and are recorded in that entry — they are intentionally not repeated here.
+
 ### v1.25.0 (2026-09-03)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/97e505b...045feca)
