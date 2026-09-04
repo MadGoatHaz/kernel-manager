@@ -44,9 +44,10 @@ int run_real_command(const std::string& cmd, bool escalate) noexcept {
 }
 
 // A step that installs a package (pacman/paru/makepkg — the custom
-// build runs makepkg through build_helper.sh), as opposed to the
-// post-install tail (the DKMS build + initramfs regeneration + GRUB
-// config).
+// build runs makepkg through build_helper.sh). Since simplify-K1 every
+// plan step is a package install step (the distro's ALPM hooks do the
+// post-install work inside the transaction — there is no app-side
+// tail), so this classifies all of them.
 [[gnu::pure]] bool is_package_install_step(const std::string& cmd) {
     return cmd.starts_with("pacman ") || cmd.starts_with("paru ") || cmd.starts_with("makepkg ")
            || cmd.starts_with(KM_HELPER_DIR "/build_helper.sh");
@@ -67,52 +68,6 @@ std::string shell_quote(std::string_view s) {
     }
     quoted += "'";
     return quoted;
-}
-
-// The bootloader name as postinstall_tail.sh's `case "$BL"` consumes it
-// (the chunk C contract: the lowercase systemd-boot / grub / uki /
-// unknown). The UI-facing bootloader_name() returns different strings
-// ("GRUB", "Unified Kernel Image (UKI)", "Unknown") that would fall into
-// the tail's out-of-contract default (no BLS/grub check at all), so map
-// the enum to the tail's exact names.
-[[gnu::pure]] std::string tail_bootloader_name(Bootloader bl) {
-    switch (bl) {
-        case Bootloader::SYSTEMD_BOOT: return "systemd-boot";
-        case Bootloader::GRUB:         return "grub";
-        case Bootloader::UKI:          return "uki";
-        case Bootloader::UNKNOWN:      return "unknown";
-    }
-    return "unknown";
-}
-
-// The verdict's log/UI label (D-E): the honest 3-state name the result
-// line and the dialogs carry.
-[[gnu::pure]] std::string verdict_label(PostinstallVerdict verdict) {
-    switch (verdict) {
-        case PostinstallVerdict::BOOT_SAFE:               return "BOOT_SAFE";
-        case PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE: return "INSTALLED_NOT_BOOT_SAFE";
-        case PostinstallVerdict::INSTALLATION_FAILED:     return "INSTALLATION_FAILED";
-    }
-    return "UNKNOWN";
-}
-
-// The single consolidated post-install tail every precompiled install
-// gets (chunk E, phase b): ONE escalated postinstall_tail.sh step (the
-// script produced by chunks A/B/C) that, in ONE root session, syncs the
-// kernel drivers, regenerates the initramfs for the new <KVER>, verifies
-// boot-safety and exits with the 3-state verdict rc. `pkgname` is the
-// installed package (the dir flow's .PKGINFO pkgname, the repo/AUR flow's
-// table package) and `kver` the new kernel's version (the dir flow's
-// .PKGINFO version; the repo/AUR flow passes the EMPTY version, which the
-// tail then derives from the local DB itself). This replaces the old
-// three inline fire-and-forget steps (driver rebuild / initramfs / GRUB
-// refresh).
-void append_postinstall_tail(std::vector<InstallStep>& steps, Bootloader bl,
-                             std::string_view pkgname, std::string_view kver) {
-    steps.push_back(
-        {KM_HELPER_DIR "/postinstall_tail.sh " + shell_quote(pkgname) + " " + shell_quote(kver) + " "
-         + shell_quote(tail_bootloader_name(bl)),
-         true});
 }
 
 // The built-package suffix (D2: the literal .pkg.tar.zst per the user
@@ -234,7 +189,7 @@ void append_log(const std::string& log_path, std::string_view text) {
 
 }  // namespace
 
-std::vector<InstallStep> plan_steps(const KnownKernel& kernel, Bootloader bl) {
+std::vector<InstallStep> plan_steps(const KnownKernel& kernel) {
     std::vector<InstallStep> steps{};
 
     if (kernel.precompiled_available && !kernel.install_package.empty()) {
@@ -247,13 +202,11 @@ std::vector<InstallStep> plan_steps(const KnownKernel& kernel, Bootloader bl) {
         } else {
             // Every documented pacman repo (core/extra/cachyos/
             // chaotic-aur/liquorix, or a third-party one the user
-            // added) installs through pacman.
+            // added) installs through pacman. The distro's ALPM hooks
+            // (70-dkms-install, 90-kernel-install) do the post-install
+            // work inside the transaction — there is no app-side tail.
             steps.push_back({"pacman -S --needed " + kernel.install_package, true});
         }
-        // Phase b: the single consolidated tail. The repo/AUR flow passes
-        // an EMPTY kver — the tail derives it from the local DB of the
-        // package phase a just installed (chunk A's awk, never uname).
-        append_postinstall_tail(steps, bl, kernel.install_package, "");
         return steps;
     }
 
@@ -291,49 +244,55 @@ InstallKernelResult install_kernel(const KnownKernel& kernel, CommandRunner runn
         runner = run_real_command;
     }
 
-    auto steps = plan_steps(kernel, bl);
+    auto steps = plan_steps(kernel);
 
     // AUR parity (the same pattern detail::install_aur_kernels uses): a
     // precompiled AUR install needs paru; without it the build path
-    // takes over instead of failing. Only reachable with the real
-    // runner — an injected runner asserts the exact paru sequence.
+    // takes over instead of failing (build + install in one makepkg
+    // command; the distro's ALPM hooks run inside its transaction).
+    // Only reachable with the real runner — an injected runner asserts
+    // the exact paru sequence.
     if (use_default_runner
         && kernel.install_repo == "aur"
         && !steps.empty()
         && steps.front().cmd.starts_with("paru ")) {
         if (utils::exec("command -v paru").empty()) {
             std::vector<std::string> packages{kernel.install_package};
-            detail::install_aur_kernels(packages);
-            steps.erase(steps.begin());  // keep the post-install tail
+            detail::install_aur_kernels(packages);  // blocks until the build terminal closes
+            // The build + install command was the install step here and
+            // it ran, but install_aur_kernels is void and discards the
+            // build's exit code, so this flow cannot confirm the
+            // outcome: report an honest failure + a pointer at the
+            // terminal output (the authoritative record), never a false
+            // success. (Capturing the AUR build's rc is a separate
+            // improvement — it would need an rc-returning
+            // install_aur_kernels.)
+            result.verdict = InstallVerdict::INSTALL_FAILED;
+            result.ok = false;
+            result.error = "AUR build + install ran via the build path (makepkg -sicf); this flow does not capture its exit code — check the terminal output";
+            return result;
         }
     }
 
-    // The execution loop (D-E, the 3-state verdict): the phase-(a) package
-    // install runs first; a failure there ⇒ INSTALLATION_FAILED and the tail
-    // never runs. The phase-(b) consolidated tail is identified by its
-    // postinstall_tail.sh command (not by position — the AUR-erase path may
-    // leave it as the only step); its REAL rc (the sentinel-captured exit
-    // code, chunk D) IS the verdict: 0 = BOOT_SAFE, != 0 = INSTALLED_NOT_BOOT_SAFE.
+    // The execution loop (simplify-K1, the 2-state result): the install
+    // command's REAL rc (the sentinel-captured exit code, chunk D) is
+    // the result: 0 = INSTALL_SUCCESS, != 0 = INSTALL_FAILED. The
+    // post-install work (nvidia DKMS, initramfs, BLS entry) is done by
+    // the distro's ALPM hooks inside the transaction — the app reports,
+    // it does not verify.
     for (const auto& step : steps) {
         const int rc = runner(step.cmd, step.escalate);
-        if (step.cmd.starts_with(KM_HELPER_DIR "/postinstall_tail.sh")) {
-            // Phase (b): the tail's real rc is the verdict. Never a false
-            // SUCCESS — the H3 fire-and-forget gap is closed by the sentinel.
-            if (rc == 0) {
-                result.verdict = PostinstallVerdict::BOOT_SAFE;
-                result.ok = true;
-            } else {
-                result.verdict = PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE;
-                result.ok = false;
-                result.error = "Post-install tail not boot-safe (exit code " + std::to_string(rc) + "): " + step.cmd;
-            }
-        } else if (rc != 0) {
-            // Phase (a): the package install itself failed (a missing/
-            // disabled repo, an unresolved conflict, a Polkit denial).
-            result.verdict = PostinstallVerdict::INSTALLATION_FAILED;
+        result.rc = rc;
+        if (rc == 0) {
+            result.verdict = InstallVerdict::INSTALL_SUCCESS;
+            result.ok = true;
+        } else {
+            // The install command itself failed (a missing/disabled
+            // repo, an unresolved conflict, a Polkit denial).
+            result.verdict = InstallVerdict::INSTALL_FAILED;
             result.ok = false;
             result.error = "Command failed (exit code " + std::to_string(rc) + "): " + step.cmd;
-            return result;  // the tail never runs; graceful, never a crash
+            return result;  // the remaining steps are skipped; graceful, never a crash
         }
     }
 
@@ -373,8 +332,9 @@ InstallPlan plan_install(std::string_view kernel_name) {
     }
 
     // Split the ordered plan into the package install commands and the
-    // post-install tail (computed for the live-detected bootloader).
-    for (const auto& step : plan_steps(kernel, detect_bootloader())) {
+    // post-install steps (always empty since simplify-K1 — the distro's
+    // ALPM hooks do the post-install work inside the transaction).
+    for (const auto& step : plan_steps(kernel)) {
         if (is_package_install_step(step.cmd)) {
             plan.install_cmds.push_back(step.cmd);
         } else {
@@ -498,10 +458,10 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
     // ABSOLUTE paths — no shell glob (D2: the 0c918d4 pkexec-CWD-reset
     // rationale, the root shell starts in $HOME so relative paths
     // break; quoting keeps a spaced name one word instead of
-    // word-splitting an expanded glob) — then the single consolidated
-    // post-install tail (phase b). The dir flow passes the resolved
-    // .PKGINFO name + version, so the tail targets the new <KVER>
-    // directly (no local-DB derivation needed here).
+    // word-splitting an expanded glob). The distro's ALPM hooks
+    // (70-dkms-install, 90-kernel-install) do the post-install work
+    // (nvidia DKMS, initramfs, BLS entry) inside the transaction —
+    // there is no app-side tail step.
     std::vector<InstallStep> steps{};
     std::string pacman_cmd = "pacman -U";
     for (const auto& pkg : pkgs) {
@@ -510,7 +470,6 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
         pacman_cmd += " '" + std::filesystem::absolute(pkg).string() + "'";
     }
     steps.push_back({pacman_cmd, true});
-    append_postinstall_tail(steps, bl, name, version);
 
     // The install log (the real runner only — an injected test runner
     // records the raw commands and never touches the filesystem, so it
@@ -538,23 +497,21 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
         result.log_path = log_path;
     }
 
-    // The execution loop (D-E, the 3-state verdict, with the install_logger
-    // wrapper for the real runner): the phase-(a) pacman -U runs first; a
-    // failure ⇒ INSTALLATION_FAILED and the tail never runs. The phase-(b)
-    // consolidated tail (identified by its postinstall_tail.sh command, not
-    // by position) is wrapped in install_logger.sh too, so its REAL rc (the
-    // sentinel-captured exit code, chunk D) lands in the log AND drives the
-    // verdict: 0 = BOOT_SAFE, != 0 = INSTALLED_NOT_BOOT_SAFE.
+    // The execution loop (simplify-K1, the 2-state result, with the
+    // install_logger wrapper for the real runner): the pacman -U's REAL
+    // rc (the sentinel-captured exit code, chunk D) lands in the log
+    // (via install_logger.sh) AND is the result: 0 = INSTALL_SUCCESS,
+    // != 0 = INSTALL_FAILED.
     for (std::size_t i = 0; i < steps.size(); ++i) {
         const auto& step = steps[i];
         // Real runner: run the step through the installed
         // install_logger.sh — its output streams to the terminal in
         // real time AND is appended to the log (the command, the start
         // time, the command's REAL exit code, the full output). The
-        // command stays a single quoted word: the tail step carries shell
-        // syntax (the quoted package name / version / bootloader args)
-        // that the script re-parses with `bash -c`, and runCmdTerminal's
-        // appended `; read -p …` prompt lands AFTER the wrapper on the
+        // command stays a single quoted word: the pacman -U carries
+        // shell syntax (the quoted package paths) that the script
+        // re-parses with `bash -c`, and runCmdTerminal's appended
+        // `; read -p …` prompt lands AFTER the wrapper on the
         // terminal's command line.
         std::string cmd = step.cmd;
         if (use_default_runner) {
@@ -562,30 +519,29 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
             cmd = KM_HELPER_DIR "/install_logger.sh " + shell_quote(log_path) + " " + shell_quote(label) + " " + shell_quote(cmd);
         }
         const int rc = runner(cmd, step.escalate);
-        if (step.cmd.starts_with(KM_HELPER_DIR "/postinstall_tail.sh")) {
-            // Phase (b): the tail's real rc is the verdict. Never a false
-            // SUCCESS — the H3 fire-and-forget gap is closed by the sentinel.
-            if (rc == 0) {
-                result.verdict = PostinstallVerdict::BOOT_SAFE;
-                result.ok = true;
-            } else {
-                result.verdict = PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE;
-                result.ok = false;
-                result.error = "Post-install tail not boot-safe (exit code " + std::to_string(rc) + "): " + step.cmd;
-            }
+        result.rc = rc;
+        if (rc == 0) {
+            // Installed: the package is in the local DB and the
+            // distro's ALPM hooks did the post-install work inside the
+            // transaction. Never a hard-coded SUCCESS — the rc is the
+            // sentinel-captured real exit code (H3 closed by the
+            // sentinel, chunk D).
+            result.verdict = InstallVerdict::INSTALL_SUCCESS;
+            result.ok = true;
             if (use_default_runner) {
-                append_log(log_path, "=== Result: " + verdict_label(result.verdict) + " ===");
+                append_log(log_path, "=== Result: SUCCESS ===");
             }
-        } else if (rc != 0) {
-            // Phase (a): the package install itself failed.
-            result.verdict = PostinstallVerdict::INSTALLATION_FAILED;
+        } else {
+            // The pacman -U itself failed (a broken package, an
+            // unresolved conflict, a Polkit denial).
+            result.verdict = InstallVerdict::INSTALL_FAILED;
             result.ok = false;
             result.error = "Command failed (exit code " + std::to_string(rc) + "): " + step.cmd;
             if (use_default_runner) {
                 append_log(log_path, "=== Result: FAILED (step " + std::to_string(i + 1) + ": " + short_label(step.cmd)
-                                 + ", exit code " + std::to_string(rc) + ") ===");
+                                     + ", exit code " + std::to_string(rc) + ") ===");
             }
-            return result;  // the tail never runs; graceful, never a crash
+            return result;  // the remaining steps are skipped; graceful, never a crash
         }
     }
 

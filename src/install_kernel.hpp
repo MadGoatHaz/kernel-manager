@@ -54,20 +54,17 @@ struct InstallStep {
 using CommandRunner = std::function<int(const std::string& cmd, bool escalate)>;
 
 // Pure install planning (no filesystem access, no commands run): the
-// ordered step list that installs the given kernel on the given
-// bootloader, derived only from the curated table data
-// (known_kernels.hpp):
+// ordered step list that installs the given kernel, derived only from
+// the curated table data (known_kernels.hpp). Since simplify-K1 the app
+// relies on the distro's ALPM hooks (70-dkms-install, 90-kernel-install)
+// for the post-install work (nvidia DKMS, initramfs, BLS entry) — they
+// run inside the pacman transaction — so the plan carries only the
+// package install step:
 //   precompiled + pacman repo (core/extra/cachyos/chaotic-aur/liquorix):
-//       `pacman -S --needed <package>` (escalated, phase a)
-//       -> the single consolidated post-install tail (phase b): ONE
-//          escalated `postinstall_tail.sh <pkg> <kver|empty> <bl>` step
-//          (the script produced by chunks A/B/C) that, in ONE root
-//          session, syncs the kernel drivers, regenerates the initramfs
-//          for <kver>, verifies boot-safety and exits with the 3-state
-//          verdict rc (0 = BOOT_SAFE, 1 = INSTALLED_NOT_BOOT_SAFE)
+//       `pacman -S --needed <package>` (escalated)
 //   precompiled + AUR (install_repo == "aur"):
 //       `paru -S --needed <package>` (not escalated — an AUR build runs
-//       as the user) -> the same single tail step
+//       as the user)
 //   buildable only (no precompiled package):
 //       `KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild"` (not
 //       escalated — the makepkg wrapper auto-imports a missing GPG key
@@ -75,35 +72,38 @@ using CommandRunner = std::function<int(const std::string& cmd, bool escalate)>;
 //       by the existing build environment — see detail::install_aur_kernels
 //       in aur_kernel.cpp and the Build-custom (Configure) flow)
 //   neither: an empty plan.
-[[gnu::pure]] [[nodiscard]] std::vector<InstallStep> plan_steps(const KnownKernel& kernel, Bootloader bl);
+[[gnu::pure]] [[nodiscard]] std::vector<InstallStep> plan_steps(const KnownKernel& kernel);
 
-// The honest 3-state result of a precompiled install (D-E, R4): computed
-// from the TWO real exit codes the terminal-helper sentinel (chunk D)
-// captures — the phase-(a) package-install rc and the phase-(b)
-// consolidated-tail (postinstall_tail.sh, chunks A/B/C) rc. Never a
-// hard-coded SUCCESS (the old all-`|| true` + unconditional "SUCCESS"
-// verification, H3, is gone).
-//   BOOT_SAFE               — phase a rc 0 AND the tail rc 0: installed and
-//                             confirmed boot-safe (driver modules + a
-//                             non-empty per-<KVER> initramfs + a boot entry).
-//   INSTALLED_NOT_BOOT_SAFE — phase a rc 0 but the tail rc != 0: the package
-//                             is installed but a tail stage left a gap
-//                             (a DISTINCT, honest outcome, never masked as ok).
-//   INSTALLATION_FAILED     — the phase-(a) package install itself failed;
-//                             the tail never runs.
-enum class PostinstallVerdict { BOOT_SAFE, INSTALLED_NOT_BOOT_SAFE, INSTALLATION_FAILED };
+// The honest 2-state result of a package install (simplify-K1): computed
+// from the REAL exit code the terminal-helper sentinel (chunk D) captures
+// for the install command itself. The app relies on the distro's ALPM
+// hooks (70-dkms-install, 90-kernel-install) for the post-install work
+// (nvidia DKMS, initramfs, BLS entry) — they run inside the pacman
+// transaction — so the app only reports whether the install command
+// succeeded. Never a hard-coded SUCCESS (the old all-`|| true` +
+// unconditional "SUCCESS" verification, H3, is gone).
+//   INSTALL_SUCCESS — the install command exited 0: the package is
+//                     installed and the ALPM hooks did the post-install
+//                     work.
+//   INSTALL_FAILED  — the install command exited non-zero, or no install
+//                     command could run / its rc is not captured (the
+//                     reason is in the result's `error` text).
+enum class InstallVerdict { INSTALL_SUCCESS, INSTALL_FAILED };
 
 // Result of one install_kernel() run: the outcome flag + error text, the
-// 3-state post-install verdict, and the post-install boot-selection steps.
-// `ok` is true iff the verdict is BOOT_SAFE (phase a AND the tail both rc
-// 0). The instructions are filled on every run (they describe the detected
-// bootloader and the kernel, not the outcome), so the caller can show them
-// even after a failure.
+// 2-state install verdict, the install command's real exit code (`rc`;
+// -1 = no install command ran, or its rc is not captured), and the
+// post-install boot-selection steps. `ok` is true iff the verdict is
+// INSTALL_SUCCESS (the install command exited 0). The instructions are
+// filled on every run (they describe the detected bootloader and the
+// kernel, not the outcome), so the caller can show them even after a
+// failure.
 struct InstallKernelResult {
     bool ok = false;
     std::string error;
     std::vector<std::string> boot_instructions;
-    PostinstallVerdict verdict = PostinstallVerdict::INSTALLATION_FAILED;
+    InstallVerdict verdict = InstallVerdict::INSTALL_FAILED;
+    int rc = -1;
 };
 
 // Executes the plan for `kernel` (plan_steps above): runs each step
@@ -120,7 +120,7 @@ struct InstallKernelResult {
 //   - a buildable-only kernel (no precompiled package) fails gracefully
 //     with a message pointing at the Build-custom (Configure) flow and
 //     runs no command
-// `bl` is the bootloader the post-install tail targets (default: the
+// `bl` is the bootloader the boot instructions describe (default: the
 // live detection, detect_bootloader()).
 [[nodiscard]] InstallKernelResult install_kernel(const KnownKernel& kernel,
                                                  CommandRunner runner = CommandRunner{},
@@ -136,24 +136,24 @@ struct InstallPlan {
     std::string package; // pre-compiled package name ("" if none)
     std::string repo;    // pacman repo name ("aur" when AUR; "" when unknown)
     bool precompiled = false;
-    std::vector<std::string> install_cmds;      // the package install step(s) (phase a)
-    std::vector<std::string> postinstall_cmds;  // the single consolidated post-install tail (phase b): one postinstall_tail.sh step (driver sync + initramfs for <KVER> + boot-safety verify, chunks A/B/C) carrying the 3-state verdict rc
+    std::vector<std::string> install_cmds;      // the package install step(s)
+    std::vector<std::string> postinstall_cmds;  // always empty since simplify-K1: the post-install work (nvidia DKMS, initramfs, BLS entry) is done by the distro's ALPM hooks inside the pacman transaction — there is no app-side tail
     std::string note;                           // build-only guidance ("" when precompiled)
 };
 
 // The install plan for a kernel name: the table lookup + plan_steps,
-// split into the package install commands and the post-install tail
-// (computed for the live-detected bootloader). A build-only (or
-// unknown) kernel gets empty command lists and a note pointing at the
-// Build-custom (Configure) flow.
+// split into the package install commands (postinstall_cmds is always
+// empty since simplify-K1 — the distro's ALPM hooks do the post-install
+// work inside the transaction). A build-only (or unknown) kernel gets
+// empty command lists and a note pointing at the Build-custom
+// (Configure) flow.
 [[nodiscard]] InstallPlan plan_install(std::string_view kernel_name);
 
-// Executes a plan: the install commands first, then the post-install
-// tail, each through `runner` (an empty runner selects the real
-// utils::runCmdTerminal, escalated). Graceful: the first failing
-// command lands in `error_out` and false is returned, the remaining
-// commands are skipped, no crash. A build-only plan (precompiled =
-// false) returns false with the note and runs nothing.
+// Executes a plan: the install command(s) through `runner` (an empty
+// runner selects the real utils::runCmdTerminal, escalated). Graceful:
+// the first failing command lands in `error_out` and false is returned,
+// the remaining commands are skipped, no crash. A build-only plan
+// (precompiled = false) returns false with the note and runs nothing.
 [[nodiscard]] bool execute_plan(const InstallPlan& plan,
                                 std::string& error_out,
                                 CommandRunner runner = CommandRunner{});
@@ -196,18 +196,19 @@ struct InstallPlan {
                                 std::string& version_out);
 
 // Result of one install_from_directory() run: the outcome flag + error
-// text, the 3-state post-install verdict (D-E), the installed kernel's
+// text, the 2-state install verdict (simplify-K1), the pacman -U's real
+// exit code (`rc`; -1 = no install command ran), the installed kernel's
 // name + version (for the boot-instructions display and the list refresh),
 // the post-install boot-selection steps, and the install log's path. `ok`
-// is true iff the verdict is BOOT_SAFE. The instructions are filled on
-// every run (they describe the detected bootloader and the kernel, not the
-// outcome), so the caller can show them even after a failure — except when
-// the directory holds no packages at all (zero commands, no kernel to point
-// at). `log_path` is filled only for the real (default) runner: the log
-// holds every executed step's command, real exit code and full output plus
-// the tail's VERDICT line (see install_from_directory below); an injected
-// test runner executes nothing, so it gets an empty `log_path` (zero
-// filesystem side effects).
+// is true iff the verdict is INSTALL_SUCCESS (pacman -U exited 0). The
+// instructions are filled on every run (they describe the detected
+// bootloader and the kernel, not the outcome), so the caller can show them
+// even after a failure — except when the directory holds no packages at all
+// (zero commands, no kernel to point at). `log_path` is filled only for the
+// real (default) runner: the log holds every executed step's command, real
+// exit code and full output plus the result line (see
+// install_from_directory below); an injected test runner executes nothing,
+// so it gets an empty `log_path` (zero filesystem side effects).
 struct DirInstallResult {
     bool ok = false;
     std::string error;
@@ -215,30 +216,32 @@ struct DirInstallResult {
     std::string version;
     std::vector<std::string> boot_instructions;
     std::string log_path;  // the install log ("" for an injected runner)
-    PostinstallVerdict verdict = PostinstallVerdict::INSTALLATION_FAILED;
+    InstallVerdict verdict = InstallVerdict::INSTALL_FAILED;
+    int rc = -1;
 };
 
 // Install the built packages found in `dir` (list_local_packages): one
 // escalated `pacman -U` of the explicit single-quoted ABSOLUTE paths
 // (no shell glob — the 0c918d4 pkexec-CWD-reset rationale: the root
 // shell starts in $HOME, so relative paths break, and quoting keeps a
-// spaced name one word instead of word-splitting an expanded glob)
-// followed by the single consolidated post-install tail (one escalated
-// postinstall_tail.sh step: driver sync + the initramfs for the new
-// <KVER> + the boot-safety verify, chunks A/B/C), each step through
-// `runner`:
+// spaced name one word instead of word-splitting an expanded glob),
+// through `runner`. The distro's ALPM hooks (70-dkms-install,
+// 90-kernel-install) do the post-install work (nvidia DKMS, initramfs,
+// BLS entry) inside the transaction — there is no app-side tail step:
 //   - an empty runner selects the real one (utils::runCmdTerminal, the
 //     shared pkexec terminal path; resolved in the .cpp so this header
 //     stays Qt-free)
 //   - a directory with no *.pkg.tar.zst packages fails with the
 //     "no *.pkg.tar.zst packages found in '<dir>'" error and runs zero
 //     commands (the D2 guard)
-//   - the first failing step lands in `error` (the command + its exit
-//     code), the remaining steps are skipped — graceful, never a crash
+//   - the pacman -U's REAL rc (the sentinel-captured exit code) is the
+//     result: 0 = INSTALL_SUCCESS (ok = true), != 0 = INSTALL_FAILED
+//     (ok = false, the command + its exit code land in `error`) —
+//     graceful, never a crash
 // `name`/`version` come from the first package whose .PKGINFO parses
 // to a non-headers kernel name (read_pkginfo), else the first filename
 // (best-effort: the .pkg.tar.zst suffix stripped); `bl` is the
-// bootloader the post-install tail targets (default: the live
+// bootloader the boot instructions describe (default: the live
 // detection, detect_bootloader()).
 //
 // Install logging (real runner only — an injected runner records the
@@ -249,13 +252,13 @@ struct DirInstallResult {
 // executed step (the command, start time, the command's REAL exit code
 // and its full stdout+stderr — each step runs through the installed
 // install_logger.sh helper, which streams the output to the terminal in
-// real time AND appends it to the log) + a result tail (the verdict:
-// BOOT_SAFE, INSTALLED_NOT_BOOT_SAFE, or FAILED naming the first failing
-// step). The consolidated tail's own verify stage (the driver modules, the
-// per-<KVER> initramfs, the boot entry) is what the log's boot-safety
-// record is — the separate read-only verification compound command is gone,
-// the tail IS the verification now. The log is the post-mortem record: the
-// terminal windows are transient and their output is otherwise lost.
+// real time AND appends it to the log) + a result tail (SUCCESS, or
+// FAILED naming the first failing step + its exit code). The pacman -U
+// command's real exit code + full output IS the install record: the
+// post-install work is done by the distro's ALPM hooks inside the
+// transaction, so there is no separate app-side verification. The log is
+// the post-mortem record: the terminal windows are transient and their
+// output is otherwise lost.
 [[nodiscard]] DirInstallResult install_from_directory(std::string_view dir,
                                                       CommandRunner runner = CommandRunner{},
                                                       Bootloader bl = detect_bootloader());
