@@ -313,79 +313,47 @@ void show_boot_instructions(QWidget* parent, const std::vector<std::string>& ins
     dialog.exec();
 }
 
-// ── The 3-state verdict outcome dialog (D-E, chunk E2) ────────────────
-// The install result's PostinstallVerdict (chunk E) is one of three
-// states, each shown as a DISTINCT dialog (never masked as success):
-//   BOOT_SAFE               → green (Information): installed and confirmed
-//                             boot-safe — safe to reboot.
-//   INSTALLED_NOT_BOOT_SAFE → amber (Warning): installed but NOT confirmed
-//                             boot-safe — do NOT reboot; run
-//                             `sudo reinstall-kernels` to repair first.
-//   INSTALLATION_FAILED     → red (Critical): the install itself failed.
-// verdict_dialog() builds the (icon, text) for a given verdict + the
-// flow's data. It is pure and testable: the throwaway driver injects each
-// verdict and checks the text + icon without driving a blocking
-// QMessageBox. The caller raises + activates the window BEFORE the modal
-// (H1) and shows the QMessageBox with the returned icon + text.
+// ── The 2-state install outcome dialog (simplify-K1/K2) ───────────────
+// The install result's InstallVerdict (simplify-K1) is one of two
+// states, each shown as a DISTINCT dialog. The terminal's output is the
+// source of truth for the post-install details (nvidia DKMS, initramfs,
+// BLS entry — done by the distro's ALPM hooks inside the pacman
+// transaction), so the app only reports success or failure:
+//   INSTALL_SUCCESS → green (Information): the install command exited 0
+//                     — the package is in; reboot when ready.
+//   INSTALL_FAILED  → red (Critical): the install command exited
+//                     non-zero — the text carries the real rc and points
+//                     at the terminal output for the details.
+// verdict_dialog() builds the (icon, text) for a given verdict + rc. It
+// is pure and testable: the driver injects each verdict and checks the
+// text + icon without driving a blocking QMessageBox. The caller raises
+// + activates the window BEFORE the modal (H1) and shows the
+// QMessageBox with the returned icon + text.
 
-// The data the outcome dialog is built from: the verdict, the kernel's
-// display subject (the name, or "name (version)" for the directory flow),
-// the error line ("" for BOOT_SAFE), the post-install boot-selection
-// steps, the install log path ("" for the pre-compiled flow, which keeps
-// no log), the source directory ("" for the pre-compiled flow), and which
-// flow produced the result.
+// The data the outcome dialog is built from: the verdict + the install
+// command's real exit code (`rc`; -1 = no install command ran, e.g. the
+// build-only graceful failure — the reason is in the result's `error`).
 struct VerdictDialogSpec {
-    PostinstallVerdict verdict = PostinstallVerdict::INSTALLATION_FAILED;
-    QString subject;  // "linux" (pre-compiled) / "linux-cachyos-custom 7.2.2-1" (dir)
-    QString error;    // the result error line ("" for BOOT_SAFE)
-    std::vector<std::string> boot_instructions;  // the post-install steps
-    QString log_path;  // "" when the flow keeps no log
-    QString dir;       // the source directory (the dir flow only)
-    bool dir_flow = false;  // true = on_install_from_directory
+    InstallVerdict verdict = InstallVerdict::INSTALL_FAILED;
+    int rc = -1;
 };
 
-// The dialog a verdict produces: the icon (green/amber/red) + the full
-// text.
+// The dialog a verdict produces: the icon (green/red) + the full text.
 struct VerdictDialog {
     QMessageBox::Icon icon = QMessageBox::Critical;
     QString text;
 };
 
 [[nodiscard]] VerdictDialog verdict_dialog(const VerdictDialogSpec& spec) {
-    // The numbered boot-selection steps (the shape the success dialog
-    // built inline before this refactor).
-    QString instructions;
-    for (std::size_t i = 0; i < spec.boot_instructions.size(); ++i) {
-        instructions += QLatin1Char('\n');
-        instructions += QStringLiteral("%1. %2").arg(static_cast<int>(i + 1)).arg(QString::fromStdString(spec.boot_instructions[i]));
-    }
-    // The install log's path line ("" for the pre-compiled flow, which
-    // keeps no log).
-    QString log_line;
-    if (!spec.log_path.isEmpty()) {
-        log_line = QStringLiteral("\n\n") + QObject::tr("Log: %1").arg(spec.log_path);
-    }
-
     VerdictDialog d{};
-    if (spec.verdict == PostinstallVerdict::BOOT_SAFE) {
+    if (spec.verdict == InstallVerdict::INSTALL_SUCCESS) {
         d.icon = QMessageBox::Information;
-        d.text = QObject::tr("Installed '%1'. Boot-safe — ready to select at the next restart:").arg(spec.subject)
-                 + instructions + log_line;
-    } else if (spec.verdict == PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE) {
-        d.icon = QMessageBox::Warning;
-        d.text = QObject::tr("Installed '%1', but it is NOT confirmed boot-safe:\n%2\n\n"
-                             "Do NOT reboot. Run `sudo reinstall-kernels` to repair it before "
-                             "relying on it to boot.")
-                     .arg(spec.subject, spec.error)
-                 + instructions + log_line;
+        d.text = QObject::tr("Kernel installed successfully. You can reboot when ready.");
     } else {
-        // INSTALLATION_FAILED: the install itself failed.
+        // INSTALL_FAILED: the install command exited non-zero (or never
+        // ran — rc -1); the terminal output is the detail record.
         d.icon = QMessageBox::Critical;
-        if (spec.dir_flow) {
-            d.text = QObject::tr("Failed to install from '%1':\n%2").arg(spec.dir, spec.error) + log_line;
-        } else {
-            d.text = QObject::tr("Failed to install '%1':\n%2").arg(spec.subject, spec.error) + log_line;
-        }
+        d.text = QObject::tr("Kernel installation failed (rc=%1). Check the terminal output for details.").arg(spec.rc);
     }
     return d;
 }
@@ -782,9 +750,9 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
         // The K8 install path (chunk E): build the table entry (the same
         // K1-fallback shape plan_install uses) and run the install through
         // the shared pkexec terminal path. Synchronous for now (a progress
-        // dialog is a later refinement); the 3-state PostinstallVerdict in
-        // the result decides which outcome dialog is shown below (green /
-        // amber / red — never a masked success).
+        // dialog is a later refinement); the 2-state InstallVerdict in
+        // the result decides which outcome dialog is shown below (green
+        // for INSTALL_SUCCESS / red for INSTALL_FAILED).
         KnownKernel kernel{};
         if (const auto entry = km::find_kernel(name); entry.has_value()) {
             kernel = **entry;
@@ -798,13 +766,9 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
         }
         const InstallKernelResult result = install_kernel(kernel);
 
-        // The pre-compiled flow shows the kernel name only (no version)
-        // and keeps no install log (that is the directory flow's).
         VerdictDialogSpec spec{};
         spec.verdict = result.verdict;
-        spec.subject = display;
-        spec.error = QString::fromStdString(result.error);
-        spec.boot_instructions = result.boot_instructions;
+        spec.rc = result.rc;
         const auto d = verdict_dialog(spec);
 
         // Raise + activate BEFORE the modal (H1): after the synchronous
@@ -882,7 +846,8 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
 // where locally built packages live), the C2 install_from_directory()
 // with the REAL runner (the escalated pkexec terminal — the whole install
 // is visible to the user, the synchronous pattern of the pre-compiled
-// install above), then the boot-selection dialog and a same-thread list
+// install above), then the 2-state outcome dialog (green for
+// INSTALL_SUCCESS / red for INSTALL_FAILED) and a same-thread list
 // refresh so the just-installed kernel's row appears immediately.
 void MainWindow::on_install_from_directory() noexcept {
     const QString dir = QFileDialog::getExistingDirectory(this, tr("Choose build directory…"), QString::fromStdString(utils::build_repo_path().string()));
@@ -891,24 +856,18 @@ void MainWindow::on_install_from_directory() noexcept {
     }
 
     // The real runner: an empty CommandRunner selects run_real_command
-    // (utils::runCmdTerminal, escalated). The run is logged (every step's
-    // command, real exit code and full output + the tail's VERDICT line):
-    // r.log_path names the file, shown in the outcome dialog below so the
-    // output of the (transient) terminal windows stays diagnosable after
-    // the fact.
+    // (utils::runCmdTerminal, escalated). The terminal's output is the
+    // source of truth for the install's details (the distro's ALPM hooks
+    // do the post-install work inside the transaction); the run is also
+    // logged to r.log_path as a post-mortem record.
     const DirInstallResult r = install_from_directory(dir.toStdString());
 
-    // The outcome dialog from the verdict (D-E, chunk E2): green for
-    // BOOT_SAFE, amber for INSTALLED_NOT_BOOT_SAFE (the package IS present
-    // — refresh so its row appears), red for INSTALLATION_FAILED.
+    // The outcome dialog from the verdict (simplify-K1/K2): green for
+    // INSTALL_SUCCESS, red for INSTALL_FAILED (the real rc is in the
+    // text; the terminal output is the detail record).
     VerdictDialogSpec spec{};
     spec.verdict = r.verdict;
-    spec.subject = QString("%1 (%2)").arg(QString::fromStdString(r.name), QString::fromStdString(r.version));
-    spec.error = QString::fromStdString(r.error);
-    spec.boot_instructions = r.boot_instructions;
-    spec.log_path = QString::fromStdString(r.log_path);
-    spec.dir = dir;
-    spec.dir_flow = true;
+    spec.rc = r.rc;
     const auto d = verdict_dialog(spec);
 
     // Raise + activate BEFORE the modal (H1): after the synchronous
@@ -925,10 +884,9 @@ void MainWindow::on_install_from_directory() noexcept {
 
     // Same-thread refresh (the C5 Add-repo pattern) so the just-installed
     // kernel's row — local/… (C1) or its repo row — appears with the
-    // Installed ✓. The package is present for BOOT_SAFE and
-    // INSTALLED_NOT_BOOT_SAFE (phase a succeeded); only INSTALLATION_FAILED
-    // (phase a failed) leaves the list unchanged.
-    if (r.verdict != PostinstallVerdict::INSTALLATION_FAILED) {
+    // Installed ✓. The package is present only for INSTALL_SUCCESS;
+    // INSTALL_FAILED leaves the list unchanged.
+    if (r.verdict != InstallVerdict::INSTALL_FAILED) {
         init_kernels();
     }
 }

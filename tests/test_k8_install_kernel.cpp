@@ -21,13 +21,16 @@
 // precedent of tests/run_k6.sh). Compiles the real module plus the
 // modules it reuses (known_kernels, bootloader, boot_instructions,
 // aur_kernel, utils) with the project's GCC warning set and asserts:
-//   - plan_steps (pure, table-driven): core pacman precompiled (exact
-//     2-step sequence — the package install + the single consolidated
-//     postinstall_tail.sh step (chunk E), per-bootloader tail args,
-//     escalation flags), the AUR branch (non-escalated `paru -S --needed`
-//     + the same single tail), buildable-only (single non-escalated
-//     build-helper step — makepkg with auto GPG import —, mirroring
-//     aur_kernel.cpp), synthetic entries (environment-independent)
+//   - plan_steps (pure, table-driven, bootloader-independent since
+//     simplify-K1): the SINGLE package install step — pacman repo
+//     precompiled (`pacman -S --needed`, escalated), AUR precompiled
+//     (`paru -S --needed`, not escalated — an AUR build runs as the
+//     user), buildable-only (the single non-escalated build-helper
+//     step — makepkg with auto GPG import —, mirroring aur_kernel.cpp),
+//     synthetic entries (environment-independent). There is NO app-side
+//     postinstall step: the distro's ALPM hooks (70-dkms-install,
+//     90-kernel-install) do the post-install work (nvidia DKMS,
+//     initramfs, BLS entry) inside the pacman transaction.
 //   - the real-table cases (linux always; linux-xanmod + linux-tkg
 //     gated on the K3 community rows so the harness passes on a
 //     13-row pre-K3 main too): xanmod is precompiled from the
@@ -36,14 +39,15 @@
 //   - plan_install (the name-based convenience API): table fields,
 //     prefix tolerance ("core/linux"), unknown-name fallback (no
 //     commands + the Build-custom note), build-only (no commands +
-//     note)
+//     note); postinstall_cmds is always empty (simplify-K1: the ALPM
+//     hooks do the post-install work inside the transaction)
 //   - install_kernel with a recording CommandRunner: the exact
-//     cmd/escalate sequence on success (package install + the single
-//     tail); the 3-state verdict (D-E) from the REAL rcs — phase-a
-//     rc!=0 => INSTALLATION_FAILED (the tail is skipped); tail rc 0 =>
-//     BOOT_SAFE (ok); tail rc 1 or 2 => INSTALLED_NOT_BOOT_SAFE (ok
-//     false, never a false SUCCESS); buildable-only => graceful note,
-//     zero commands run
+//     cmd/escalate sequence; the 2-state verdict (simplify-K1) from
+//     the REAL rc — rc 0 => INSTALL_SUCCESS (ok); any non-zero rc (1,
+//     7, the sentinel's 124 done-timeout / 126 Polkit-denied) =>
+//     INSTALL_FAILED (ok false, never a false SUCCESS, result.rc
+//     carries the real rc); buildable-only => graceful note, zero
+//     commands run, rc -1 (no install command ran to capture)
 //   - execute_plan: build-only => false + note (real runner selected
 //     but never used — nothing is executed); failing injected runner =>
 //     false + error + one command attempted; ok injected runner => true
@@ -78,43 +82,6 @@ bool contains(const std::string& hay, const std::string& needle) {
     return hay.find(needle) != std::string::npos;
 }
 
-// True when any command in the list STARTS with the prefix (a
-// substring match would be wrong: the guarded initramfs step contains
-// "mkinitcpio" as one of its `command -v` sub-actions, so only a
-// prefix test can tell a standalone mkinitcpio step from the guarded
-// sub-action). Used to assert no standalone mkinitcpio / dkms step is
-// present and that no GRUB refresh step is on the non-GRUB bootloaders.
-bool any_starts_with(const std::vector<std::string>& cmds, const std::string& prefix) {
-    for (const auto& cmd : cmds) {
-        if (cmd.starts_with(prefix)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// The single consolidated tail step append_postinstall_tail emits (chunk E;
-// the exact command the .cpp pushes, kept here so the assertions stay in
-// lockstep with the implementation): ONE postinstall_tail.sh call (chunks
-// A/B/C) carrying (pkgname, kver, bootloader). The bootloader name follows
-// the tail's `case "$BL"` contract (chunk C) — the lowercase systemd-boot /
-// grub / uki / unknown — NOT the UI-facing bootloader_name() strings
-// ("GRUB", "Unified Kernel Image (UKI)", "Unknown") that would fall into the
-// tail's out-of-contract default. `kver` is the .PKGINFO version for a dir
-// install and the EMPTY string for the repo/AUR flow (the tail then derives
-// it from the local DB). The single quotes mirror the .cpp's shell_quote for
-// these quote-free values.
-std::string tail_cmd(const std::string& pkg, const std::string& kver, Bootloader bl) {
-    const char* blname = "unknown";
-    switch (bl) {
-        case Bootloader::SYSTEMD_BOOT: blname = "systemd-boot"; break;
-        case Bootloader::GRUB:         blname = "grub"; break;
-        case Bootloader::UKI:          blname = "uki"; break;
-        case Bootloader::UNKNOWN:      blname = "unknown"; break;
-    }
-    return std::string(KM_HELPER_DIR) + "/postinstall_tail.sh '" + pkg + "' '" + kver + "' '" + blname + "'";
-}
-
 // The mandatory closing note: one constant text instructions_for (K6)
 // appends for every bootloader (the kernel is installed and ready to
 // boot; select it from the bootloader menu at next reboot — no tool
@@ -124,7 +91,10 @@ constexpr const char* expected_note =
 
 // A recording command runner: returns a fixed exit code for every step
 // and records the (cmd, escalate) pairs asked to run, so no real
-// terminal, pkexec, pacman or network is ever touched.
+// terminal, pkexec, pacman or network is ever touched. Since
+// simplify-K1 the plan is a single package install step, so one fixed
+// rc drives the whole 2-state verdict probe (0 / 1 / 7 / the
+// sentinel's 124 / 126).
 struct RecordingRunner {
     int rc = 0;
     std::vector<std::pair<std::string, bool>> calls{};
@@ -134,28 +104,15 @@ struct RecordingRunner {
     };
 };
 
-// A per-call scripted runner (the D-E 3-state verdict probe): returns a
-// distinct exit code for the Nth call (rcs[0] for call 1, rcs[1] for call 2,
-// ...; 0 past the end) and records the (cmd, escalate) pairs, so a phase-a
-// rc 0 + tail rc 1 can be driven to INSTALLED_NOT_BOOT_SAFE (and a phase-a
-// rc 7 to INSTALLATION_FAILED) — no real terminal, pkexec, pacman or network
-// is touched.
-struct ScriptedRunner {
-    std::vector<int> rcs{};
-    std::vector<std::pair<std::string, bool>> calls{};
-    CommandRunner fn = [this](const std::string& cmd, bool escalate) noexcept -> int {
-        calls.emplace_back(cmd, escalate);
-        const std::size_t idx = calls.size() - 1;
-        return idx < rcs.size() ? rcs[idx] : 0;
-    };
-};
-
 }  // namespace
 
 int main() {
     // ------------------------------------------------------------------
-    // 1. plan_steps: core pacman precompiled, per bootloader.
-    //    ("linux" is curated since K1 and is always in the table.)
+    // 1. plan_steps: core pacman precompiled (the single package
+    //    install step — bootloader-independent since simplify-K1: the
+    //    distro's ALPM hooks do the post-install work inside the
+    //    transaction). ("linux" is curated since K1 and is always in
+    //    the table.)
     // ------------------------------------------------------------------
     // find_kernel hands out optional<const KnownKernel*>; the "linux"
     // row is curated since K1 and is always in the table.
@@ -163,33 +120,19 @@ int main() {
     check(maybe_linux.has_value(), "table: 'linux' is curated");
     const KnownKernel* const linux = maybe_linux.has_value() ? *maybe_linux : nullptr;
     if (linux != nullptr) {
-        const std::vector<InstallStep> grub = plan_steps(*linux, Bootloader::GRUB);
-        check(grub.size() == 2, "linux+GRUB: exactly 2 steps (package install + the single consolidated tail)");
-        if (grub.size() == 2) {
-            check(grub[0].cmd == "pacman -S --needed linux" && grub[0].escalate,
-                  "linux+GRUB[0]: escalated `pacman -S --needed linux`");
-            check(grub[1].cmd == tail_cmd("linux", "", Bootloader::GRUB) && grub[1].escalate,
-                  "linux+GRUB[1]: the single consolidated tail (escalated; the GRUB refresh now lives inside it)");
-        }
-
-        for (const Bootloader bl : {Bootloader::SYSTEMD_BOOT, Bootloader::UKI, Bootloader::UNKNOWN}) {
-            const std::string label = bootloader_name(bl);
-            const std::vector<InstallStep> steps = plan_steps(*linux, bl);
-            check(steps.size() == 2,
-                  (label + ": exactly 2 steps (install + the single consolidated tail)").c_str());
-            if (steps.size() == 2) {
-                check(steps[0].cmd == "pacman -S --needed linux" && steps[0].escalate,
-                      (label + "[0]: pacman install").c_str());
-                check(steps[1].cmd == tail_cmd("linux", "", bl) && steps[1].escalate,
-                      (label + "[1]: the single consolidated tail (escalated, per-bootloader arg = the tail's name)").c_str());
-            }
+        const std::vector<InstallStep> steps = plan_steps(*linux);
+        check(steps.size() == 1, "linux: exactly 1 step (the package install — no app-side postinstall)");
+        if (steps.size() == 1) {
+            check(steps[0].cmd == "pacman -S --needed linux" && steps[0].escalate,
+                  "linux[0]: escalated `pacman -S --needed linux`");
         }
     }
 
     // ------------------------------------------------------------------
     // 2. plan_steps: the AUR branch (synthetic entry — the curated
     //    table documents no precompiled AUR row, but the branch must
-    //    exist): non-escalated `paru -S --needed`, same tail.
+    //    exist): the single non-escalated `paru -S --needed` (an AUR
+    //    build runs as the user), no app-side tail.
     // ------------------------------------------------------------------
     {
         const KnownKernel aur{
@@ -202,20 +145,11 @@ int main() {
             true,             // precompiled_available
             true              // buildable
         };
-        const std::vector<InstallStep> uki = plan_steps(aur, Bootloader::UKI);
-        check(uki.size() == 2, "AUR+UKI: exactly 2 steps (install + the single consolidated tail)");
-        if (uki.size() == 2) {
-            check(uki[0].cmd == "paru -S --needed linux-aurx" && !uki[0].escalate,
-                  "AUR+UKI[0]: non-escalated `paru -S --needed`");
-            check(uki[1].cmd == tail_cmd("linux-aurx", "", Bootloader::UKI) && uki[1].escalate,
-                  "AUR+UKI[1]: the single consolidated tail (escalated)");
-        }
-        const std::vector<InstallStep> grub = plan_steps(aur, Bootloader::GRUB);
-        check(grub.size() == 2, "AUR+GRUB: exactly 2 steps (install + the single consolidated tail)");
-        if (grub.size() == 2) {
-            check(grub[0].cmd == "paru -S --needed linux-aurx" && !grub[0].escalate, "AUR+GRUB[0]: paru non-escalated");
-            check(grub[1].cmd == tail_cmd("linux-aurx", "", Bootloader::GRUB) && grub[1].escalate,
-                  "AUR+GRUB[1]: the single consolidated tail (escalated)");
+        const std::vector<InstallStep> steps = plan_steps(aur);
+        check(steps.size() == 1, "AUR: exactly 1 step (the paru install — no app-side postinstall)");
+        if (steps.size() == 1) {
+            check(steps[0].cmd == "paru -S --needed linux-aurx" && !steps[0].escalate,
+                  "AUR[0]: non-escalated `paru -S --needed`");
         }
     }
 
@@ -235,7 +169,7 @@ int main() {
             false,           // precompiled_available
             true             // buildable
         };
-        const std::vector<InstallStep> steps = plan_steps(tkg, Bootloader::UNKNOWN);
+        const std::vector<InstallStep> steps = plan_steps(tkg);
         check(steps.size() == 1, "build-only: exactly 1 step");
         if (steps.size() == 1) {
             check(steps[0].cmd == KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild" && !steps[0].escalate,
@@ -253,21 +187,16 @@ int main() {
         const KnownKernel* const xanmod = *found;
         check(xanmod->precompiled_available && xanmod->install_repo == "chaotic-aur",
               "xanmod: precompiled from the chaotic-aur pacman repo (curated table)");
-        const std::vector<InstallStep> steps = plan_steps(*xanmod, Bootloader::SYSTEMD_BOOT);
-        check(steps.size() == 2, "xanmod+systemd-boot: exactly 2 steps (install + the single consolidated tail)");
-        if (steps.size() == 2) {
-            check(steps[0].cmd == "pacman -S --needed linux-xanmod" && steps[0].escalate,
-                  "xanmod[0]: escalated `pacman -S --needed linux-xanmod` (chaotic-aur is pacman, not AUR)");
-            check(steps[1].cmd == tail_cmd("linux-xanmod", "", Bootloader::SYSTEMD_BOOT) && steps[1].escalate,
-                  "xanmod+systemd-boot: the single consolidated tail (no separate GRUB refresh)");
-        }
+        const std::vector<InstallStep> steps = plan_steps(*xanmod);
+        check(steps.size() == 1 && steps[0].cmd == "pacman -S --needed linux-xanmod" && steps[0].escalate,
+              "xanmod: the single escalated `pacman -S --needed linux-xanmod` (chaotic-aur is pacman, not AUR)");
     } else {
         std::printf("INFO: linux-xanmod not curated on this table (pre-K3 main) - AUR/pacman branch covered by the synthetic entries\n");
     }
     if (const auto found = km::find_kernel("linux-tkg"); found.has_value()) {
         const KnownKernel* const tkg = *found;
         check(!tkg->precompiled_available && tkg->install_package.empty(), "tkg: build-only, no precompiled package");
-        const std::vector<InstallStep> steps = plan_steps(*tkg, Bootloader::UNKNOWN);
+        const std::vector<InstallStep> steps = plan_steps(*tkg);
         check(steps.size() == 1 && steps[0].cmd == KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild" && !steps[0].escalate,
               "tkg: the build-helper makepkg path, non-escalated");
     } else {
@@ -285,23 +214,13 @@ int main() {
         check(plan.note.empty(), "plan_install(linux): no build-only note");
         check(plan.install_cmds.size() == 1 && plan.install_cmds[0] == "pacman -S --needed linux",
               "plan_install(linux): install_cmds = [`pacman -S --needed linux`]");
-        // The postinstall is now the SINGLE consolidated tail (chunk E): one
-        // postinstall_tail.sh step carrying the live-detected bootloader,
-        // with an empty kver (the repo/AUR flow — the tail derives it from
-        // the local DB). No separate driver / initramfs / GRUB refresh
-        // commands remain in the C++ (they all live inside the script).
-        check(plan.postinstall_cmds.size() == 1
-              && plan.postinstall_cmds[0] == tail_cmd("linux", "", detect_bootloader()),
-              "plan_install(linux): postinstall = the single consolidated tail (live detect)");
-        // The single tail call is the only postinstall step, and no inline
-        // driver / initramfs / GRUB command (the old sh -c / dkms /
-        // mkinitcpio / dracut / grub-mkconfig steps) may remain in the C++.
-        check(!any_starts_with(plan.postinstall_cmds, "sh -c")
-              && !any_starts_with(plan.postinstall_cmds, "dkms")
-              && !any_starts_with(plan.postinstall_cmds, "mkinitcpio")
-              && !any_starts_with(plan.postinstall_cmds, "dracut")
-              && !any_starts_with(plan.postinstall_cmds, "grub-mkconfig"),
-              "plan_install(linux): no inline driver / initramfs / GRUB command (command -v-free in the C++)");
+        // Since simplify-K1 the postinstall list is ALWAYS empty: the
+        // distro's ALPM hooks (70-dkms-install, 90-kernel-install) do
+        // the post-install work (nvidia DKMS, initramfs, BLS entry)
+        // inside the pacman transaction — there is no app-side tail,
+        // driver, initramfs or GRUB-refresh command in the C++.
+        check(plan.postinstall_cmds.empty(),
+              "plan_install(linux): postinstall empty (the ALPM hooks do the post-install work)");
         std::printf("INFO: plan_install(linux) -> %zu install + %zu postinstall cmd(s), live bootloader = %s\n",
                     plan.install_cmds.size(), plan.postinstall_cmds.size(), bootloader_name(detect_bootloader()).c_str());
     }
@@ -329,75 +248,51 @@ int main() {
         check(xanmod.precompiled && xanmod.repo == "chaotic-aur", "plan_install(xanmod): precompiled, chaotic-aur repo");
         check(xanmod.install_cmds.size() == 1 && xanmod.install_cmds[0] == "pacman -S --needed linux-xanmod",
               "plan_install(xanmod): pacman install (chaotic-aur is a pacman repo)");
+        check(xanmod.postinstall_cmds.empty(), "plan_install(xanmod): postinstall empty (the ALPM hooks do the work)");
     }
 
     // ------------------------------------------------------------------
-    // 6. install_kernel with a recording CommandRunner (plan's exact
-    //    sequence contract; nothing real is executed).
+    // 6. install_kernel with a recording CommandRunner (the exact
+    //    single-step sequence + the 2-state verdict from the REAL rc;
+    //    nothing real is executed).
     // ------------------------------------------------------------------
     if (linux != nullptr) {
         RecordingRunner ok_runner{};
         const InstallKernelResult ok_result = install_kernel(*linux, ok_runner.fn, Bootloader::GRUB);
-        check(ok_result.ok && ok_result.error.empty(), "install_kernel(linux, GRUB, ok): ok, no error");
-        check(ok_result.verdict == PostinstallVerdict::BOOT_SAFE, "install_kernel(linux, GRUB, ok): verdict == BOOT_SAFE");
-        check(ok_runner.calls.size() == 2, "install_kernel: exactly 2 commands run (package install + the single tail), in order");
-        if (ok_runner.calls.size() == 2) {
+        check(ok_result.ok && ok_result.error.empty(), "install_kernel(linux, GRUB, rc=0): ok, no error");
+        check(ok_result.verdict == InstallVerdict::INSTALL_SUCCESS && ok_result.rc == 0,
+              "install_kernel(rc=0): verdict == INSTALL_SUCCESS, rc == 0");
+        check(ok_runner.calls.size() == 1, "install_kernel: exactly 1 command run (the package install)");
+        if (ok_runner.calls.size() == 1) {
             check(ok_runner.calls[0].first == "pacman -S --needed linux" && ok_runner.calls[0].second,
                   "install_kernel[0]: escalated pacman");
-            check(ok_runner.calls[1].first == tail_cmd("linux", "", Bootloader::GRUB) && ok_runner.calls[1].second,
-                  "install_kernel[1]: the single consolidated tail (escalated)");
         }
         check(!ok_result.boot_instructions.empty() && ok_result.boot_instructions.back() == expected_note,
               "install_kernel: boot instructions filled, ends with the note");
 
-        RecordingRunner fail_runner{};
-        fail_runner.rc = 1;
-        const InstallKernelResult fail_result = install_kernel(*linux, fail_runner.fn, Bootloader::GRUB);
-        check(!fail_result.ok, "install_kernel(failing phase-a runner): not ok");
-        check(fail_result.verdict == PostinstallVerdict::INSTALLATION_FAILED,
-              "install_kernel(failing phase-a): verdict == INSTALLATION_FAILED");
-        check(contains(fail_result.error, "pacman") && contains(fail_result.error, "1"),
-              "install_kernel: error names the failed command and its exit code");
-        check(fail_runner.calls.size() == 1, "install_kernel: post-install tail skipped after a phase-a failure");
-        check(!fail_result.boot_instructions.empty() && fail_result.boot_instructions.back() == expected_note,
-              "install_kernel: boot instructions still filled on failure");
-
-        // The D-E 3-state verdict probe (per-call rcs — the phase-a rc and the
-        // tail rc are judged independently; the H3 false-SUCCESS is gone):
-        //   phase-a rc 0 + tail rc 1  => INSTALLED_NOT_BOOT_SAFE (ok false)
-        //   phase-a rc 0 + tail rc 2  => INSTALLED_NOT_BOOT_SAFE (raw rc)
-        //   phase-a rc 0 + tail rc 0  => BOOT_SAFE (ok true)
-        //   phase-a rc 7 (+ tail rc 0)=> INSTALLATION_FAILED (tail skipped)
-        ScriptedRunner not_boot_safe{};
-        not_boot_safe.rcs = {0, 1};
-        const InstallKernelResult r_nbs = install_kernel(*linux, not_boot_safe.fn, Bootloader::GRUB);
-        check(!r_nbs.ok && r_nbs.verdict == PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE,
-              "install_kernel(tail rc=1): INSTALLED_NOT_BOOT_SAFE, not a false SUCCESS");
-        check(contains(r_nbs.error, "not boot-safe") && contains(r_nbs.error, "1"),
-              "install_kernel(tail rc=1): the error names the tail + its raw rc");
-
-        ScriptedRunner tail_rc2{};
-        tail_rc2.rcs = {0, 2};
-        const InstallKernelResult r_rc2 = install_kernel(*linux, tail_rc2.fn, Bootloader::GRUB);
-        check(!r_rc2.ok && r_rc2.verdict == PostinstallVerdict::INSTALLED_NOT_BOOT_SAFE && contains(r_rc2.error, "2"),
-              "install_kernel(tail rc=2): INSTALLED_NOT_BOOT_SAFE with the raw rc (>=2 folds in)");
-
-        ScriptedRunner all_zero{};
-        all_zero.rcs = {0, 0};
-        const InstallKernelResult r_bs = install_kernel(*linux, all_zero.fn, Bootloader::GRUB);
-        check(r_bs.ok && r_bs.verdict == PostinstallVerdict::BOOT_SAFE,
-              "install_kernel(phase-a rc=0 + tail rc=0): BOOT_SAFE, ok");
-
-        ScriptedRunner phase_a_fail{};
-        phase_a_fail.rcs = {7};
-        const InstallKernelResult r_if = install_kernel(*linux, phase_a_fail.fn, Bootloader::GRUB);
-        check(!r_if.ok && r_if.verdict == PostinstallVerdict::INSTALLATION_FAILED,
-              "install_kernel(phase-a rc=7): INSTALLATION_FAILED");
-        check(phase_a_fail.calls.size() == 1, "install_kernel(phase-a rc=7): the tail is skipped");
+        // The 2-state verdict probe (simplify-K1): the install
+        // command's REAL rc is the result — rc 0 = INSTALL_SUCCESS, any
+        // non-zero = INSTALL_FAILED (never a false SUCCESS), and
+        // result.rc carries the real rc. The sentinel (chunk D) can
+        // return 124 (done-timeout) and 126 (Polkit denied / the window
+        // never launched) — both fold in as failures.
+        for (const int rc : {1, 7, 124, 126}) {
+            RecordingRunner fail_runner{};
+            fail_runner.rc = rc;
+            const InstallKernelResult fail_result = install_kernel(*linux, fail_runner.fn, Bootloader::GRUB);
+            const std::string label = "install_kernel(rc=" + std::to_string(rc) + "): ";
+            check(!fail_result.ok && fail_result.verdict == InstallVerdict::INSTALL_FAILED && fail_result.rc == rc,
+                  (label + "INSTALL_FAILED, ok false, the real rc is carried").c_str());
+            check(contains(fail_result.error, "pacman") && contains(fail_result.error, std::to_string(rc)),
+                  (label + "error names the failed command and its exit code").c_str());
+            check(fail_runner.calls.size() == 1, (label + "graceful stop, exactly 1 command run").c_str());
+            check(!fail_result.boot_instructions.empty() && fail_result.boot_instructions.back() == expected_note,
+                  (label + "boot instructions still filled on failure").c_str());
+        }
     }
 
     {
-        // AUR branch, injected runner: the exact paru sequence.
+        // AUR branch, injected runner: the exact single paru step.
         const KnownKernel aur{
             "linux-aurx",     // name
             "AUR Test",       // display_name
@@ -410,19 +305,18 @@ int main() {
         };
         RecordingRunner runner{};
         const InstallKernelResult result = install_kernel(aur, runner.fn, Bootloader::GRUB);
-        check(result.ok && result.verdict == PostinstallVerdict::BOOT_SAFE,
-              "install_kernel(AUR, ok runner): ok, verdict == BOOT_SAFE");
-        check(runner.calls.size() == 2, "install_kernel(AUR): exactly 2 commands (paru + the single tail)");
-        if (runner.calls.size() == 2) {
+        check(result.ok && result.verdict == InstallVerdict::INSTALL_SUCCESS && result.rc == 0,
+              "install_kernel(AUR, rc=0): ok, verdict == INSTALL_SUCCESS");
+        check(runner.calls.size() == 1, "install_kernel(AUR): exactly 1 command (the non-escalated paru)");
+        if (runner.calls.size() == 1) {
             check(runner.calls[0].first == "paru -S --needed linux-aurx" && !runner.calls[0].second,
                   "install_kernel(AUR)[0]: non-escalated paru");
-            check(runner.calls[1].first == tail_cmd("linux-aurx", "", Bootloader::GRUB) && runner.calls[1].second,
-                  "install_kernel(AUR)[1]: the single consolidated tail (escalated)");
         }
     }
 
     {
-        // Buildable-only: graceful note, zero commands run.
+        // Buildable-only: graceful note, zero commands run, rc -1 (no
+        // install command ran to capture).
         const KnownKernel tkg{
             "linux-tkg",     // name
             "TKG Test",      // display_name
@@ -437,8 +331,8 @@ int main() {
         const InstallKernelResult result = install_kernel(tkg, runner.fn, Bootloader::UNKNOWN);
         check(!result.ok && contains(result.error, "Build-custom"),
               "install_kernel(build-only): graceful Build-custom note");
-        check(result.verdict == PostinstallVerdict::INSTALLATION_FAILED,
-              "install_kernel(build-only): degenerate default verdict == INSTALLATION_FAILED (no precompiled install ran)");
+        check(result.verdict == InstallVerdict::INSTALL_FAILED && result.rc == -1,
+              "install_kernel(build-only): verdict == INSTALL_FAILED, rc -1 (no command ran)");
         check(runner.calls.empty(), "install_kernel(build-only): no command run");
         check(!result.boot_instructions.empty() && result.boot_instructions.back() == expected_note,
               "install_kernel(build-only): boot instructions filled (the constant note)");
@@ -458,24 +352,26 @@ int main() {
     }
     {
         // Precompiled plan, failing injected runner: false + error,
-        // exactly one command attempted (the tail is skipped).
+        // exactly one command attempted (the single install step).
         const InstallPlan plan = plan_install("linux");
         RecordingRunner fail_runner{};
         fail_runner.rc = 1;
         std::string error{};
         check(!execute_plan(plan, error, fail_runner.fn), "execute_plan(failing runner): false");
         check(!error.empty() && contains(error, "pacman"), "execute_plan(failing runner): error names the command");
-        check(fail_runner.calls.size() == 1, "execute_plan(failing runner): no post-install after the failure");
+        check(fail_runner.calls.size() == 1, "execute_plan(failing runner): exactly 1 command attempted (graceful stop)");
     }
     {
         // Precompiled plan, ok injected runner: true, no error, exactly
-        // the planned commands run (install first, then the tail).
+        // the planned commands run (the single install step; the
+        // postinstall list is empty since simplify-K1).
         const InstallPlan plan = plan_install("linux");
         RecordingRunner ok_runner{};
         std::string error{};
         check(execute_plan(plan, error, ok_runner.fn), "execute_plan(ok runner): true");
         check(error.empty(), "execute_plan(ok runner): no error");
         const std::size_t expected = plan.install_cmds.size() + plan.postinstall_cmds.size();
+        check(expected == 1, "execute_plan: the plan is the single install step (no app-side postinstall)");
         check(ok_runner.calls.size() == expected, "execute_plan: runs exactly the planned commands");
     }
 
