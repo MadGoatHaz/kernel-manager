@@ -46,6 +46,7 @@
 #include <QPushButton>
 #include <QScreen>
 #include <QShortcut>
+#include <QStatusBar>
 #include <QTextEdit>
 #include <QVBoxLayout>
 #include <QTimer>
@@ -363,6 +364,12 @@ MainWindow::MainWindow(QWidget* parent)
   : QMainWindow(parent) {
     m_ui->setupUi(this);
     setWindowIcon(QApplication::windowIcon());  // explicit dedicated icon; the .ui no longer overrides; robust to Qt app-fallback semantics
+
+    // Version display (v1.25.0 follow-up): the PROJECT_VERSION from CMake
+    // (exposed as APP_VERSION) is shown in the window title and as a
+    // permanent status-bar label, so the running build is easy to identify.
+    setWindowTitle(tr("Kernel Manager %1").arg(APP_VERSION));
+    statusBar()->addPermanentWidget(new QLabel(tr("v%1").arg(APP_VERSION)));
 
     setAttribute(Qt::WA_NativeWindow);
     setWindowFlags(Qt::Window);  // for the close, min and max buttons
