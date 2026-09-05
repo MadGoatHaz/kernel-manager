@@ -813,6 +813,10 @@ void ConfWindow::handle_build_done() noexcept {
             break;
         }
     }
+    // The build dir is the target's local-dir fact: the gate's headers
+    // check also sees a headers package shipped alongside the kernel in
+    // that dir (the post-build pairing — no repo needed).
+    target.dir = m_build_conf_path;
     if (!run_driver_gate(target)) {
         return;  // the user aborted the install
     }

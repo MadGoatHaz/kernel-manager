@@ -1000,6 +1000,10 @@ void MainWindow::on_install_from_directory() noexcept {
             break;
         }
     }
+    // The install folder is the target's local-dir fact: the gate's
+    // headers check also sees a headers package shipped alongside the
+    // kernel in that folder (the dir-install pairing — no repo needed).
+    target.dir = dir.toStdString();
     if (!run_driver_gate(target)) {
         return;
     }

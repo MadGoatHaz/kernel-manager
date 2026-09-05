@@ -43,8 +43,10 @@
 //     headers installed + build dir ok -> PROCEED; dkms + headers
 //     missing + repo available -> ENSURE_HEADERS with the exact ensure
 //     command; dkms + headers missing + no repo -> WARN_ONLY + the
-//     non-empty D7 banner; kver "" + headers installed -> PROCEED;
-//     unbound probe -> PROCEED, no crash
+//     non-empty D7 banner; dkms + headers missing from the DB and the
+//     repos but present in the local install dir -> PROCEED (the
+//     dir-install pairing — the local-dir disjunct, D6); kver "" +
+//     headers installed -> PROCEED; unbound probe -> PROCEED, no crash
 //   - the real evaluate_gate() smoke runs read-only on this machine
 //     (local-DB + /sys + lspci/pacman -Siq): a valid action + no crash +
 //     an INFO line — MACHINE-TOLERANT, no specific action is asserted
@@ -109,13 +111,15 @@ GateProbe make_probe(bool hardware,
     std::string_view gpu,
     const std::vector<std::string>& installed,
     const std::vector<std::string>& build_dirs,
-    const std::vector<std::string>& repos) {
+    const std::vector<std::string>& repos,
+    const std::vector<std::string>& local_dir_files) {
     GateProbe probe{};
-    probe.nvidia_hardware   = [hardware] { return hardware; };
-    probe.gpu_names         = [gpu] { return std::string{gpu}; };
-    probe.package_installed = [installed](std::string_view name) { return in_list(installed, name); };
-    probe.build_dir_exists  = [build_dirs](std::string_view kver) { return in_list(build_dirs, kver); };
-    probe.repo_available    = [repos](std::string_view name) { return in_list(repos, name); };
+    probe.nvidia_hardware       = [hardware] { return hardware; };
+    probe.gpu_names             = [gpu] { return std::string{gpu}; };
+    probe.package_installed     = [installed](std::string_view name) { return in_list(installed, name); };
+    probe.build_dir_exists      = [build_dirs](std::string_view kver) { return in_list(build_dirs, kver); };
+    probe.repo_available        = [repos](std::string_view name) { return in_list(repos, name); };
+    probe.local_headers_present = [local_dir_files](std::string_view, std::string_view pkg) { return in_list(local_dir_files, pkg); };
     return probe;
 }
 
@@ -229,21 +233,21 @@ int main() {
     // ------------------------------------------------------------------
     // 4a. No nvidia hardware -> PROCEED (nothing to gate).
     {
-        const GateVerdict v = evaluate_gate(make_probe(false, kRtx3070, {}, {}, {}), GateTarget{"linux-zen", "6.8.7-1-zen"});
+        const GateVerdict v = evaluate_gate(make_probe(false, kRtx3070, {}, {}, {}, {}), GateTarget{"linux-zen", "6.8.7-1-zen", {}});
         check(v.action == GateAction::PROCEED, "D3: no nvidia hardware -> PROCEED");
         check(v.migration_cmd.empty() && v.ensure_cmd.empty(), "D3: no hardware -> no command payloads");
     }
     // 4b. Hardware + no nvidia driver -> PROCEED (the user's choice).
     {
-        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {}, {}, {}), GateTarget{"linux-zen", "6.8.7-1-zen"});
+        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {}, {}, {}, {}), GateTarget{"linux-zen", "6.8.7-1-zen", {}});
         check(v.action == GateAction::PROCEED, "D3: hardware, no nvidia driver -> PROCEED");
     }
     // 4c. Hardware + precompiled (nvidia-open) + a TURING_PLUS line +
     //     target linux-cachyos-custom (kver set) -> WARN_MIGRATE with the
     //     exact idempotent migration command.
     {
-        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-open"}, {}, {}),
-            GateTarget{"linux-cachyos-custom", "7.2.3-1-cachyos-custom"});
+        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-open"}, {}, {}, {}),
+            GateTarget{"linux-cachyos-custom", "7.2.3-1-cachyos-custom", {}});
         check(v.action == GateAction::WARN_MIGRATE, "D3: precompiled nvidia-open -> WARN_MIGRATE");
         check_str(v.dkms_package, "nvidia-open-dkms", "D3: the TURING_PLUS line -> nvidia-open-dkms");
         check_str(v.headers_package, "linux-cachyos-custom-headers", "D3: headers derived from the target kernel");
@@ -255,8 +259,8 @@ int main() {
     // 4d. The same precompiled row with a PRE_TURING (GTX 1080) line ->
     //     nvidia-dkms in the command.
     {
-        const GateVerdict v = evaluate_gate(make_probe(true, kGtx1080, {"nvidia-open"}, {}, {}),
-            GateTarget{"linux-cachyos-custom", "7.2.3-1-cachyos-custom"});
+        const GateVerdict v = evaluate_gate(make_probe(true, kGtx1080, {"nvidia-open"}, {}, {}, {}),
+            GateTarget{"linux-cachyos-custom", "7.2.3-1-cachyos-custom", {}});
         check(v.action == GateAction::WARN_MIGRATE, "D3: precompiled + PRE_TURING line -> WARN_MIGRATE");
         check_str(v.migration_cmd, "pacman -S --needed --asexplicit nvidia-dkms linux-cachyos-custom-headers",
             "D3: nvidia-dkms in the command for the PRE_TURING line");
@@ -264,8 +268,8 @@ int main() {
     // 4e. The same precompiled row with no gpu line (UNKNOWN) -> the
     //     conservative nvidia-dkms.
     {
-        const GateVerdict v = evaluate_gate(make_probe(true, "", {"nvidia-open"}, {}, {}),
-            GateTarget{"linux-cachyos-custom", "7.2.3-1-cachyos-custom"});
+        const GateVerdict v = evaluate_gate(make_probe(true, "", {"nvidia-open"}, {}, {}, {}),
+            GateTarget{"linux-cachyos-custom", "7.2.3-1-cachyos-custom", {}});
         check(v.action == GateAction::WARN_MIGRATE, "D3: precompiled + UNKNOWN gpu -> WARN_MIGRATE");
         check_str(v.dkms_package, "nvidia-dkms", "D3: UNKNOWN -> conservative nvidia-dkms (never open)");
         check_str(v.migration_cmd, "pacman -S --needed --asexplicit nvidia-dkms linux-cachyos-custom-headers",
@@ -274,7 +278,7 @@ int main() {
     // 4f. Precompiled + unknown target (kernel "") -> WARN_MIGRATE; the
     //     command omits the headers part (no trailing space).
     {
-        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-open"}, {}, {}), GateTarget{});
+        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-open"}, {}, {}, {}), GateTarget{});
         check(v.action == GateAction::WARN_MIGRATE, "D3: precompiled, unknown target -> WARN_MIGRATE");
         check_str(v.migration_cmd, "pacman -S --needed --asexplicit nvidia-open-dkms",
             "D3: the headers-omitted command has no trailing space");
@@ -283,7 +287,7 @@ int main() {
     //     (the --needed command is idempotent; pacman's conflict
     //     resolution removes the precompiled package).
     {
-        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia", "nvidia-dkms"}, {}, {}), GateTarget{"linux-zen", "6.8.7-1-zen"});
+        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia", "nvidia-dkms"}, {}, {}, {}), GateTarget{"linux-zen", "6.8.7-1-zen", {}});
         check(v.action == GateAction::WARN_MIGRATE, "D3: precompiled + dkms coexistence -> WARN_MIGRATE");
         check(!v.message.empty(), "D3: the coexistence message is non-empty");
         check_str(v.migration_cmd, "pacman -S --needed --asexplicit nvidia-open-dkms linux-zen-headers",
@@ -291,15 +295,15 @@ int main() {
     }
     // 4h. Hardware + dkms + headers installed + build dir ok -> PROCEED.
     {
-        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-open-dkms", "linux-zen-headers"}, {"6.8.7-1-zen"}, {}),
-            GateTarget{"linux-zen", "6.8.7-1-zen"});
+        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-open-dkms", "linux-zen-headers"}, {"6.8.7-1-zen"}, {}, {}),
+            GateTarget{"linux-zen", "6.8.7-1-zen", {}});
         check(v.action == GateAction::PROCEED, "D3: dkms + headers installed + build dir ok -> PROCEED");
     }
     // 4i. Hardware + dkms + headers missing + repo available ->
     //     ENSURE_HEADERS with the exact ensure command.
     {
-        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-dkms"}, {}, {"linux-zen-headers"}),
-            GateTarget{"linux-zen", "6.8.7-1-zen"});
+        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-dkms"}, {}, {"linux-zen-headers"}, {}),
+            GateTarget{"linux-zen", "6.8.7-1-zen", {}});
         check(v.action == GateAction::ENSURE_HEADERS, "D3: dkms + headers missing + repo -> ENSURE_HEADERS");
         check_str(v.ensure_cmd, "pacman -S --needed linux-zen-headers", "D3: the exact ensure command");
         check(!v.message.empty(), "D3: ENSURE_HEADERS carries a non-empty message");
@@ -308,22 +312,35 @@ int main() {
     // 4j. Hardware + dkms + headers missing + no repo -> WARN_ONLY with
     //     the non-empty D7 banner.
     {
-        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-dkms"}, {}, {}),
-            GateTarget{"linux-zen", "6.8.7-1-zen"});
+        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-dkms"}, {}, {}, {}),
+            GateTarget{"linux-zen", "6.8.7-1-zen", {}});
         check(v.action == GateAction::WARN_ONLY, "D3: dkms + headers missing + no repo -> WARN_ONLY");
         check(!v.banner.empty(), "D3: WARN_ONLY carries the non-empty D7 banner");
         check(!v.message.empty(), "D3: WARN_ONLY carries a non-empty message");
     }
-    // 4k. kver "" + headers installed -> PROCEED (the check degrades to
+    // 4k. Hardware + dkms + headers missing from the local DB AND the
+    //     repos, but present in the local install dir (a dir install —
+    //     the headers .pkg.tar.zst shipped alongside the kernel
+    //     package) -> PROCEED: the local-dir fact satisfies the pairing
+    //     (the user-reported "not available from any package
+    //     repository" WARN_ONLY gap is closed).
+    {
+        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-dkms"}, {}, {}, {"linux-zen-headers"}),
+            GateTarget{"linux-zen", "6.8.7-1-zen", "/build/linux-zen"});
+        check(v.action == GateAction::PROCEED, "D6: dkms + headers only in the local dir -> PROCEED (not WARN_ONLY)");
+        check(v.message.empty(), "D6: the local-dir headers case carries no 'not available' message");
+        check(v.banner.empty(), "D6: the local-dir headers case carries no D7 banner");
+    }
+    // 4l. kver "" + headers installed -> PROCEED (the check degrades to
     //     the headers-package membership).
     {
-        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-open-dkms", "linux-zen-headers"}, {}, {}), GateTarget{"linux-zen", ""});
+        const GateVerdict v = evaluate_gate(make_probe(true, kRtx3070, {"nvidia-open-dkms", "linux-zen-headers"}, {}, {}, {}), GateTarget{"linux-zen", "", {}});
         check(v.action == GateAction::PROCEED, "D3: kver '' + headers installed -> PROCEED");
     }
-    // 4l. Unbound probe -> PROCEED, no crash (an unbound predicate
+    // 4m. Unbound probe -> PROCEED, no crash (an unbound predicate
     //     contributes no signal).
     {
-        const GateVerdict v = evaluate_gate(GateProbe{}, GateTarget{"linux-zen", "6.8.7-1-zen"});
+        const GateVerdict v = evaluate_gate(GateProbe{}, GateTarget{"linux-zen", "6.8.7-1-zen", {}});
         check(v.action == GateAction::PROCEED, "D3: unbound probe -> PROCEED, no crash");
     }
 
