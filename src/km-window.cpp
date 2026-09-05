@@ -43,6 +43,7 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
+#include <QProcess>
 #include <QPushButton>
 #include <QScreen>
 #include <QShortcut>
@@ -360,10 +361,101 @@ struct VerdictDialog {
     }
     return d;
 }
+
+// ── The nvidia driver gate (chunk 3, plan D1/D3/D7) ───────────────────
+// The gate is a main-thread pre-flight BEFORE any install flow: the
+// Qt-free driver_gate module evaluates the driver-packaging state and
+// the single MainWindow::run_driver_gate acts on the verdict with
+// plain-language dialogs. The helpers below are its Qt-side details (the
+// H1 window-raise pattern, the trigger-A union target parsing, the
+// migration command + verify).
+
+// The H1 pattern (the conf-window.cpp handle_build_done precedent): bring
+// the window to the front + fire a desktop-notification backup BEFORE a
+// modal — after a long operation the window can sit buried behind other
+// windows, and a modal parented to a buried window is invisible to the
+// user. The gate's modals all share it (notify-send is fire-and-forget,
+// like the terminal-helper's own notifications).
+void bring_window_forward(QWidget* window) {
+    window->raise();
+    window->activateWindow();
+    QProcess::startDetached("notify-send",
+        {"--app-name=Kernel Manager",
+            "nvidia driver check",
+            "Kernel Manager has a question about the nvidia driver before this install."});
+}
+
+// The version() display markers ("∨" = the installed version is newer,
+// "∧" = an update is available — kernel.cpp version()) are UI-only
+// decoration: strip a leading marker so the raw version is what the
+// gate's build-dir check uses (the same prefix strip operator< uses for
+// sorting).
+[[gnu::pure]] [[nodiscard]] std::string strip_display_marker(const std::string& version) {
+    using namespace std::string_view_literals;
+    for (const auto prefix : {"∨"sv, "∧"sv}) {
+        if (version.starts_with(prefix)) {
+            return version.substr(prefix.size());
+        }
+    }
+    return version;
+}
+
+// The target's kernel names (the trigger-A union carries them space-
+// joined in GateTarget.kernel; triggers B/C carry one name or none):
+// split + drop the empties.
+[[gnu::pure]] [[nodiscard]] std::vector<std::string> target_names(const driver_gate::GateTarget& target) {
+    std::vector<std::string> names{};
+    const std::string_view kernel{target.kernel};
+    std::size_t pos = 0;
+    while (pos < kernel.size()) {
+        const std::size_t end       = kernel.find(' ', pos);
+        const std::string_view name = (end == std::string_view::npos) ? kernel.substr(pos)
+                                                                      : kernel.substr(pos, end - pos);
+        if (!name.empty()) {
+            names.emplace_back(name);
+        }
+        if (end == std::string_view::npos) {
+            break;
+        }
+        pos = end + 1;
+    }
+    return names;
+}
+
+// The WARN_MIGRATE command to run (D3): the DKMS package + the union of
+// each target name's derived -headers package. A single name (triggers
+// B/C) rebuilds EXACTLY the verdict's migration_cmd; the trigger-A union
+// extends it to every selected kernel's headers (plan D1 row A — one
+// migration command for all of them, --needed keeps it idempotent).
+[[gnu::pure]] [[nodiscard]] std::string migration_command(const driver_gate::GateTarget& target, const std::string& dkms_package) {
+    std::string cmd = "pacman -S --needed --asexplicit " + dkms_package;
+    for (const auto& name : target_names(target)) {
+        const auto headers = driver_gate::derive_headers_pkg(name);
+        if (!headers.empty()) {
+            cmd += " " + headers;
+        }
+    }
+    return cmd;
+}
+
+// The D3 post-migration verify's headers clause, per target name (a
+// single name is exactly the verdict's headers_package): true iff every
+// name's derived -headers package is in the local DB (no names = nothing
+// to check). The local-DB fact is authoritative (the dkms tool's own
+// state is best-effort and never counts against success).
+[[nodiscard]] bool migration_headers_installed(const driver_gate::GateTarget& target) {
+    for (const auto& name : target_names(target)) {
+        const auto headers = driver_gate::derive_headers_pkg(name);
+        if (!headers.empty() && !driver_gate::package_installed(headers)) {
+            return false;
+        }
+    }
+    return true;
+}
 }  // namespace
 
 MainWindow::MainWindow(QWidget* parent)
-  : QMainWindow(parent) {
+  : QMainWindow(parent), m_driver_banner(new QLabel(parent)) {
     m_ui->setupUi(this);
     setWindowIcon(QApplication::windowIcon());  // explicit dedicated icon; the .ui no longer overrides; robust to Qt app-fallback semantics
 
@@ -372,6 +464,17 @@ MainWindow::MainWindow(QWidget* parent)
     // permanent status-bar label, so the running build is easy to identify.
     setWindowTitle(tr("Kernel Manager %1").arg(APP_VERSION));
     statusBar()->addPermanentWidget(new QLabel(tr("v%1").arg(APP_VERSION)));
+
+    // The D7 persistent banner (chunk 3): a permanent, hidden-by-default
+    // status-bar label next to the version label (created in the member
+    // initializer list above). It shows the gate's banner text when the
+    // user declines the nvidia driver fix (the custom kernel comes up
+    // without GPU acceleration) and hides on a successful migration; it
+    // lives for the session only — the gate re-evaluates fresh on every
+    // install attempt (no QSettings persistence, the next run's verdict
+    // is the source of truth).
+    m_driver_banner->hide();
+    statusBar()->addPermanentWidget(m_driver_banner);
 
     setAttribute(Qt::WA_NativeWindow);
     setWindowFlags(Qt::Window);  // for the close, min and max buttons
@@ -761,6 +864,17 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
             return;
         }
 
+        // The driver gate (chunk 3, trigger B): the curated kernel's
+        // target — the kver is unknown in this context (the K8 flow has
+        // no alpm handle), so the gate degrades to the headers-package
+        // decision (plan D3). A declined migration or an aborted install
+        // stops here, before the install runs.
+        driver_gate::GateTarget target{};
+        target.kernel = name;
+        if (!run_driver_gate(target)) {
+            return;
+        }
+
         // The K8 install path (chunk E): build the table entry (the same
         // K1-fallback shape plan_install uses) and run the install through
         // the shared pkexec terminal path. Synchronous for now (a progress
@@ -870,6 +984,26 @@ void MainWindow::on_install_from_directory() noexcept {
         return;  // cancel = silent (no dialog, no refresh — D6-style)
     }
 
+    // The driver gate (chunk 3, trigger C): the target's identity is the
+    // first built package whose .PKGINFO parses to a non-headers kernel
+    // name (the install_from_directory identity logic — a dir may hold
+    // the kernel + its headers pair); the parsed version doubles as the
+    // kver for the build-dir check. No parseable package leaves the
+    // target empty (the gate degrades to the empty-target row).
+    driver_gate::GateTarget target{};
+    for (const auto& pkg : list_local_packages(dir.toStdString())) {
+        std::string pkg_name{};
+        std::string pkg_version{};
+        if (read_pkginfo(pkg, pkg_name, pkg_version) && !pkg_name.ends_with("-headers")) {
+            target.kernel = pkg_name;
+            target.kver   = pkg_version;
+            break;
+        }
+    }
+    if (!run_driver_gate(target)) {
+        return;
+    }
+
     // The real runner: an empty CommandRunner selects run_real_command
     // (utils::runCmdTerminal, escalated). The terminal's output is the
     // source of truth for the install's details (the distro's ALPM hooks
@@ -904,6 +1038,133 @@ void MainWindow::on_install_from_directory() noexcept {
     if (r.verdict != InstallVerdict::INSTALL_FAILED) {
         init_kernels();
     }
+}
+
+// The nvidia driver gate's single Qt glue (chunk 3, plan D1/D3/D7):
+// evaluate the verdict for one install target (the main-thread pre-flight
+// — the trigger A/B/C call sites) and act on it BEFORE any install flow
+// runs:
+//   PROCEED        -> silently (no nvidia hardware, no nvidia driver, or
+//                     the DKMS driver + headers are already in place).
+//   WARN_MIGRATE   -> the plain-language warning + the one-click
+//                     migration: the command runs in the escalated
+//                     terminal (blocking — the sentinel protocol returns
+//                     its real rc) and the outcome is verified against
+//                     the local DB + build dir (the D3 post-migration
+//                     verify); declining the migration shows the
+//                     persistent D7 banner and proceeds.
+//   ENSURE_HEADERS -> the informational note that the headers ride along
+//                     in the install (trigger A structurally, B and C via
+//                     the install engine's pairing step).
+//   WARN_ONLY      -> the warning (no fix exists for this kernel):
+//                     proceed shows the banner, cancel aborts.
+// Returns false only when the user aborts the install (every other path
+// proceeds — the banner documents the consequence of a declined fix).
+bool MainWindow::run_driver_gate(const driver_gate::GateTarget& target) {
+    const auto v = driver_gate::evaluate_gate(target);
+
+    switch (v.action) {
+    case driver_gate::GateAction::PROCEED:
+        return true;
+
+    case driver_gate::GateAction::ENSURE_HEADERS:
+        bring_window_forward(this);
+        QMessageBox::information(this, tr("Kernel Manager"), QCoreApplication::translate("MainWindow", qPrintable(QString::fromStdString(v.message))));
+        return true;
+
+    case driver_gate::GateAction::WARN_ONLY: {
+        bring_window_forward(this);
+        QMessageBox box(this);
+        box.setIcon(QMessageBox::Warning);
+        box.setWindowTitle(tr("Kernel Manager"));
+        box.setText(QCoreApplication::translate("MainWindow", qPrintable(QString::fromStdString(v.message))));
+        auto* proceed = box.addButton(tr("Proceed"), QMessageBox::AcceptRole);
+        box.addButton(tr("Cancel"), QMessageBox::RejectRole);
+        box.exec();
+        if (box.clickedButton() == proceed) {
+            show_driver_banner(QString::fromStdString(v.banner));
+            return true;
+        }
+        return false;
+    }
+
+    case driver_gate::GateAction::WARN_MIGRATE: {
+        bring_window_forward(this);
+        QMessageBox box(this);
+        box.setIcon(QMessageBox::Question);
+        box.setWindowTitle(tr("Kernel Manager"));
+        box.setText(QCoreApplication::translate("MainWindow", qPrintable(QString::fromStdString(v.message))));
+        box.addButton(tr("Migrate to %1").arg(QString::fromStdString(v.dkms_package)), QMessageBox::AcceptRole);
+        auto* without = box.addButton(tr("Proceed without"), QMessageBox::ActionRole);
+        auto* cancel  = box.addButton(tr("Abort install"), QMessageBox::RejectRole);
+        box.exec();
+        if (box.clickedButton() == cancel) {
+            return false;  // the install is aborted
+        }
+        if (box.clickedButton() == without) {
+            // Proceed without the migration: the banner documents the
+            // consequence (no GPU acceleration on the custom kernel) and
+            // re-shows on every later decline.
+            show_driver_banner(QString::fromStdString(v.banner));
+            return true;
+        }
+
+        // The one-click migration: the escalated terminal runs the
+        // command and the sentinel protocol returns its real rc
+        // (blocking — the user watches it happen).
+        const int rc = utils::runCmdTerminal(QString::fromStdString(migration_command(target, v.dkms_package)), /*escalate=*/true);
+
+        // The D3 post-migration verify: the real rc + the DKMS driver
+        // installed + every target name's headers in the local DB + (for
+        // a known kver: its build dir, or the headers still in a sync
+        // repo as the soft fallback).
+        std::string first_headers{};
+        if (const auto names = target_names(target); !names.empty()) {
+            first_headers = driver_gate::derive_headers_pkg(names.front());
+        }
+        const bool verified = (rc == 0)
+            && driver_gate::dkms_driver_installed()
+            && migration_headers_installed(target)
+            && (target.kver.empty() || driver_gate::build_dir_exists(target.kver) || (!first_headers.empty() && driver_gate::package_in_sync_db(first_headers)));
+
+        bring_window_forward(this);
+        if (verified) {
+            // A successful migration clears the warning.
+            if (m_driver_banner != nullptr) {
+                m_driver_banner->hide();
+            }
+            QMessageBox::information(this, tr("Kernel Manager"), tr("The DKMS driver migration succeeded. The install will continue."));
+            return true;
+        }
+        QMessageBox critical_box(this);
+        critical_box.setIcon(QMessageBox::Critical);
+        critical_box.setWindowTitle(tr("Kernel Manager"));
+        critical_box.setText(tr("The driver migration failed (rc=%1).").arg(rc));
+        critical_box.setInformativeText(tr("Check the terminal output for details."));
+        critical_box.exec();
+        const auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Continue with the install anyway?"));
+        if (res == QMessageBox::Yes) {
+            // The migration did not verify: the banner says why the
+            // custom kernel may lack GPU acceleration.
+            show_driver_banner(QString::fromStdString(v.banner));
+            return true;
+        }
+        return false;
+    }
+    }
+    return true;  // defensive: an unknown action never blocks the install
+}
+
+// D7: show the persistent status-bar banner (the exact verdict text —
+// the module's; this method only owns the label). Shown on a declined
+// fix (WARN_MIGRATE "proceed without" / WARN_ONLY "proceed"), hidden on
+// a successful migration.
+void MainWindow::show_driver_banner(const QString& text) {
+    if (m_driver_banner == nullptr) {
+        return;
+    }
+    m_driver_banner->setText(QCoreApplication::translate("MainWindow", qPrintable(text)));
+    m_driver_banner->show();
 }
 
 // D6 (plan v1.24.0): the "Browse…" flow — a folder picker whose default
@@ -1004,6 +1265,38 @@ void MainWindow::on_execute() noexcept {
     if (m_running.load(std::memory_order_consume)) {
         return;
     }
+
+    // The driver gate (chunk 3, trigger A): a main-thread pre-flight
+    // BEFORE the worker starts (a modal dialog + a possible system-state
+    // change never run on the worker thread). The target is the union of
+    // the selected INSTALLABLE rows — the mirror of the worker's
+    // install_packages predicate (row found && has_pkg() && not
+    // installed or an update is available): the kernel names merge
+    // space-joined (their union is the migration's headers list) and the
+    // kver is the first non-"" one (its display marker stripped). No
+    // installable row (e.g. removals only) ⇒ nothing to gate. A declined
+    // or aborted gate stops the install before it starts.
+    driver_gate::GateTarget target{};
+    bool has_installable = false;
+    for (const auto& selected : m_change_list) {
+        auto kernel = std::ranges::find_if(m_kernels, [selected](auto&& el) { return el.get_raw() == selected.toStdString(); });
+        if ((kernel != m_kernels.end()) && kernel->has_pkg() && (!kernel->is_installed() || kernel->is_update_available())) {
+            const std::string name{km::kernel_name_from_raw(kernel->get_raw())};
+            if (target.kernel.empty()) {
+                target.kernel = name;
+            } else {
+                target.kernel += " " + name;
+            }
+            if (target.kver.empty()) {
+                target.kver = strip_display_marker(kernel->version());
+            }
+            has_installable = true;
+        }
+    }
+    if (has_installable && !run_driver_gate(target)) {
+        return;  // the user aborted the install
+    }
+
     m_running.store(true, std::memory_order_relaxed);
     m_thread_running.store(true, std::memory_order_relaxed);
     m_cv.notify_all();
