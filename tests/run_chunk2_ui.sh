@@ -53,6 +53,8 @@ OUT="/tmp/km-test-chunk2-ui"
     -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
     -D_FILE_OFFSET_BITS=64 -pthread \
     tests/test_chunk2_conf_window.cpp \
+    src/install_kernel.cpp \
+    src/driver_gate.cpp \
     src/utils.cpp \
     src/config-options.cpp \
     src/known_kernels.cpp \
