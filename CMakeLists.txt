@@ -136,6 +136,7 @@ qt_add_executable(${PROJECT_NAME}
     src/bootloader.hpp src/bootloader.cpp
     src/distro.hpp src/distro.cpp
     src/driver_gate.hpp src/driver_gate.cpp
+    src/kernel_info.hpp src/kernel_info.cpp
     src/boot_instructions.hpp src/boot_instructions.cpp
     src/install_kernel.hpp src/install_kernel.cpp
     src/km-window.hpp src/km-window.cpp
