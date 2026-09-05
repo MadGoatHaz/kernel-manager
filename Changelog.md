@@ -2,7 +2,7 @@
 
 ### v1.26.0 (2026-09-04)
 
-[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/045feca...12693a4)
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/045feca...bdfcf24)
 
 #### Changed
 - **Install flow simplified** — the install now relies on the distro's own alpm hooks (NVIDIA DKMS, `kernel-install`/dracut) for all post-install work instead of the app's own tail script. One code path for every install.
