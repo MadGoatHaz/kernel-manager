@@ -1,5 +1,18 @@
 # Changelog
 
+### v1.27.0 (2026-09-05)
+
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/bdfcf24...621b7ff)
+
+#### Added
+- **Nvidia driver gate** — before the app installs a kernel (and, after a custom build, before it installs the freshly built packages), it checks how your Nvidia driver is packaged and warns you if the new kernel would break it. A precompiled driver (which ships no module for the new kernel) can be moved to the DKMS variant — the one that rebuilds itself for every kernel — with a single click; the app picks the right package for your GPU (the open kernel module on Turing-and-newer cards, the proprietary one on older). You can also proceed with a warning, or cancel.
+- **Persistent driver warning** — if you choose to proceed while a driver problem is still open, a banner stays in the status bar until the driver is fixed or the kernel removed, so the warning cannot be accidentally lost.
+
+#### Changed
+- **Kernel headers install with the kernel** — when a DKMS Nvidia driver is present and the new kernel's headers are available, the install now includes the matching `-headers` package on its own (for directory installs the headers are installed first), so the driver can rebuild for the new kernel without extra steps.
+
+> Note: full QA on merged main green — 16/16 harnesses (incl. the new k19 driver-gate harness, 80/80), 0 code warnings, offscreen smoke 124/0B/0B.
+
 ### v1.26.0 (2026-09-04)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/045feca...bdfcf24)
