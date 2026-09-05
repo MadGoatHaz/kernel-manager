@@ -60,6 +60,9 @@ enum class GateAction : std::uint8_t { PROCEED,
 struct GateTarget {
     std::string kernel;
     std::string kver;
+    // Local install folder (empty unless installing from a directory);
+    // lets the gate see headers shipped alongside the kernel package.
+    std::string dir;
 };
 
 // Injection point (the DistroProbe precedent in distro.hpp): all system
@@ -67,11 +70,12 @@ struct GateTarget {
 // filesystem. An unbound predicate contributes no signal (false/""), never
 // a crash.
 struct GateProbe {
-    std::function<bool()> nvidia_hardware;                    // /sys vendor 0x10de walk
-    std::function<std::string()> gpu_names;                   // lspci -nn nvidia lines ("" if none)
-    std::function<bool(std::string_view)> package_installed;  // local-DB dir membership
-    std::function<bool(std::string_view)> build_dir_exists;   // /usr/lib/modules/<kver>/build
-    std::function<bool(std::string_view)> repo_available;     // pacman -Siq membership
+    std::function<bool()> nvidia_hardware;                                          // /sys vendor 0x10de walk
+    std::function<std::string()> gpu_names;                                         // lspci -nn nvidia lines ("" if none)
+    std::function<bool(std::string_view)> package_installed;                        // local-DB dir membership
+    std::function<bool(std::string_view)> build_dir_exists;                         // /usr/lib/modules/<kver>/build
+    std::function<bool(std::string_view)> repo_available;                           // pacman -Siq membership
+    std::function<bool(std::string_view, std::string_view)> local_headers_present;  // true if a file in `dir` matches the headers package name (prefix); unbound = no local dir
 };
 
 // The gate decision: the action + the plain-language message (the tr()

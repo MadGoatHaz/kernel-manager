@@ -111,6 +111,14 @@ namespace {
         return static_cast<bool>(predicate) && predicate(arg);
     }
 
+    // The two-argument probe form (the local_headers_present binding —
+    // the install dir + the headers package name): the same no-crash
+    // rule as above (an unbound predicate contributes no signal).
+    template <typename Predicate>
+    [[nodiscard]] bool ask(const Predicate& predicate, std::string_view arg1, std::string_view arg2) {
+        return static_cast<bool>(predicate) && predicate(arg1, arg2);
+    }
+
     // The gpu_names probe member through the same no-crash rule ("" when
     // unbound).
     [[nodiscard]] std::string ask_names(const std::function<std::string()>& names) {
@@ -238,6 +246,30 @@ namespace {
             return "the custom kernel";
         }
         return "the custom kernel '" + target.kernel + "'";
+    }
+
+    // The real local-dir probe (the dir_contains_headers prefix-match
+    // precedent from install_kernel.cpp): true iff a regular file in
+    // `dir` starts with the headers package name — the headers
+    // .pkg.tar.zst shipped alongside the kernel package in a dir
+    // install. No-signal degradation like the other probes: an
+    // unreadable dir -> false.
+    [[nodiscard]] bool local_headers_present_real(std::string_view dir, std::string_view headers_pkg) noexcept {
+        std::error_code ec{};
+        auto it = std::filesystem::directory_iterator{dir, ec};
+        if (ec) {
+            return false;
+        }
+        const std::filesystem::directory_iterator end{};
+        for (; it != end; it.increment(ec)) {
+            if (ec) {
+                break;  // unreadable entry mid-scan: stop
+            }
+            if (it->is_regular_file(ec) && !ec && it->path().filename().string().starts_with(headers_pkg)) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }  // namespace
@@ -403,11 +435,12 @@ GateVerdict evaluate_gate(const GateTarget& target) {
     // The real probe wiring (the distro.cpp real-overload precedent):
     // every system fact behind the injectable GateProbe.
     GateProbe probe{};
-    probe.nvidia_hardware   = nvidia_hardware_present;
-    probe.gpu_names         = gpu_names;
-    probe.package_installed = package_installed;
-    probe.build_dir_exists  = build_dir_exists;
-    probe.repo_available    = package_in_sync_db;
+    probe.nvidia_hardware       = nvidia_hardware_present;
+    probe.gpu_names             = gpu_names;
+    probe.package_installed     = package_installed;
+    probe.build_dir_exists      = build_dir_exists;
+    probe.repo_available        = package_in_sync_db;
+    probe.local_headers_present = local_headers_present_real;
     return evaluate_gate(probe, target);
 }
 
@@ -460,13 +493,15 @@ GateVerdict evaluate_gate(const GateProbe& probe, const GateTarget& target) {
     }
 
     // DKMS driver installed: the header pairing decides (D3 rows 5-7).
-    // "headers ok" = the build dir for the target kver (when known) or
-    // the derived headers package itself; with kver == "" the check
-    // degrades to the headers-package membership (a fresh flavor install
-    // has no build dir yet — the pairing provides it).
+    // "headers ok" = the build dir for the target kver (when known), or
+    // the derived headers package itself, or (a local-folder install)
+    // the headers package shipped in the install dir; with kver == ""
+    // the check degrades to the headers-package membership (a fresh
+    // flavor install has no build dir yet — the pairing provides it).
     const std::string headers = derive_headers_pkg(target.kernel);
     const bool headers_ok     = (!target.kver.empty() && ask(probe.build_dir_exists, target.kver))
-        || (!headers.empty() && installed(headers));
+        || (!headers.empty() && installed(headers))
+        || (!target.dir.empty() && !headers.empty() && ask(probe.local_headers_present, target.dir, headers));
     if (headers_ok) {
         return {};  // PROCEED: DKMS driver + headers/build dir in place
     }
