@@ -2,7 +2,8 @@
 # k14: directory-install harness (Feature A, D2) — see
 # tests/test_k14_dir_install.cpp. Standalone g++ recipe (run_k7.sh
 # precedent) against the real src/install_kernel.cpp + the modules it
-# reuses (known_kernels, bootloader, boot_instructions, aur_kernel, and
+# reuses (known_kernels, bootloader, boot_instructions, aur_kernel,
+# driver_gate whose D6 probes back the default pairing predicate, and
 # utils whose exec/runCmdTerminal back read_pkginfo and the default
 # runner), with the project's GCC warning set; links fmt + glib +
 # Qt6Core + libalpm. No event loop, no offscreen — the API is Qt-free
@@ -99,6 +100,7 @@ LOG="$SANDBOX/build.log"
     -D_FILE_OFFSET_BITS=64 -pthread \
     tests/test_k14_dir_install.cpp \
     src/install_kernel.cpp \
+    src/driver_gate.cpp \
     src/known_kernels.cpp \
     src/bootloader.cpp \
     src/boot_instructions.cpp \

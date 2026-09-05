@@ -124,9 +124,19 @@ struct InstallKernelResult {
 //     runs no command
 // `bl` is the bootloader the boot instructions describe (default: the
 // live detection, detect_bootloader()).
+// `pairing_headers` is the companion-headers pairing predicate (D6,
+// chunk 5): given the package name being installed, it returns the
+// `-headers` package to pair into the install command, or "" (no
+// pairing). The default (an unbound predicate) is the real D6
+// predicate, resolved in the .cpp (the CommandRunner precedent): pair
+// ONLY when a DKMS driver is installed AND the derived headers are not
+// installed AND they are in a sync repo (else pairing would make
+// pacman fail the whole command with "target not found"). Tests inject
+// an explicit predicate so no assertion depends on live system state.
 [[nodiscard]] InstallKernelResult install_kernel(const KnownKernel& kernel,
-    CommandRunner runner = CommandRunner{},
-    Bootloader bl        = detect_bootloader());
+    CommandRunner runner                                         = CommandRunner{},
+    Bootloader bl                                                = detect_bootloader(),
+    std::function<std::string(std::string_view)> pairing_headers = std::function<std::string(std::string_view)>{});
 
 // Name-based convenience API for the "install pre-compiled <kernel>"
 // action. The curated table lookup is prefix-tolerant
@@ -244,7 +254,12 @@ struct DirInstallResult {
 // to a non-headers kernel name (read_pkginfo), else the first filename
 // (best-effort: the .pkg.tar.zst suffix stripped); `bl` is the
 // bootloader the boot instructions describe (default: the live
-// detection, detect_bootloader()).
+// detection, detect_bootloader()). `pairing_headers` is the
+// companion-headers pairing predicate (D6, chunk 5, same contract as
+// install_kernel): when the dir does NOT already hold the `-headers`
+// package and the predicate names one, a leading escalated `pacman -S
+// --needed <headers>` step is prepended — `pacman -U` cannot mix repo
+// packages with local files.
 //
 // Install logging (real runner only — an injected runner records the
 // raw commands and never touches the filesystem): the run writes a log
@@ -262,7 +277,8 @@ struct DirInstallResult {
 // the post-mortem record: the terminal windows are transient and their
 // output is otherwise lost.
 [[nodiscard]] DirInstallResult install_from_directory(std::string_view dir,
-    CommandRunner runner = CommandRunner{},
-    Bootloader bl        = detect_bootloader());
+    CommandRunner runner                                         = CommandRunner{},
+    Bootloader bl                                                = detect_bootloader(),
+    std::function<std::string(std::string_view)> pairing_headers = std::function<std::string(std::string_view)>{});
 
 #endif  // INSTALL_KERNEL_HPP

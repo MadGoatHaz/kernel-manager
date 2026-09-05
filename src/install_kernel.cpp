@@ -20,6 +20,7 @@
 
 #include "aur_kernel.hpp"         // for detail::install_aur_kernels (the AUR build path)
 #include "boot_instructions.hpp"  // for instructions_for
+#include "driver_gate.hpp"        // for the D6 pairing probes (derive_headers_pkg, package_installed, package_in_sync_db, dkms_driver_installed)
 #include "utils.hpp"              // for runCmdTerminal (default runner), exec (paru probe + .PKGINFO)
 
 #include <algorithm>     // for ranges::sort
@@ -51,6 +52,35 @@ int run_real_command(const std::string& cmd, bool escalate) noexcept {
 [[gnu::pure]] bool is_package_install_step(const std::string& cmd) {
     return cmd.starts_with("pacman ") || cmd.starts_with("paru ") || cmd.starts_with("makepkg ")
         || cmd.starts_with(KM_HELPER_DIR "/build_helper.sh");
+}
+
+// The D6 pairing predicate (the real default, resolved in the .cpp like
+// the CommandRunner precedent): derive the companion -headers package
+// for `pkg` and return it ONLY when a DKMS driver is installed AND the
+// headers are not already installed AND they are installable from a
+// sync repo — else pairing would make pacman fail the whole command
+// with "target not found". Inert on any test fixture (the fake names
+// are in no repo and no DKMS driver is part of the test state); the
+// harnesses still inject an explicit predicate so no assertion depends
+// on live system state (D6).
+std::string pairing_headers_default(std::string_view pkg) {
+    const auto headers = driver_gate::derive_headers_pkg(pkg);
+    return (driver_gate::dkms_driver_installed() && !driver_gate::package_installed(headers)
+               && driver_gate::package_in_sync_db(headers))
+        ? headers
+        : std::string{};
+}
+
+// True iff one of the built package filenames starts with the
+// companion -headers package name (the dir already carries the headers
+// pair — no prepended pre-step, D4/C).
+[[gnu::pure]] bool dir_contains_headers(const std::vector<std::filesystem::path>& pkgs, std::string_view headers) {
+    for (const auto& pkg : pkgs) {
+        if (pkg.filename().string().starts_with(headers)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Shell-quote a string for embedding in the terminal command line: wrap
@@ -222,7 +252,10 @@ std::vector<InstallStep> plan_steps(const KnownKernel& kernel) {
     return steps;
 }
 
-InstallKernelResult install_kernel(const KnownKernel& kernel, CommandRunner runner, Bootloader bl) {
+InstallKernelResult install_kernel(const KnownKernel& kernel,
+    CommandRunner runner,
+    Bootloader bl,
+    std::function<std::string(std::string_view)> pairing_headers) {
     InstallKernelResult result{};
     // The boot-selection steps describe the detected bootloader + the
     // kernel, not the install outcome: they are filled on every run so
@@ -242,8 +275,22 @@ InstallKernelResult install_kernel(const KnownKernel& kernel, CommandRunner runn
     if (!runner) {
         runner = run_real_command;
     }
+    if (!pairing_headers) {
+        pairing_headers = pairing_headers_default;  // the D6 real predicate
+    }
 
     auto steps = plan_steps(kernel);
+
+    // D4/B: the companion-headers pairing (the D6 predicate): when the
+    // predicate names a headers package for the install target, append
+    // it to the first package-install command — one transaction, and
+    // --needed keeps it idempotent. plan_steps itself is UNCHANGED.
+    if (!steps.empty() && is_package_install_step(steps.front().cmd)) {
+        const auto headers = pairing_headers(kernel.install_package);
+        if (!headers.empty() && !steps.front().cmd.contains(headers)) {
+            steps.front().cmd += " " + headers;
+        }
+    }
 
     // AUR parity (the same pattern detail::install_aur_kernels uses): a
     // precompiled AUR install needs paru; without it the build path
@@ -404,7 +451,10 @@ bool read_pkginfo(const std::filesystem::path& pkg, std::string& name_out, std::
     return true;
 }
 
-DirInstallResult install_from_directory(std::string_view dir, CommandRunner runner, Bootloader bl) {
+DirInstallResult install_from_directory(std::string_view dir,
+    CommandRunner runner,
+    Bootloader bl,
+    std::function<std::string(std::string_view)> pairing_headers) {
     DirInstallResult result{};
 
     // The D2 guard: no built packages in the dir ⇒ nothing to install,
@@ -451,6 +501,9 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
     if (!runner) {
         runner = run_real_command;  // the shared pkexec terminal path
     }
+    if (!pairing_headers) {
+        pairing_headers = pairing_headers_default;  // the D6 real predicate
+    }
 
     // The plan: one escalated pacman -U of the explicit single-quoted
     // ABSOLUTE paths — no shell glob (D2: the 0c918d4 pkexec-CWD-reset
@@ -461,6 +514,16 @@ DirInstallResult install_from_directory(std::string_view dir, CommandRunner runn
     // (nvidia DKMS, initramfs, BLS entry) inside the transaction —
     // there is no app-side tail step.
     std::vector<InstallStep> steps{};
+    // D4/C: the companion-headers pairing pre-step: `pacman -U` cannot
+    // mix repo packages with local files, so when the dir does NOT
+    // already hold the headers package and the predicate names one, a
+    // leading escalated `pacman -S --needed <headers>` step is
+    // prepended (it runs before the pacman -U; the 2-state verdict
+    // logic below is unchanged — the first failing step stops the run).
+    const auto headers = pairing_headers(name);
+    if (!headers.empty() && !dir_contains_headers(pkgs, headers)) {
+        steps.push_back({.cmd = "pacman -S --needed " + headers, .escalate = true});
+    }
     std::string pacman_cmd = "pacman -U";
     for (const auto& pkg : pkgs) {
         // fs::absolute before quoting: list_local_packages hands out

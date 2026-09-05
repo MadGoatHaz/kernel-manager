@@ -10,7 +10,9 @@
 # MainWindow source closure with the project's GCC warning set, links fmt +
 # the cxxbridge Rust libs + glib + Qt6 + libalpm, drives the real window
 # offscreen, never writes — alpm opened read-only, no root, no terminal,
-# menu actions never clicked, /etc/pacman.conf untouched).
+# menu actions never clicked, /etc/pacman.conf untouched). install_kernel.cpp
+# resolves its D6 pairing default to driver_gate (chunk 5), so
+# src/driver_gate.cpp is in the compile list (the k8/k14 companion).
 #
 # Gates:
 #   1. the harness exits 0 with all assertions passing (both runs)
@@ -116,6 +118,7 @@ LOG="/tmp/km-test-k12-build.log"
     src/alpm_utils.cpp \
     src/utils.cpp \
     src/install_kernel.cpp \
+    src/driver_gate.cpp \
     src/aur_kernel.cpp \
     src/boot_instructions.cpp \
     src/bootloader.cpp \

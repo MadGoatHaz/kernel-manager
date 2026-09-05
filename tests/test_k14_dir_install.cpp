@@ -48,18 +48,27 @@
 //     == INSTALL_FAILED, rc == 1, the error names the pacman step + rc,
 //     exactly 1 call, instructions still filled; the sentinel rc probes
 //     (124 done-timeout / 126 Polkit-denied) ⇒ INSTALL_FAILED with the
-//     real rc carried (never a false SUCCESS).
+//     real rc carried (never a false SUCCESS). All these cases pass an
+//     explicit "" pairing predicate (D6 hermeticity, chunk 5 — no
+//     assertion depends on live system state).
+//   - (D) D6 header pairing (chunk 5, D4/C): a predicate naming the
+//     companion -headers package + a dir that does NOT hold it ⇒
+//     exactly 2 calls — the prepended escalated `pacman -S --needed
+//     linux-test-headers` THEN the single-package `pacman -U` (`pacman
+//     -U` cannot mix repo packages with local files); a dir that
+//     ALREADY holds the headers package ⇒ the predicate is bypassed,
+//     1 call (the plain 2-package `pacman -U`).
 
 #include "install_kernel.hpp"
 
-#include <cstdio>      // for printf
-#include <cstdlib>     // for system, mkstemp
-#include <filesystem>  // for path, create_directories, copy_file, remove_all
-#include <fstream>     // for ofstream
-#include <string>      // for string
-#include <system_error> // for error_code
-#include <utility>     // for pair
-#include <vector>      // for vector
+#include <cstdio>        // for printf
+#include <cstdlib>       // for system, mkstemp
+#include <filesystem>    // for path, create_directories, copy_file, remove_all
+#include <fstream>       // for ofstream
+#include <string>        // for string
+#include <system_error>  // for error_code
+#include <utility>       // for pair
+#include <vector>        // for vector
 
 namespace {
 
@@ -80,8 +89,7 @@ bool contains(const std::string& hay, const std::string& needle) {
 
 // The mandatory closing note instructions_for (K6) appends for every
 // bootloader: one constant text (same text the k8 harness asserts).
-constexpr const char* expected_note =
-    "The kernel is installed and ready to boot. Select it from your bootloader menu at next reboot.";
+constexpr const char* expected_note = "The kernel is installed and ready to boot. Select it from your bootloader menu at next reboot.";
 
 // A recording command runner (k8 pattern): returns a fixed exit code
 // for every step and records the (cmd, escalate) pairs asked to run,
@@ -100,6 +108,14 @@ struct RecordingRunner {
     };
 };
 
+// The explicit "no pairing" predicate (D6 hermeticity, chunk 5):
+// returns "" for every input — every pre-existing case passes it so
+// no assertion ever depends on the machine's live driver state (the
+// default is the real D6 predicate, resolved in the .cpp).
+[[nodiscard]] std::string no_pairing(std::string_view) {
+    return std::string{};
+}
+
 // Write a plain-text file (false on any failure).
 bool write_text(const std::filesystem::path& file, const std::string& content) {
     std::ofstream out{file};
@@ -117,16 +133,16 @@ bool write_text(const std::filesystem::path& file, const std::string& content) {
 // The build asserts rc == 0: a missing tar/zstd ⇒ the harness fails
 // loudly, never vacuously (the D2/C4 spec).
 bool build_package(const std::filesystem::path& pkg,
-                   const std::filesystem::path& staging,
-                   const std::string& pkginfo) {
+    const std::filesystem::path& staging,
+    const std::string& pkginfo) {
     if (!write_text(staging / ".PKGINFO", pkginfo)
         || !write_text(staging / "payload.txt", "dummy payload\n")) {
         check(false, ("fixture: staging files for " + pkg.filename().string()).c_str());
         return false;
     }
     const std::string cmd = "tar --zstd -cf '" + pkg.string()
-                            + "' -C '" + staging.string()
-                            + "' .PKGINFO payload.txt 2>/dev/null";
+        + "' -C '" + staging.string()
+        + "' .PKGINFO payload.txt 2>/dev/null";
     const int rc = std::system(cmd.c_str());
     check(rc == 0, ("fixture: `tar --zstd -cf` rc==0 for " + pkg.filename().string()).c_str());
     return rc == 0;
@@ -141,12 +157,14 @@ int main() {
     //      <sandbox>/pkgs/  — the fixture dir: the 2 real zst packages
     //                         + decoys (foo.txt, legacy.pkg.tar.gz) +
     //                         a sub/ dir holding a copy of a package
+    //      <sandbox>/kernel-only/ — the kernel package ONLY (no
+    //                         headers — the D4/C pairing pre-step dir)
     //      <sandbox>/empty/ — an empty dir
     //      <sandbox>/bad/   — a non-archive .pkg.tar.zst (plain text)
     //      <sandbox>/norel/ — a real package whose .PKGINFO lacks pkgrel
     //      <sandbox>/stage/ — per-package tar staging dirs
     // ------------------------------------------------------------------
-    char tmpl[] = "/tmp/km14-sandbox.XXXXXX";
+    char tmpl[]                = "/tmp/km14-sandbox.XXXXXX";
     char* const mkdtemp_result = mkdtemp(tmpl);
     check(mkdtemp_result != nullptr, "fixture: sandbox created (mkdtemp)");
     if (mkdtemp_result == nullptr) {
@@ -156,23 +174,24 @@ int main() {
     const std::filesystem::path sandbox = tmpl;
     // The API takes std::string_view (path has no one-step conversion to
     // it): the dir strings for the calls under test.
-    const std::string pkgs_dir = (sandbox / "pkgs").string();
+    const std::string pkgs_dir  = (sandbox / "pkgs").string();
     const std::string empty_dir = (sandbox / "empty").string();
 
     std::error_code ec{};
     const bool dirs_ok = std::filesystem::create_directories(sandbox / "pkgs" / "sub", ec)
-                         && std::filesystem::create_directories(sandbox / "empty", ec)
-                         && std::filesystem::create_directories(sandbox / "bad", ec)
-                         && std::filesystem::create_directories(sandbox / "norel", ec)
-                         && std::filesystem::create_directories(sandbox / "stage" / "linux-test", ec)
-                         && std::filesystem::create_directories(sandbox / "stage" / "linux-test-headers", ec)
-                         && std::filesystem::create_directories(sandbox / "stage" / "linux-norel", ec);
+        && std::filesystem::create_directories(sandbox / "kernel-only", ec)
+        && std::filesystem::create_directories(sandbox / "empty", ec)
+        && std::filesystem::create_directories(sandbox / "bad", ec)
+        && std::filesystem::create_directories(sandbox / "norel", ec)
+        && std::filesystem::create_directories(sandbox / "stage" / "linux-test", ec)
+        && std::filesystem::create_directories(sandbox / "stage" / "linux-test-headers", ec)
+        && std::filesystem::create_directories(sandbox / "stage" / "linux-norel", ec);
     check(dirs_ok, "fixture: sandbox subdirs created");
 
     // The two real packages of the fixture dir (+ their staging dirs).
-    const std::filesystem::path kernel_pkg = sandbox / "pkgs" / "linux-test-1.2.3-4-x86_64.pkg.tar.zst";
+    const std::filesystem::path kernel_pkg  = sandbox / "pkgs" / "linux-test-1.2.3-4-x86_64.pkg.tar.zst";
     const std::filesystem::path headers_pkg = sandbox / "pkgs" / "linux-test-headers-1.2.3-4-x86_64.pkg.tar.zst";
-    const bool kernel_built = build_package(
+    const bool kernel_built                 = build_package(
         kernel_pkg,
         sandbox / "stage" / "linux-test",
         "pkgname = linux-test\npkgbase = linux-test\npkgarch = x86_64\npkgver = 1.2.3\npkgrel = 4\n");
@@ -194,16 +213,24 @@ int main() {
     // The bad dir: a .pkg.tar.zst NAME holding plain text (not a zstd
     // archive) — read_pkginfo must degrade to false, never crash.
     check(write_text(sandbox / "bad" / "fake.pkg.tar.zst", "this is not a zstd archive\n"),
-          "fixture: non-archive fake.pkg.tar.zst written");
+        "fixture: non-archive fake.pkg.tar.zst written");
 
     // The norel dir: a real package whose .PKGINFO has no pkgrel line
     // (the lenient-parse gate — version degrades to the bare pkgver).
     const std::filesystem::path norel_pkg = sandbox / "norel" / "linux-norel-1.2.3-x86_64.pkg.tar.zst";
-    const bool norel_built = build_package(
+    const bool norel_built                = build_package(
         norel_pkg,
         sandbox / "stage" / "linux-norel",
         "pkgname = linux-norel\npkgbase = linux-norel\npkgarch = x86_64\npkgver = 1.2.3\n");
     check(norel_built, "fixture: the no-pkgrel package built");
+
+    // The kernel-only dir: the kernel package WITHOUT its headers pair
+    // (the D4/C pairing pre-step gate — the prepended headers step is
+    // asserted against this dir).
+    const std::filesystem::path kernel_only_pkg = sandbox / "kernel-only" / "linux-test-1.2.3-4-x86_64.pkg.tar.zst";
+    ec.clear();
+    std::filesystem::copy_file(kernel_pkg, kernel_only_pkg, ec);
+    check(!ec, "fixture: the kernel package copied into the kernel-only dir");
 
     // ------------------------------------------------------------------
     // (A) list_local_packages (non-recursive, .pkg.tar.zst, sorted).
@@ -216,13 +243,13 @@ int main() {
         check(pkgs.size() == 2, "A: fixture dir ⇒ exactly 2 packages listed");
         if (pkgs.size() == 2) {
             check(pkgs[0] == kernel_pkg && pkgs[1] == headers_pkg,
-                  "A: sorted by filename (kernel before headers)");
+                "A: sorted by filename (kernel before headers)");
             check(!pkgs[0].parent_path().filename().string().starts_with("sub")
-                  && !pkgs[1].parent_path().filename().string().starts_with("sub"),
-                  "A: the sub/ directory's package is NOT listed (non-recursive)");
+                    && !pkgs[1].parent_path().filename().string().starts_with("sub"),
+                "A: the sub/ directory's package is NOT listed (non-recursive)");
             check(pkgs[0].filename().string().ends_with(".pkg.tar.zst")
-                  && pkgs[1].filename().string().ends_with(".pkg.tar.zst"),
-                  "A: the decoys (foo.txt + .pkg.tar.gz) are NOT listed");
+                    && pkgs[1].filename().string().ends_with(".pkg.tar.zst"),
+                "A: the decoys (foo.txt + .pkg.tar.gz) are NOT listed");
         }
     }
 
@@ -233,22 +260,22 @@ int main() {
         std::string name{};
         std::string version{};
         check(read_pkginfo(kernel_pkg, name, version) && name == "linux-test" && version == "1.2.3-4",
-              "B: kernel pkg ⇒ linux-test / 1.2.3-4");
+            "B: kernel pkg ⇒ linux-test / 1.2.3-4");
 
         name.clear();
         version.clear();
         check(read_pkginfo(headers_pkg, name, version) && name == "linux-test-headers" && version == "1.2.3-4",
-              "B: headers pkg ⇒ linux-test-headers / 1.2.3-4");
+            "B: headers pkg ⇒ linux-test-headers / 1.2.3-4");
 
         name.clear();
         version.clear();
         check(!read_pkginfo(sandbox / "bad" / "fake.pkg.tar.zst", name, version),
-              "B: non-archive .pkg.tar.zst ⇒ false (no crash)");
+            "B: non-archive .pkg.tar.zst ⇒ false (no crash)");
 
         name.clear();
         version.clear();
         check(read_pkginfo(norel_pkg, name, version) && name == "linux-norel" && version == "1.2.3",
-              "B: missing pkgrel ⇒ version = the bare pkgver (lenient parse)");
+            "B: missing pkgrel ⇒ version = the bare pkgver (lenient parse)");
     }
 
     // ------------------------------------------------------------------
@@ -264,46 +291,46 @@ int main() {
         // Fixture dir + GRUB: the exact 1-call sequence + identity +
         // verdict + rc + the filled boot instructions.
         RecordingRunner runner{};
-        const DirInstallResult grub = install_from_directory(pkgs_dir, runner.fn, Bootloader::GRUB);
+        const DirInstallResult grub = install_from_directory(pkgs_dir, runner.fn, Bootloader::GRUB, no_pairing);
         check(grub.ok && grub.error.empty(), "C: fixture dir + GRUB ⇒ ok, no error");
         check(grub.verdict == InstallVerdict::INSTALL_SUCCESS && grub.rc == 0,
-              "C: GRUB ⇒ verdict == INSTALL_SUCCESS, rc == 0");
+            "C: GRUB ⇒ verdict == INSTALL_SUCCESS, rc == 0");
         check(runner.calls.size() == 1, "C: GRUB ⇒ exactly 1 call (the single pacman -U — no app-side tail)");
         if (runner.calls.size() == 1) {
             check(runner.calls[0].first == "pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'"
-                  && runner.calls[0].second,
-                  "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'` (quoted absolutes, no glob)");
+                    && runner.calls[0].second,
+                "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'` (quoted absolutes, no glob)");
         }
         check(grub.name == "linux-test" && grub.version == "1.2.3-4",
-              "C: identity = the kernel package (linux-test / 1.2.3-4)");
+            "C: identity = the kernel package (linux-test / 1.2.3-4)");
         check(grub.boot_instructions.size() == 4 && grub.boot_instructions.back() == expected_note,
-              "C: GRUB boot instructions filled (3 steps + the note, ends with the note)");
+            "C: GRUB boot instructions filled (3 steps + the note, ends with the note)");
 
         // Fixture dir + UNKNOWN: 1 call (the single pacman -U — no
         // separate tail, no grub-mkconfig).
         RecordingRunner unknown_runner{};
-        const DirInstallResult unknown = install_from_directory(pkgs_dir, unknown_runner.fn, Bootloader::UNKNOWN);
+        const DirInstallResult unknown = install_from_directory(pkgs_dir, unknown_runner.fn, Bootloader::UNKNOWN, no_pairing);
         check(unknown.ok && unknown.verdict == InstallVerdict::INSTALL_SUCCESS && unknown.rc == 0,
-              "C: fixture dir + UNKNOWN ⇒ ok (INSTALL_SUCCESS), rc == 0");
+            "C: fixture dir + UNKNOWN ⇒ ok (INSTALL_SUCCESS), rc == 0");
         check(unknown_runner.calls.size() == 1, "C: UNKNOWN ⇒ 1 call (the single pacman -U, no separate tail)");
         if (unknown_runner.calls.size() == 1) {
             check(unknown_runner.calls[0].first == "pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'"
-                  && unknown_runner.calls[0].second,
-                  "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'`");
+                    && unknown_runner.calls[0].second,
+                "C[0]: the exact escalated `pacman -U '<abs1>' '<abs2>'`");
         }
         check(unknown.boot_instructions.size() == 3 && unknown.boot_instructions.back() == expected_note,
-              "C: UNKNOWN boot instructions filled (2 steps + the note)");
+            "C: UNKNOWN boot instructions filled (2 steps + the note)");
 
         // Empty dir: the exact error, zero runner calls (the D2 guard),
         // verdict == INSTALL_FAILED, rc -1 (no command ran), no boot
         // instructions (no kernel to point at).
         RecordingRunner empty_runner{};
-        const DirInstallResult empty = install_from_directory(empty_dir, empty_runner.fn, Bootloader::GRUB);
+        const DirInstallResult empty = install_from_directory(empty_dir, empty_runner.fn, Bootloader::GRUB, no_pairing);
         check(!empty.ok, "C: empty dir ⇒ not ok");
         check(empty.error == "no *.pkg.tar.zst packages found in '" + (sandbox / "empty").string() + "'",
-              "C: empty dir ⇒ the exact 'no packages' error");
+            "C: empty dir ⇒ the exact 'no packages' error");
         check(empty.verdict == InstallVerdict::INSTALL_FAILED && empty.rc == -1,
-              "C: empty dir ⇒ INSTALL_FAILED, rc -1 (no command ran)");
+            "C: empty dir ⇒ INSTALL_FAILED, rc -1 (no command ran)");
         check(empty_runner.calls.empty(), "C: empty dir ⇒ 0 runner calls");
         check(empty.boot_instructions.empty(), "C: empty dir ⇒ no boot instructions");
 
@@ -312,16 +339,16 @@ int main() {
         // its rc, exactly 1 call, instructions still filled (the
         // install_kernel pattern).
         RecordingRunner fail_runner{};
-        fail_runner.rc = 1;
-        const DirInstallResult fail = install_from_directory(pkgs_dir, fail_runner.fn, Bootloader::GRUB);
+        fail_runner.rc              = 1;
+        const DirInstallResult fail = install_from_directory(pkgs_dir, fail_runner.fn, Bootloader::GRUB, no_pairing);
         check(!fail.ok, "C: fake rc=1 on the pacman -U ⇒ not ok");
         check(fail.verdict == InstallVerdict::INSTALL_FAILED && fail.rc == 1,
-              "C: rc=1 ⇒ INSTALL_FAILED, the real rc is carried");
+            "C: rc=1 ⇒ INSTALL_FAILED, the real rc is carried");
         check(fail.error == "Command failed (exit code 1): pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'",
-              "C: the error names the pacman step + rc 1");
+            "C: the error names the pacman step + rc 1");
         check(fail_runner.calls.size() == 1, "C: exactly 1 call (the single install step)");
         check(fail.boot_instructions.size() == 4 && fail.boot_instructions.back() == expected_note,
-              "C: boot instructions still filled on failure");
+            "C: boot instructions still filled on failure");
 
         // The sentinel rc probes (simplify-K1: any non-zero rc =
         // INSTALL_FAILED, never a false SUCCESS, result.rc carries the
@@ -329,13 +356,62 @@ int main() {
         // denied / the window never launched.
         for (const int rc : {124, 126}) {
             RecordingRunner sentinel_runner{};
-            sentinel_runner.rc = rc;
-            const DirInstallResult r_sentinel = install_from_directory(pkgs_dir, sentinel_runner.fn, Bootloader::GRUB);
-            const std::string label = "C: sentinel rc=" + std::to_string(rc) + " ⇒ ";
+            sentinel_runner.rc                = rc;
+            const DirInstallResult r_sentinel = install_from_directory(pkgs_dir, sentinel_runner.fn, Bootloader::GRUB, no_pairing);
+            const std::string label           = "C: sentinel rc=" + std::to_string(rc) + " ⇒ ";
             check(!r_sentinel.ok && r_sentinel.verdict == InstallVerdict::INSTALL_FAILED && r_sentinel.rc == rc,
-                  (label + "INSTALL_FAILED with the real rc (never a false SUCCESS)").c_str());
+                (label + "INSTALL_FAILED with the real rc (never a false SUCCESS)").c_str());
             check(contains(r_sentinel.error, std::to_string(rc)),
-                  (label + "the error names the pacman step + rc").c_str());
+                (label + "the error names the pacman step + rc").c_str());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // (D) D6 header pairing (chunk 5, D4/C): the predicate names the
+    //     companion -headers package. `pacman -U` cannot mix repo
+    //     packages with local files, so a dir that does NOT already
+    //     hold the headers package gets a leading escalated `pacman -S
+    //     --needed <headers>` pre-step; a dir that does hold it
+    //     bypasses the predicate.
+    // ------------------------------------------------------------------
+    {
+        const std::function<std::string(std::string_view)> test_pairing = [](std::string_view) {
+            return std::string{"linux-test-headers"};
+        };
+
+        // The kernel-only dir (no headers package present): exactly 2
+        // calls — the prepended escalated headers install, THEN the
+        // single-package pacman -U.
+        const std::string kernel_only_dir = (sandbox / "kernel-only").string();
+        RecordingRunner pair_runner{};
+        const DirInstallResult paired = install_from_directory(kernel_only_dir, pair_runner.fn, Bootloader::GRUB, test_pairing);
+        check(paired.ok && paired.error.empty(), "D: kernel-only dir + pairing ⇒ ok, no error");
+        check(paired.verdict == InstallVerdict::INSTALL_SUCCESS && paired.rc == 0,
+            "D: pairing rc=0 ⇒ INSTALL_SUCCESS");
+        check(paired.name == "linux-test" && paired.version == "1.2.3-4",
+            "D: identity = the kernel package (linux-test / 1.2.3-4)");
+        check(pair_runner.calls.size() == 2, "D: exactly 2 calls (the prepended headers step + the pacman -U)");
+        if (pair_runner.calls.size() == 2) {
+            check(pair_runner.calls[0].first == "pacman -S --needed linux-test-headers" && pair_runner.calls[0].second,
+                "D[0]: the prepended escalated `pacman -S --needed linux-test-headers`");
+            check(pair_runner.calls[1].first == "pacman -U '" + std::filesystem::absolute(kernel_only_pkg).string() + "'"
+                    && pair_runner.calls[1].second,
+                "D[1]: the single-package `pacman -U '<abs>'`");
+        }
+
+        // The fixture dir already holds the headers package: the
+        // predicate is bypassed — 1 call, the plain 2-package
+        // pacman -U.
+        RecordingRunner bypass_runner{};
+        const DirInstallResult bypass = install_from_directory(pkgs_dir, bypass_runner.fn, Bootloader::GRUB, test_pairing);
+        check(bypass.ok && bypass.verdict == InstallVerdict::INSTALL_SUCCESS && bypass.rc == 0,
+            "D: bypass rc=0 ⇒ INSTALL_SUCCESS");
+        check(bypass_runner.calls.size() == 1,
+            "D: the dir already holds the headers ⇒ the predicate is bypassed, 1 call");
+        if (bypass_runner.calls.size() == 1) {
+            check(bypass_runner.calls[0].first == "pacman -U '" + kernel_pkg.string() + "' '" + headers_pkg.string() + "'"
+                    && bypass_runner.calls[0].second,
+                "D[0]: the plain 2-package `pacman -U '<abs1>' '<abs2>'`");
         }
     }
 
