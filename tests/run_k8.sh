@@ -2,9 +2,10 @@
 # Standalone K8 unit test (no CTest infra in this project; follows the
 # "standalone g++ on the real sources" precedent of tests/run_k6.sh).
 # Compiles the real install_kernel module plus the modules it reuses
-# (known_kernels, bootloader, boot_instructions, aur_kernel, and utils
-# whose runCmdTerminal/exec back the default runner and the paru
-# probe) with the project's GCC warning set, and runs the plan /
+# (known_kernels, bootloader, boot_instructions, aur_kernel, driver_gate
+# whose D6 probes back the default pairing predicate, and utils whose
+# runCmdTerminal/exec back the default runner and the paru probe) with
+# the project's GCC warning set, and runs the plan /
 # execute / boot-instructions assertions. Every executed command goes
 # through an injected recording CommandRunner, so no real terminal,
 # pkexec, pacman, paru or network is touched (environment-tolerant).
@@ -42,6 +43,7 @@ OUT="/tmp/km-test-k8"
     -D_FILE_OFFSET_BITS=64 -pthread \
     tests/test_k8_install_kernel.cpp \
     src/install_kernel.cpp \
+    src/driver_gate.cpp \
     src/known_kernels.cpp \
     src/bootloader.cpp \
     src/boot_instructions.cpp \

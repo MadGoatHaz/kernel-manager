@@ -47,7 +47,16 @@
 //     7, the sentinel's 124 done-timeout / 126 Polkit-denied) =>
 //     INSTALL_FAILED (ok false, never a false SUCCESS, result.rc
 //     carries the real rc); buildable-only => graceful note, zero
-//     commands run, rc -1 (no install command ran to capture)
+//     commands run, rc -1 (no install command ran to capture). All
+//     these cases pass an explicit "" pairing predicate (D6
+//     hermeticity, chunk 5 — no assertion depends on live system
+//     state)
+//   - D6 header pairing (chunk 5): a predicate naming a companion
+//     -headers package => it is appended to the first package-install
+//     command (repo `pacman -S --needed linux-zen linux-zen-headers`,
+//     AUR `paru -S --needed linux-zen linux-zen-headers` — one
+//     transaction, --needed idempotent, plan_steps UNCHANGED);
+//     buildable-only stays unchanged (zero commands)
 //   - execute_plan: build-only => false + note (real runner selected
 //     but never used — nothing is executed); failing injected runner =>
 //     false + error + one command attempted; ok injected runner => true
@@ -86,8 +95,7 @@ bool contains(const std::string& hay, const std::string& needle) {
 // appends for every bootloader (the kernel is installed and ready to
 // boot; select it from the bootloader menu at next reboot — no tool
 // command, no /boot/ or /efi/ loader path is named).
-constexpr const char* expected_note =
-    "The kernel is installed and ready to boot. Select it from your bootloader menu at next reboot.";
+constexpr const char* expected_note = "The kernel is installed and ready to boot. Select it from your bootloader menu at next reboot.";
 
 // A recording command runner: returns a fixed exit code for every step
 // and records the (cmd, escalate) pairs asked to run, so no real
@@ -103,6 +111,14 @@ struct RecordingRunner {
         return rc;
     };
 };
+
+// The explicit "no pairing" predicate (D6 hermeticity, chunk 5):
+// returns "" for every input — every pre-existing case passes it so
+// no assertion ever depends on the machine's live driver state (the
+// default is the real D6 predicate, resolved in the .cpp).
+[[nodiscard]] std::string no_pairing(std::string_view) {
+    return std::string{};
+}
 
 }  // namespace
 
@@ -124,7 +140,7 @@ int main() {
         check(steps.size() == 1, "linux: exactly 1 step (the package install — no app-side postinstall)");
         if (steps.size() == 1) {
             check(steps[0].cmd == "pacman -S --needed linux" && steps[0].escalate,
-                  "linux[0]: escalated `pacman -S --needed linux`");
+                "linux[0]: escalated `pacman -S --needed linux`");
         }
     }
 
@@ -136,20 +152,20 @@ int main() {
     // ------------------------------------------------------------------
     {
         const KnownKernel aur{
-            "linux-aurx",     // name
-            "AUR Test",       // display_name
+            "linux-aurx",                            // name
+            "AUR Test",                              // display_name
             "A synthetic precompiled AUR package.",  // description
-            "linux-aurx",     // default_source
-            "linux-aurx",     // install_package
-            "aur",            // install_repo
-            true,             // precompiled_available
-            true              // buildable
+            "linux-aurx",                            // default_source
+            "linux-aurx",                            // install_package
+            "aur",                                   // install_repo
+            true,                                    // precompiled_available
+            true                                     // buildable
         };
         const std::vector<InstallStep> steps = plan_steps(aur);
         check(steps.size() == 1, "AUR: exactly 1 step (the paru install — no app-side postinstall)");
         if (steps.size() == 1) {
             check(steps[0].cmd == "paru -S --needed linux-aurx" && !steps[0].escalate,
-                  "AUR[0]: non-escalated `paru -S --needed`");
+                "AUR[0]: non-escalated `paru -S --needed`");
         }
     }
 
@@ -160,20 +176,20 @@ int main() {
     // ------------------------------------------------------------------
     {
         const KnownKernel tkg{
-            "linux-tkg",     // name
-            "TKG Test",      // display_name
-            "A synthetic build-only kernel.",  // description
+            "linux-tkg",                                         // name
+            "TKG Test",                                          // display_name
+            "A synthetic build-only kernel.",                    // description
             "https://github.com/Frogging-Family/linux-tkg.git",  // default_source
-            "",              // install_package (none)
-            "chaotic-aur",   // install_repo
-            false,           // precompiled_available
-            true             // buildable
+            "",                                                  // install_package (none)
+            "chaotic-aur",                                       // install_repo
+            false,                                               // precompiled_available
+            true                                                 // buildable
         };
         const std::vector<InstallStep> steps = plan_steps(tkg);
         check(steps.size() == 1, "build-only: exactly 1 step");
         if (steps.size() == 1) {
             check(steps[0].cmd == KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild" && !steps[0].escalate,
-                  "build-only[0]: non-escalated build helper (makepkg + auto GPG import)");
+                "build-only[0]: non-escalated build helper (makepkg + auto GPG import)");
         }
     }
 
@@ -186,10 +202,10 @@ int main() {
     if (const auto found = km::find_kernel("linux-xanmod"); found.has_value()) {
         const KnownKernel* const xanmod = *found;
         check(xanmod->precompiled_available && xanmod->install_repo == "chaotic-aur",
-              "xanmod: precompiled from the chaotic-aur pacman repo (curated table)");
+            "xanmod: precompiled from the chaotic-aur pacman repo (curated table)");
         const std::vector<InstallStep> steps = plan_steps(*xanmod);
         check(steps.size() == 1 && steps[0].cmd == "pacman -S --needed linux-xanmod" && steps[0].escalate,
-              "xanmod: the single escalated `pacman -S --needed linux-xanmod` (chaotic-aur is pacman, not AUR)");
+            "xanmod: the single escalated `pacman -S --needed linux-xanmod` (chaotic-aur is pacman, not AUR)");
     } else {
         std::printf("INFO: linux-xanmod not curated on this table (pre-K3 main) - AUR/pacman branch covered by the synthetic entries\n");
     }
@@ -198,7 +214,7 @@ int main() {
         check(!tkg->precompiled_available && tkg->install_package.empty(), "tkg: build-only, no precompiled package");
         const std::vector<InstallStep> steps = plan_steps(*tkg);
         check(steps.size() == 1 && steps[0].cmd == KM_HELPER_DIR "/build_helper.sh -sicf --cleanbuild" && !steps[0].escalate,
-              "tkg: the build-helper makepkg path, non-escalated");
+            "tkg: the build-helper makepkg path, non-escalated");
     } else {
         std::printf("INFO: linux-tkg not curated on this table (pre-K3 main) - build-only branch covered by the synthetic entry\n");
     }
@@ -209,45 +225,45 @@ int main() {
     {
         const InstallPlan plan = plan_install("linux");
         check(plan.kernel == "linux" && plan.package == "linux" && plan.repo == "core",
-              "plan_install(linux): kernel/package/repo from the table");
+            "plan_install(linux): kernel/package/repo from the table");
         check(plan.precompiled, "plan_install(linux): precompiled");
         check(plan.note.empty(), "plan_install(linux): no build-only note");
         check(plan.install_cmds.size() == 1 && plan.install_cmds[0] == "pacman -S --needed linux",
-              "plan_install(linux): install_cmds = [`pacman -S --needed linux`]");
+            "plan_install(linux): install_cmds = [`pacman -S --needed linux`]");
         // Since simplify-K1 the postinstall list is ALWAYS empty: the
         // distro's ALPM hooks (70-dkms-install, 90-kernel-install) do
         // the post-install work (nvidia DKMS, initramfs, BLS entry)
         // inside the pacman transaction — there is no app-side tail,
         // driver, initramfs or GRUB-refresh command in the C++.
         check(plan.postinstall_cmds.empty(),
-              "plan_install(linux): postinstall empty (the ALPM hooks do the post-install work)");
+            "plan_install(linux): postinstall empty (the ALPM hooks do the post-install work)");
         std::printf("INFO: plan_install(linux) -> %zu install + %zu postinstall cmd(s), live bootloader = %s\n",
-                    plan.install_cmds.size(), plan.postinstall_cmds.size(), bootloader_name(detect_bootloader()).c_str());
+            plan.install_cmds.size(), plan.postinstall_cmds.size(), bootloader_name(detect_bootloader()).c_str());
     }
     {
         const InstallPlan prefix = plan_install("core/linux");
         check(prefix.kernel == "linux" && prefix.install_cmds == plan_install("linux").install_cmds,
-              "plan_install(core/linux): prefix-tolerant, same install commands");
+            "plan_install(core/linux): prefix-tolerant, same install commands");
     }
     {
         const InstallPlan unknown = plan_install("linux-mystery-xyz");
         check(unknown.kernel == "linux-mystery-xyz" && !unknown.precompiled,
-              "plan_install(unknown): K1 fallback, not precompiled");
+            "plan_install(unknown): K1 fallback, not precompiled");
         check(unknown.install_cmds.empty() && unknown.postinstall_cmds.empty(),
-              "plan_install(unknown): no commands planned");
+            "plan_install(unknown): no commands planned");
         check(contains(unknown.note, "Build-custom"), "plan_install(unknown): note points at the Build-custom flow");
     }
     if (km::find_kernel("linux-tkg").has_value()) {
         const InstallPlan tkg = plan_install("linux-tkg");
         check(!tkg.precompiled && tkg.install_cmds.empty() && tkg.postinstall_cmds.empty(),
-              "plan_install(tkg): build-only, no commands");
+            "plan_install(tkg): build-only, no commands");
         check(contains(tkg.note, "Build-custom"), "plan_install(tkg): note points at the Build-custom flow");
     }
     if (km::find_kernel("linux-xanmod").has_value()) {
         const InstallPlan xanmod = plan_install("linux-xanmod");
         check(xanmod.precompiled && xanmod.repo == "chaotic-aur", "plan_install(xanmod): precompiled, chaotic-aur repo");
         check(xanmod.install_cmds.size() == 1 && xanmod.install_cmds[0] == "pacman -S --needed linux-xanmod",
-              "plan_install(xanmod): pacman install (chaotic-aur is a pacman repo)");
+            "plan_install(xanmod): pacman install (chaotic-aur is a pacman repo)");
         check(xanmod.postinstall_cmds.empty(), "plan_install(xanmod): postinstall empty (the ALPM hooks do the work)");
     }
 
@@ -258,17 +274,17 @@ int main() {
     // ------------------------------------------------------------------
     if (linux != nullptr) {
         RecordingRunner ok_runner{};
-        const InstallKernelResult ok_result = install_kernel(*linux, ok_runner.fn, Bootloader::GRUB);
+        const InstallKernelResult ok_result = install_kernel(*linux, ok_runner.fn, Bootloader::GRUB, no_pairing);
         check(ok_result.ok && ok_result.error.empty(), "install_kernel(linux, GRUB, rc=0): ok, no error");
         check(ok_result.verdict == InstallVerdict::INSTALL_SUCCESS && ok_result.rc == 0,
-              "install_kernel(rc=0): verdict == INSTALL_SUCCESS, rc == 0");
+            "install_kernel(rc=0): verdict == INSTALL_SUCCESS, rc == 0");
         check(ok_runner.calls.size() == 1, "install_kernel: exactly 1 command run (the package install)");
         if (ok_runner.calls.size() == 1) {
             check(ok_runner.calls[0].first == "pacman -S --needed linux" && ok_runner.calls[0].second,
-                  "install_kernel[0]: escalated pacman");
+                "install_kernel[0]: escalated pacman");
         }
         check(!ok_result.boot_instructions.empty() && ok_result.boot_instructions.back() == expected_note,
-              "install_kernel: boot instructions filled, ends with the note");
+            "install_kernel: boot instructions filled, ends with the note");
 
         // The 2-state verdict probe (simplify-K1): the install
         // command's REAL rc is the result — rc 0 = INSTALL_SUCCESS, any
@@ -278,39 +294,39 @@ int main() {
         // never launched) — both fold in as failures.
         for (const int rc : {1, 7, 124, 126}) {
             RecordingRunner fail_runner{};
-            fail_runner.rc = rc;
-            const InstallKernelResult fail_result = install_kernel(*linux, fail_runner.fn, Bootloader::GRUB);
-            const std::string label = "install_kernel(rc=" + std::to_string(rc) + "): ";
+            fail_runner.rc                        = rc;
+            const InstallKernelResult fail_result = install_kernel(*linux, fail_runner.fn, Bootloader::GRUB, no_pairing);
+            const std::string label               = "install_kernel(rc=" + std::to_string(rc) + "): ";
             check(!fail_result.ok && fail_result.verdict == InstallVerdict::INSTALL_FAILED && fail_result.rc == rc,
-                  (label + "INSTALL_FAILED, ok false, the real rc is carried").c_str());
+                (label + "INSTALL_FAILED, ok false, the real rc is carried").c_str());
             check(contains(fail_result.error, "pacman") && contains(fail_result.error, std::to_string(rc)),
-                  (label + "error names the failed command and its exit code").c_str());
+                (label + "error names the failed command and its exit code").c_str());
             check(fail_runner.calls.size() == 1, (label + "graceful stop, exactly 1 command run").c_str());
             check(!fail_result.boot_instructions.empty() && fail_result.boot_instructions.back() == expected_note,
-                  (label + "boot instructions still filled on failure").c_str());
+                (label + "boot instructions still filled on failure").c_str());
         }
     }
 
     {
         // AUR branch, injected runner: the exact single paru step.
         const KnownKernel aur{
-            "linux-aurx",     // name
-            "AUR Test",       // display_name
+            "linux-aurx",                            // name
+            "AUR Test",                              // display_name
             "A synthetic precompiled AUR package.",  // description
-            "linux-aurx",     // default_source
-            "linux-aurx",     // install_package
-            "aur",            // install_repo
-            true,             // precompiled_available
-            true              // buildable
+            "linux-aurx",                            // default_source
+            "linux-aurx",                            // install_package
+            "aur",                                   // install_repo
+            true,                                    // precompiled_available
+            true                                     // buildable
         };
         RecordingRunner runner{};
-        const InstallKernelResult result = install_kernel(aur, runner.fn, Bootloader::GRUB);
+        const InstallKernelResult result = install_kernel(aur, runner.fn, Bootloader::GRUB, no_pairing);
         check(result.ok && result.verdict == InstallVerdict::INSTALL_SUCCESS && result.rc == 0,
-              "install_kernel(AUR, rc=0): ok, verdict == INSTALL_SUCCESS");
+            "install_kernel(AUR, rc=0): ok, verdict == INSTALL_SUCCESS");
         check(runner.calls.size() == 1, "install_kernel(AUR): exactly 1 command (the non-escalated paru)");
         if (runner.calls.size() == 1) {
             check(runner.calls[0].first == "paru -S --needed linux-aurx" && !runner.calls[0].second,
-                  "install_kernel(AUR)[0]: non-escalated paru");
+                "install_kernel(AUR)[0]: non-escalated paru");
         }
     }
 
@@ -318,24 +334,99 @@ int main() {
         // Buildable-only: graceful note, zero commands run, rc -1 (no
         // install command ran to capture).
         const KnownKernel tkg{
-            "linux-tkg",     // name
-            "TKG Test",      // display_name
-            "A synthetic build-only kernel.",  // description
+            "linux-tkg",                                         // name
+            "TKG Test",                                          // display_name
+            "A synthetic build-only kernel.",                    // description
             "https://github.com/Frogging-Family/linux-tkg.git",  // default_source
-            "",              // install_package (none)
-            "chaotic-aur",   // install_repo
-            false,           // precompiled_available
-            true             // buildable
+            "",                                                  // install_package (none)
+            "chaotic-aur",                                       // install_repo
+            false,                                               // precompiled_available
+            true                                                 // buildable
         };
         RecordingRunner runner{};
-        const InstallKernelResult result = install_kernel(tkg, runner.fn, Bootloader::UNKNOWN);
+        const InstallKernelResult result = install_kernel(tkg, runner.fn, Bootloader::UNKNOWN, no_pairing);
         check(!result.ok && contains(result.error, "Build-custom"),
-              "install_kernel(build-only): graceful Build-custom note");
+            "install_kernel(build-only): graceful Build-custom note");
         check(result.verdict == InstallVerdict::INSTALL_FAILED && result.rc == -1,
-              "install_kernel(build-only): verdict == INSTALL_FAILED, rc -1 (no command ran)");
+            "install_kernel(build-only): verdict == INSTALL_FAILED, rc -1 (no command ran)");
         check(runner.calls.empty(), "install_kernel(build-only): no command run");
         check(!result.boot_instructions.empty() && result.boot_instructions.back() == expected_note,
-              "install_kernel(build-only): boot instructions filled (the constant note)");
+            "install_kernel(build-only): boot instructions filled (the constant note)");
+    }
+
+    {
+        // D6 header pairing (chunk 5): the predicate returns the
+        // companion -headers package ⇒ install_kernel appends it to the
+        // first package-install command — one transaction, --needed
+        // keeps it idempotent. plan_steps itself is UNCHANGED.
+        const std::function<std::string(std::string_view)> zen_pairing = [](std::string_view) {
+            return std::string{"linux-zen-headers"};
+        };
+
+        // Repo (pacman) target: the headers are appended to the
+        // escalated install command.
+        const KnownKernel zen{
+            "linux-zen",                              // name
+            "Zen Test",                               // display_name
+            "A synthetic precompiled repo package.",  // description
+            "linux-zen",                              // default_source
+            "linux-zen",                              // install_package
+            "core",                                   // install_repo
+            true,                                     // precompiled_available
+            true                                      // buildable
+        };
+        RecordingRunner zen_runner{};
+        const InstallKernelResult zen_result = install_kernel(zen, zen_runner.fn, Bootloader::GRUB, zen_pairing);
+        check(zen_result.ok && zen_result.verdict == InstallVerdict::INSTALL_SUCCESS && zen_result.rc == 0,
+            "pairing: repo rc=0 ⇒ INSTALL_SUCCESS");
+        check(zen_runner.calls.size() == 1, "pairing: repo ⇒ exactly 1 command (the paired install)");
+        if (zen_runner.calls.size() == 1) {
+            check(zen_runner.calls[0].first == "pacman -S --needed linux-zen linux-zen-headers" && zen_runner.calls[0].second,
+                "pairing[0]: `pacman -S --needed linux-zen linux-zen-headers` (the headers appended)");
+        }
+
+        // AUR (paru) target: the headers are appended to the
+        // non-escalated install command.
+        const KnownKernel zen_aur{
+            "linux-zen",                             // name
+            "Zen AUR Test",                          // display_name
+            "A synthetic precompiled AUR package.",  // description
+            "linux-zen",                             // default_source
+            "linux-zen",                             // install_package
+            "aur",                                   // install_repo
+            true,                                    // precompiled_available
+            true                                     // buildable
+        };
+        RecordingRunner aur_pairing_runner{};
+        const InstallKernelResult aur_pairing_result = install_kernel(zen_aur, aur_pairing_runner.fn, Bootloader::GRUB, zen_pairing);
+        check(aur_pairing_result.ok && aur_pairing_result.verdict == InstallVerdict::INSTALL_SUCCESS
+                && aur_pairing_result.rc == 0,
+            "pairing: AUR rc=0 ⇒ INSTALL_SUCCESS");
+        check(aur_pairing_runner.calls.size() == 1, "pairing: AUR ⇒ exactly 1 command (the paired paru)");
+        if (aur_pairing_runner.calls.size() == 1) {
+            check(aur_pairing_runner.calls[0].first == "paru -S --needed linux-zen linux-zen-headers"
+                    && !aur_pairing_runner.calls[0].second,
+                "pairing[0]: `paru -S --needed linux-zen linux-zen-headers` (non-escalated)");
+        }
+
+        // Buildable-only: unchanged — the early return (no
+        // precompiled package) runs before the pairing, so the
+        // predicate is never reached and zero commands run.
+        const KnownKernel zen_tkg{
+            "linux-tkg",                                         // name
+            "TKG Test",                                          // display_name
+            "A synthetic build-only kernel.",                    // description
+            "https://github.com/Frogging-Family/linux-tkg.git",  // default_source
+            "",                                                  // install_package (none)
+            "chaotic-aur",                                       // install_repo
+            false,                                               // precompiled_available
+            true                                                 // buildable
+        };
+        RecordingRunner tkg_pairing_runner{};
+        const InstallKernelResult tkg_pairing_result = install_kernel(zen_tkg, tkg_pairing_runner.fn, Bootloader::GRUB, zen_pairing);
+        check(!tkg_pairing_result.ok && tkg_pairing_result.verdict == InstallVerdict::INSTALL_FAILED && tkg_pairing_result.rc == -1,
+            "pairing: build-only unchanged (graceful note, no command, rc -1)");
+        check(tkg_pairing_runner.calls.empty(), "pairing: build-only ⇒ zero commands (the predicate is never reached)");
     }
 
     // ------------------------------------------------------------------
@@ -385,9 +476,9 @@ int main() {
             check(steps.back() == expected_note, "boot_instructions_for(linux): ends with the ready-to-boot note");
         }
         check(boot_instructions_for("core/linux") == steps,
-              "boot_instructions_for(core/linux): prefix-tolerant, identical to linux");
+            "boot_instructions_for(core/linux): prefix-tolerant, identical to linux");
         std::printf("INFO: live detection -> %s (%zu boot-instruction step(s))\n",
-                    bootloader_name(detect_bootloader()).c_str(), steps.size());
+            bootloader_name(detect_bootloader()).c_str(), steps.size());
     }
 
     if (g_failures == 0) {
