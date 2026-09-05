@@ -2,7 +2,7 @@
 
 ### v1.27.0 (2026-09-05)
 
-[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/bdfcf24...621b7ff)
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/bdfcf24...a8dda06)
 
 #### Added
 - **Nvidia driver gate** — before the app installs a kernel (and, after a custom build, before it installs the freshly built packages), it checks how your Nvidia driver is packaged and warns you if the new kernel would break it. A precompiled driver (which ships no module for the new kernel) can be moved to the DKMS variant — the one that rebuilds itself for every kernel — with a single click; the app picks the right package for your GPU (the open kernel module on Turing-and-newer cards, the proprietary one on older). You can also proceed with a warning, or cancel.
