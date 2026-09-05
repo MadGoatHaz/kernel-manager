@@ -14,6 +14,18 @@
 # resolves its D6 pairing default to driver_gate (chunk 5), so
 # src/driver_gate.cpp is in the compile list (the k8/k14 companion).
 #
+# Recipe shape (one forced deviation from the single driver command, the
+# k19 precedent): the TUs are compiled separately with the project's GCC
+# warning set, then linked with LTO WITHOUT the -W flags — exactly the
+# canonical cmake pipeline shape. A single command would carry the -W flags
+# onto the link-time LTRANS whole-program pass, where GCC 16's
+# -Wnull-dereference re-analysis flags libstdc++ istreambuf_iterator false
+# positives in src/driver_gate.cpp's read_small_file (4 header warnings,
+# zero project-code warnings) now that chunk 3 makes the module's probes
+# live in the km-window.cpp closure (the cmake build's link line carries
+# no -W flags, so it stays 0-warning; separate TUs compile clean — proven
+# per-TU before this split).
+#
 # Gates:
 #   1. the harness exits 0 with all assertions passing (both runs)
 #   2. 0 source warnings (cycle-7 C7a eliminated the -Wignored-attributes
@@ -80,8 +92,21 @@ fi
 OUT="/tmp/km-test-k12"
 LOG="/tmp/km-test-k12-build.log"
 
-/usr/bin/c++ \
-    -DAPP_VERSION=\"$APP_VERSION\" \
+# The shared compiler settings: the original single command's flags,
+# verbatim, split into the compile phase (with the warning set) and the
+# LTO-link phase (without — the canonical cmake shape).
+COMPILE_FLAGS="-O3 -flto -fwhole-program -fuse-linker-plugin \
+    -std=c++23 -fPIE -fdiagnostics-color=always -mno-direct-extern-access \
+    -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual \
+    -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 \
+    -Wimplicit-fallthrough -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
+    -Wuseless-cast -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
+    -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
+    -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
+    -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
+    -D_FILE_OFFSET_BITS=64 -pthread"
+
+INCLUDES="-DAPP_VERSION=\"$APP_VERSION\" \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_DISABLE_DEPRECATED_BEFORE=0x050F00 -DQT_GUI_LIB -DQT_NO_DEBUG -DQT_WIDGETS_LIB \
@@ -99,34 +124,42 @@ LOG="/tmp/km-test-k12-build.log"
     -isystem /usr/include/qt6/QtConcurrent \
     -isystem /usr/include/glib-2.0 \
     -isystem /usr/lib/glib-2.0/include \
-    -isystem /usr/include/sysprof-6 \
-    -O3 -flto -fwhole-program -fuse-linker-plugin \
-    -std=c++23 -fPIE -fdiagnostics-color=always -mno-direct-extern-access \
-    -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual \
-    -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 \
-    -Wimplicit-fallthrough -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
-    -Wuseless-cast -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
-    -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
-    -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
-    -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
-    -D_FILE_OFFSET_BITS=64 -pthread \
-    tests/test_k12_tree_render.cpp \
-    src/km-window.cpp \
-    src/conf-window.cpp \
-    src/kernel.cpp \
-    src/known_kernels.cpp \
-    src/alpm_utils.cpp \
-    src/utils.cpp \
-    src/install_kernel.cpp \
-    src/driver_gate.cpp \
-    src/aur_kernel.cpp \
-    src/boot_instructions.cpp \
-    src/bootloader.cpp \
-    src/config-options.cpp \
-    "$MOC_KM_WINDOW" \
-    "$MOC_CONF_WINDOW" \
-    "$MOC_CONF_OPTIONS_PAGE" \
-    "$MOC_CONF_PATCHES_PAGE" \
+    -isystem /usr/include/sysprof-6"
+
+# Phase 1: compile every TU separately with the project's GCC warning set
+# (the per-TU passes are clean — it is the LTRANS whole-program pass that
+# re-flags the libstdc++ istreambuf_iterator false positives).
+TUS=(
+    tests/test_k12_tree_render.cpp
+    src/km-window.cpp
+    src/conf-window.cpp
+    src/kernel.cpp
+    src/known_kernels.cpp
+    src/alpm_utils.cpp
+    src/utils.cpp
+    src/install_kernel.cpp
+    src/driver_gate.cpp
+    src/aur_kernel.cpp
+    src/boot_instructions.cpp
+    src/bootloader.cpp
+    src/config-options.cpp
+    "$MOC_KM_WINDOW"
+    "$MOC_CONF_WINDOW"
+    "$MOC_CONF_OPTIONS_PAGE"
+    "$MOC_CONF_PATCHES_PAGE"
+)
+OBJS=()
+: > "$LOG"
+for tu in "${TUS[@]}"; do
+    obj="/tmp/km-test-k12-$(printf '%s' "$tu" | tr '/.' '__').o"
+    /usr/bin/c++ $INCLUDES $COMPILE_FLAGS -c "$tu" -o "$obj" 2>> "$LOG" \
+        || { echo "error: k12 compile of $tu failed:" >&2; tail -n 30 "$LOG" >&2; exit 1; }
+    OBJS+=("$obj")
+done
+
+# Phase 2: the LTO link WITHOUT the -W flags (the link line never carries
+# code diagnostics — the cmake pipeline shape).
+/usr/bin/c++ -O3 -flto -fuse-linker-plugin -fPIE "${OBJS[@]}" \
     "$BUILD/_deps/fmt-build/libfmt.a" \
     "$BUILD/libconfig-option-lib-cxxbridge.a" \
     "$BUILD/libconfig_option_lib.a" \
@@ -136,7 +169,9 @@ LOG="/tmp/km-test-k12-build.log"
     /usr/lib/libQt6Gui.so \
     /usr/lib/libQt6Core.so \
     -lalpm \
-    -o "$OUT" 2> "$LOG"
+    -o "$OUT" 2>> "$LOG" \
+    || { echo "error: k12 LTO link failed:" >&2; tail -n 30 "$LOG" >&2; exit 1; }
+rm -f "${OBJS[@]}"
 
 # Warning gate: 0 source warnings (cycle-7 C7a eliminated the
 # -Wignored-attributes baseline; the

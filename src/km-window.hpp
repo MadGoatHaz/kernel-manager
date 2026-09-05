@@ -41,6 +41,7 @@
 #include <ui_km-window.h>
 
 #include "conf-window.hpp"
+#include "driver_gate.hpp"
 #include "kernel.hpp"
 #include "utils.hpp"
 
@@ -136,6 +137,20 @@ class MainWindow final : public QMainWindow {
     // dedicated one-action context-menu branch of on_kernel_context_menu.
     void on_install_from_directory() noexcept;
     void on_kernel_context_menu(const QPoint& pos) noexcept;
+    // The nvidia driver gate's single Qt glue (chunk 3, plan D1/D3/D7):
+    // evaluates the driver-packaging verdict for one install target on
+    // the main thread BEFORE any install flow runs and acts on it —
+    // PROCEED silently; WARN_MIGRATE offers the one-click migration
+    // (blocking, real rc, post-migration verify); ENSURE_HEADERS informs
+    // that the headers ride along in the install; WARN_ONLY warns +
+    // banners. Wired to trigger A (on_execute), B (the context-menu
+    // install branch) and C (on_install_from_directory). Returns false
+    // only when the user aborts the install.
+    bool run_driver_gate(const driver_gate::GateTarget& target);
+    // D7: show the persistent status-bar banner (the exact verdict text
+    // — the module's; this method only owns the label). Shown on a
+    // declined fix, hidden on a successful migration.
+    void show_driver_banner(const QString& text);
 
     void check_uncheck_item() noexcept;
 
@@ -153,6 +168,11 @@ class MainWindow final : public QMainWindow {
     QProgressDialog* m_conf_progress_dialog{nullptr};
     QProgressBar* m_conf_progress_bar{nullptr};
     QFutureWatcher<void> m_future_watcher;
+
+    // The D7 persistent status-bar banner (chunk 3): a permanent,
+    // hidden-by-default label next to the version label; shown on a
+    // driver-gate decline, hidden on a successful migration.
+    QLabel* m_driver_banner = nullptr;
 
     QThread* m_worker_th = new QThread(this);
     Work* m_worker{nullptr};
