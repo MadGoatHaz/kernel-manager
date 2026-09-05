@@ -39,12 +39,15 @@
 
 #include <ui_conf-window.h>
 
+#include "driver_gate.hpp"
+
 #include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include <QLabel>
 #include <QMainWindow>
 #include <QProcess>
 #include <QTimer>
@@ -102,6 +105,19 @@ class ConfWindow final : public QMainWindow {
     // timer's timeout slot.
     void handle_build_done() noexcept;
     void on_done_status_tick() noexcept;
+    // The nvidia driver gate's single Qt glue (chunk 4, plan D1/D3/D7):
+    // evaluates the driver-packaging verdict for the just-built kernel on
+    // the main thread AFTER the build completes and BEFORE the post-build
+    // `pacman -U` (trigger D — handle_build_done) and acts on it — PROCEED
+    // silently; WARN_MIGRATE offers the one-click migration (blocking,
+    // real rc, post-migration verify); ENSURE_HEADERS runs the blocking
+    // headers pre-step; WARN_ONLY warns + banners. Returns false only when
+    // the user aborts the install.
+    bool run_driver_gate(const driver_gate::GateTarget& target);
+    // D7: show the persistent status-bar banner (the exact verdict text
+    // — the module's; this method only owns the label). Shown on a
+    // declined fix, hidden on a successful migration.
+    void show_driver_banner(const QString& text);
 
     [[nodiscard]] auto kernel_path_for_index(std::int32_t index) const noexcept -> std::string;
     void update_option_set() noexcept;
@@ -136,6 +152,11 @@ class ConfWindow final : public QMainWindow {
     bool m_expect_done{true};
     int m_last_helper_rc{0};
     std::size_t m_done_polls_left{0};
+
+    // The D7 persistent status-bar banner (chunk 4): a permanent,
+    // hidden-by-default label; shown on a driver-gate decline, hidden on a
+    // successful migration.
+    QLabel* m_driver_banner = nullptr;
 
     std::unique_ptr<Ui::ConfWindow> m_ui = std::make_unique<Ui::ConfWindow>();
 

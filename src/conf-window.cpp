@@ -19,6 +19,8 @@
 #include "conf-window.hpp"
 #include "compile_options.hpp"
 #include "config-options.hpp"
+#include "driver_gate.hpp"
+#include "install_kernel.hpp"
 #include "known_kernels.hpp"
 #include "utils.hpp"
 
@@ -45,12 +47,15 @@
 #endif
 
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QFileDialog>
 #include <QInputDialog>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QProcess>
 #include <QSignalBlocker>
+#include <QStatusBar>
 #include <QStringList>
 
 #ifdef __clang__
@@ -678,6 +683,26 @@ inline void list_widget_apply_edit_flag(QListWidget* list_widget) noexcept {
     }
 }
 
+// ── The nvidia driver gate (chunk 4, plan D1/D3/D7) ───────────────────
+// The H1 pattern (this file's handle_build_done precedent, adopted by
+// km-window.cpp's gate helper): bring the window to the front + fire a
+// desktop-notification backup BEFORE a modal — after a long operation
+// the window can sit buried behind other windows, and a modal parented
+// to a buried window is invisible to the user (the frozen-behind-the-
+// modal bug). handle_build_done fires it once before the first modal
+// (the gate modal or the install question — both share the single
+// raise); the gate's modals that follow a blocking terminal re-fire it
+// (notify-send is fire-and-forget, like the terminal-helper's own
+// notifications).
+void bring_window_forward(QWidget* window) {
+    window->raise();
+    window->activateWindow();
+    QProcess::startDetached("notify-send",
+        {"--app-name=Kernel Manager",
+            "Kernel build finished",
+            "Do you want to install build packages?"});
+}
+
 }  // namespace
 
 // NOTE: we use std::string const ref intentionally to prevent conversion from string_view into QString
@@ -756,22 +781,41 @@ void ConfWindow::handle_build_done() noexcept {
 
     fmt::print("success\n");
 
-    // Bring this window to the front BEFORE the modal: after a long
-    // unattended build the ConfWindow can sit buried behind the main
-    // window, and a modal parented to a buried window is invisible to
-    // the user (the frozen-behind-the-modal bug). raise() +
-    // activateWindow() restores the window's focus, so the question
-    // box appears on top of it.
-    raise();
-    activateWindow();
-    // Desktop notification as a backup (it is visible even if the
-    // window manager does not hand focus to the window): fire-and-forget
-    // notify-send — the same tool the terminal-helper uses for its own
-    // notifications.
-    QProcess::startDetached("notify-send",
-        {"--app-name=Kernel Manager",
-            "Kernel build finished",
-            "Do you want to install build packages?"});
+    // Bring this window to the front BEFORE the first modal (the
+    // driver-gate modal when one fires, else the install question):
+    // after a long unattended build the ConfWindow can sit buried behind
+    // the main window, and a modal parented to a buried window is
+    // invisible to the user (the frozen-behind-the-modal bug). raise() +
+    // activateWindow() restores the window's focus, so the modal appears
+    // on top of it; the desktop notification is a backup (it is visible
+    // even if the window manager does not hand focus to the window). The
+    // single H1 block is shared by both modals — the gate's modals that
+    // follow a blocking terminal re-raise on their own.
+    bring_window_forward(this);
+
+    // The nvidia driver gate (chunk 4, trigger D): the post-build
+    // pre-flight BEFORE the install question + the `pacman -U` — the
+    // kver is only known once the build finished, and the gate must run
+    // before any `pacman -U` of the built packages. The target's
+    // identity is the first built package whose .PKGINFO parses to a
+    // non-headers kernel name (the install_from_directory identity
+    // logic; the parsed version doubles as the kver for the build-dir
+    // check). No parseable package leaves the target empty (the gate
+    // degrades to the empty-target row). A declined migration or an
+    // aborted install stops here, before the install runs.
+    driver_gate::GateTarget target{};
+    for (const auto& pkg : list_local_packages(m_build_conf_path)) {
+        std::string pkg_name{};
+        std::string pkg_version{};
+        if (read_pkginfo(pkg, pkg_name, pkg_version) && !pkg_name.ends_with("-headers")) {
+            target.kernel = pkg_name;
+            target.kver   = pkg_version;
+            break;
+        }
+    }
+    if (!run_driver_gate(target)) {
+        return;  // the user aborted the install
+    }
 
     auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Do you want to install build packages?"));
     if (res == QMessageBox::Yes) {
@@ -791,6 +835,179 @@ void ConfWindow::handle_build_done() noexcept {
         m_running = true;
         run_cmd_async(pacman_cmd, m_build_conf_path, /*escalate=*/true, /*expect_done=*/false);
     }
+}
+
+// The nvidia driver gate's single Qt glue (chunk 4, plan D1/D3/D7):
+// evaluate the verdict for the just-built kernel (the post-build
+// pre-flight — trigger D) and act on it BEFORE the post-build `pacman -U`
+// runs:
+//   PROCEED        -> silently (no nvidia hardware, no nvidia driver, or
+//                     the DKMS driver + headers are already in place).
+//   WARN_MIGRATE   -> the plain-language warning + the one-click
+//                     migration: the command runs in the escalated
+//                     terminal (blocking — the sentinel protocol returns
+//                     its real rc) and the outcome is verified against
+//                     the local DB + build dir (the D3 post-migration
+//                     verify); declining the migration shows the
+//                     persistent D7 banner and proceeds.
+//   ENSURE_HEADERS -> the blocking headers pre-step (D4 row D): one
+//                     escalated `pacman -S --needed <headers>` before
+//                     the async `pacman -U` (the async single-m_cmd slot
+//                     cannot chain a second async command).
+//   WARN_ONLY      -> the warning (no fix exists for this kernel):
+//                     proceed shows the banner, cancel aborts.
+// The caller's single H1 raise covers the first modal; the modals that
+// follow a blocking terminal re-raise on their own (bring_window_forward).
+// Returns false only when the user aborts the install (every other path
+// proceeds — the banner documents the consequence of a declined fix).
+bool ConfWindow::run_driver_gate(const driver_gate::GateTarget& target) {
+    const auto v = driver_gate::evaluate_gate(target);
+
+    switch (v.action) {
+    case driver_gate::GateAction::PROCEED:
+        return true;
+
+    case driver_gate::GateAction::ENSURE_HEADERS: {
+        // The repo-membership re-check (D3) guards the window between the
+        // verdict and the pre-step: if the headers left every sync repo
+        // in the meantime, no fix exists — the D3 WARN_ONLY row (the
+        // warning dialog + the persistent banner).
+        if (!driver_gate::package_in_sync_db(v.headers_package)) {
+            const auto w = driver_gate::evaluate_gate(target);
+            if (w.action == driver_gate::GateAction::WARN_ONLY) {
+                QMessageBox box(this);
+                box.setIcon(QMessageBox::Warning);
+                box.setWindowTitle(tr("Kernel Manager"));
+                box.setText(QCoreApplication::translate("ConfWindow", qPrintable(QString::fromStdString(w.message))));
+                auto* proceed = box.addButton(tr("Proceed"), QMessageBox::AcceptRole);
+                box.addButton(tr("Cancel"), QMessageBox::RejectRole);
+                box.exec();
+                if (box.clickedButton() == proceed) {
+                    show_driver_banner(QString::fromStdString(w.banner));
+                    return true;
+                }
+                return false;
+            }
+            return true;  // the state resolved itself in the meantime: proceed
+        }
+
+        // The headers pre-step (D4 row D): the verdict's message explains
+        // that the headers ride along; the blocking escalated terminal
+        // installs them (one polkit prompt, sequential, real rc) before
+        // the caller's async `pacman -U`.
+        QMessageBox::information(this, tr("Kernel Manager"), QCoreApplication::translate("ConfWindow", qPrintable(QString::fromStdString(v.message))));
+        const int rc = utils::runCmdTerminal(QString::fromStdString(v.ensure_cmd), /*escalate=*/true);
+
+        // The terminal took the user's attention: re-raise before the
+        // next modal (the outcome dialogs, or the caller's install
+        // question on success).
+        bring_window_forward(this);
+        if (rc == 0) {
+            // The headers are installed: the `pacman -U` can proceed.
+            return true;
+        }
+        QMessageBox critical_box(this);
+        critical_box.setIcon(QMessageBox::Critical);
+        critical_box.setWindowTitle(tr("Kernel Manager"));
+        critical_box.setText(tr("Failed to install the kernel headers (rc=%1).").arg(rc));
+        critical_box.setInformativeText(tr("Check the terminal output for details."));
+        critical_box.exec();
+        const auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Continue with the install anyway?"));
+        // Continue anyway: the install proceeds without the headers — the
+        // DKMS driver may not build for this kernel. No banner: the
+        // ENSURE_HEADERS verdict carries none (the D7 banner text belongs
+        // to the WARN_MIGRATE / WARN_ONLY decline paths).
+        return res == QMessageBox::Yes;
+    }
+
+    case driver_gate::GateAction::WARN_ONLY: {
+        QMessageBox box(this);
+        box.setIcon(QMessageBox::Warning);
+        box.setWindowTitle(tr("Kernel Manager"));
+        box.setText(QCoreApplication::translate("ConfWindow", qPrintable(QString::fromStdString(v.message))));
+        auto* proceed = box.addButton(tr("Proceed"), QMessageBox::AcceptRole);
+        box.addButton(tr("Cancel"), QMessageBox::RejectRole);
+        box.exec();
+        if (box.clickedButton() == proceed) {
+            show_driver_banner(QString::fromStdString(v.banner));
+            return true;
+        }
+        return false;
+    }
+
+    case driver_gate::GateAction::WARN_MIGRATE: {
+        QMessageBox box(this);
+        box.setIcon(QMessageBox::Question);
+        box.setWindowTitle(tr("Kernel Manager"));
+        box.setText(QCoreApplication::translate("ConfWindow", qPrintable(QString::fromStdString(v.message))));
+        box.addButton(tr("Migrate to %1").arg(QString::fromStdString(v.dkms_package)), QMessageBox::AcceptRole);
+        auto* without = box.addButton(tr("Proceed without"), QMessageBox::ActionRole);
+        auto* cancel  = box.addButton(tr("Abort install"), QMessageBox::RejectRole);
+        box.exec();
+        if (box.clickedButton() == cancel) {
+            return false;  // the install is aborted
+        }
+        if (box.clickedButton() == without) {
+            // Proceed without the migration: the banner documents the
+            // consequence (no GPU acceleration on the custom kernel) and
+            // re-shows on every later decline.
+            show_driver_banner(QString::fromStdString(v.banner));
+            return true;
+        }
+
+        // The one-click migration: the escalated terminal runs the
+        // verdict's command (the DKMS package + the target's headers) and
+        // the sentinel protocol returns its real rc (blocking — the user
+        // watches it happen).
+        const int rc = utils::runCmdTerminal(QString::fromStdString(v.migration_cmd), /*escalate=*/true);
+
+        // The D3 post-migration verify: the real rc + the DKMS driver
+        // installed + the target's headers in the local DB + (for a known
+        // kver: its build dir, or the headers still in a sync repo as the
+        // soft fallback).
+        const bool verified = (rc == 0)
+            && driver_gate::dkms_driver_installed()
+            && (v.headers_package.empty() || driver_gate::package_installed(v.headers_package))
+            && (target.kver.empty() || driver_gate::build_dir_exists(target.kver) || (!v.headers_package.empty() && driver_gate::package_in_sync_db(v.headers_package)));
+
+        bring_window_forward(this);
+        if (verified) {
+            // A successful migration clears the warning.
+            if (m_driver_banner != nullptr) {
+                m_driver_banner->hide();
+            }
+            QMessageBox::information(this, tr("Kernel Manager"), tr("The DKMS driver migration succeeded. The install will continue."));
+            return true;
+        }
+        QMessageBox critical_box(this);
+        critical_box.setIcon(QMessageBox::Critical);
+        critical_box.setWindowTitle(tr("Kernel Manager"));
+        critical_box.setText(tr("The driver migration failed (rc=%1).").arg(rc));
+        critical_box.setInformativeText(tr("Check the terminal output for details."));
+        critical_box.exec();
+        const auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Continue with the install anyway?"));
+        if (res == QMessageBox::Yes) {
+            // The migration did not verify: the banner says why the
+            // custom kernel may lack GPU acceleration.
+            show_driver_banner(QString::fromStdString(v.banner));
+            return true;
+        }
+        return false;
+    }
+    }
+    return true;  // defensive: an unknown action never blocks the install
+}
+
+// D7: show the persistent status-bar banner (the exact verdict text —
+// the module's; this method only owns the label). Shown on a declined
+// fix (WARN_MIGRATE "proceed without" / WARN_ONLY "proceed"), hidden on
+// a successful migration.
+void ConfWindow::show_driver_banner(const QString& text) {
+    if (m_driver_banner == nullptr) {
+        return;
+    }
+    m_driver_banner->setText(QCoreApplication::translate("ConfWindow", qPrintable(text)));
+    m_driver_banner->show();
 }
 
 // The bounded done-status poll (cycle-7 C3/D3): 10 x 3 s retries of the
@@ -1029,12 +1246,23 @@ void ConfWindow::reset_patches_data_tab() noexcept {
 }
 
 ConfWindow::ConfWindow(QWidget* parent)
-  : QMainWindow(parent) {
+  : QMainWindow(parent), m_driver_banner(new QLabel(parent)) {
     m_ui->setupUi(this);
     setWindowIcon(QApplication::windowIcon());  // explicit dedicated icon; the .ui no longer overrides; robust to Qt app-fallback semantics
 
     setAttribute(Qt::WA_NativeWindow);
     setWindowFlags(Qt::Window);  // for the close, min and max buttons
+
+    // The D7 persistent banner (chunk 4): a permanent, hidden-by-default
+    // status-bar label (created in the member initializer list above). It
+    // shows the gate's banner text when the user declines the nvidia
+    // driver fix (the custom kernel comes up without GPU acceleration)
+    // and hides on a successful migration; it lives for the session only
+    // — the gate re-evaluates fresh on every build completion (no
+    // QSettings persistence, the next run's verdict is the source of
+    // truth).
+    m_driver_banner->hide();
+    statusBar()->addPermanentWidget(m_driver_banner);
 
     auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
     auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
