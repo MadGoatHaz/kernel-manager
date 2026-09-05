@@ -2,7 +2,7 @@
 
 ### v1.27.1 (2026-09-05)
 
-[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/a8dda06...62047f5)
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/a8dda06...016eea3)
 
 #### Fixed
 - **Driver gate detects headers in the local install folder** — the driver gate now detects kernel headers shipped in the local install folder, so installing a pre-built kernel from a directory no longer falsely warns that headers are unavailable.
