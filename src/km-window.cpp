@@ -1069,7 +1069,7 @@ bool MainWindow::run_driver_gate(const driver_gate::GateTarget& target) {
 
     case driver_gate::GateAction::ENSURE_HEADERS:
         bring_window_forward(this);
-        QMessageBox::information(this, tr("Kernel Manager"), QString::fromStdString(v.message));
+        QMessageBox::information(this, tr("Kernel Manager"), QCoreApplication::translate("MainWindow", qPrintable(QString::fromStdString(v.message))));
         return true;
 
     case driver_gate::GateAction::WARN_ONLY: {
@@ -1077,7 +1077,7 @@ bool MainWindow::run_driver_gate(const driver_gate::GateTarget& target) {
         QMessageBox box(this);
         box.setIcon(QMessageBox::Warning);
         box.setWindowTitle(tr("Kernel Manager"));
-        box.setText(QString::fromStdString(v.message));
+        box.setText(QCoreApplication::translate("MainWindow", qPrintable(QString::fromStdString(v.message))));
         auto* proceed = box.addButton(tr("Proceed"), QMessageBox::AcceptRole);
         box.addButton(tr("Cancel"), QMessageBox::RejectRole);
         box.exec();
@@ -1093,7 +1093,7 @@ bool MainWindow::run_driver_gate(const driver_gate::GateTarget& target) {
         QMessageBox box(this);
         box.setIcon(QMessageBox::Question);
         box.setWindowTitle(tr("Kernel Manager"));
-        box.setText(QString::fromStdString(v.message));
+        box.setText(QCoreApplication::translate("MainWindow", qPrintable(QString::fromStdString(v.message))));
         box.addButton(tr("Migrate to %1").arg(QString::fromStdString(v.dkms_package)), QMessageBox::AcceptRole);
         auto* without = box.addButton(tr("Proceed without"), QMessageBox::ActionRole);
         auto* cancel  = box.addButton(tr("Abort install"), QMessageBox::RejectRole);
@@ -1163,7 +1163,7 @@ void MainWindow::show_driver_banner(const QString& text) {
     if (m_driver_banner == nullptr) {
         return;
     }
-    m_driver_banner->setText(text);
+    m_driver_banner->setText(QCoreApplication::translate("MainWindow", qPrintable(text)));
     m_driver_banner->show();
 }
 
