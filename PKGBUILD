@@ -8,21 +8,22 @@
 #
 # --------------------------------------------------------------------------
 # VERSIONING
-#   pkgver mirrors the version of the pinned source tree: the v1.26.0 tag
-#   (the fork's fifth tag after the distro-agnostic rename to
+#   pkgver mirrors the version of the pinned source tree: the v1.27.0 tag
+#   (the fork's sixth tag after the distro-agnostic rename to
 #   `kernel-manager`). The pre-rebrand tags (incl. v1.19.0) package the
 #   WRONG (CachyOS-branded) content and are not used.
 #
-#   The stable source below is pinned to the v1.26.0 release commit
-#   65f19b3 (the version-bump commit `CMakeLists.txt 1.25.0 -> 1.26.0`,
-#   one commit BEFORE the v1.26.0 tag). The tag itself sits on the PKGBUILD
+#   The stable source below is pinned to the v1.27.0 release commit
+#   8945714 (the version-bump commit `CMakeLists.txt 1.26.0 -> 1.27.0`,
+#   one commit BEFORE the v1.27.0 tag). The tag itself sits on the PKGBUILD
 #   re-pin (this file), so it includes both the version bump and the re-pin;
 #   `_commit` points at the version-bump commit (not the tag) so the archived
 #   source is a stable, non-circular snapshot (pinning the tag's own commit
-#   would make `sha256sums` self-referential). The v1.26.0 cycle: simplified
-#   install flow (distro alpm hooks, 2-state result) + the UI version
-#   display. When the next release tag is cut, bump pkgver and re-pin
-#   `_commit` to that release's version-bump commit (+ refresh `sha256sums`).
+#   would make `sha256sums` self-referential). The v1.27.0 cycle: the DKMS vs
+#   prebuilt Nvidia driver gate (pre-install dialog + persistent banner) +
+#   automatic kernel-header pairing. When the next release tag is cut, bump
+#   pkgver and re-pin `_commit` to that release's version-bump commit
+#   (+ refresh `sha256sums`).
 #
 # --------------------------------------------------------------------------
 # DEPENDENCIES  (verified against `ldd` on the built binary + the CMake build)
@@ -70,7 +71,7 @@
 #   conflict + provide make it drop-in replace the CachyOS package cleanly.
 
 pkgname=kernel-manager
-pkgver=1.26.0
+pkgver=1.27.0
 pkgrel=1
 pkgdesc="Qt6 GUI for kernel configuration, compilation, and sched-ext (BPF) scheduler management"
 arch=(x86_64)
@@ -87,11 +88,11 @@ makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polki
 # Defensive polkit reload so the shipped policy is picked up on (re)install.
 install=kernel-manager.install
 
-# Pinned v1.26.0 release commit (the version-bump commit, one before the
-# v1.26.0 tag — see the VERSIONING note above).
-_commit=65f19b33f1ef79ff136cd5e0aac73893e8d450e7
+# Pinned v1.27.0 release commit (the version-bump commit, one before the
+# v1.27.0 tag — see the VERSIONING note above).
+_commit=894571474734527e55e71beb3d23f90556d698ec
 source=("https://github.com/MadGoatHaz/kernel-manager/archive/${_commit}.tar.gz")
-sha256sums=("399c2b80e2fd750de4584f5eb03451525e80fe9a509e2a4eb4d1ae282e8eafee")
+sha256sums=("159bb7c08bf2efde49b5d4ab166f6b5cabf074f3944eaf8b770411f9ac2b0db2")
 
 # GitHub archive top dir for a commit is `<repo>-<full-sha>`.
 _srcdir="kernel-manager-${_commit}"
