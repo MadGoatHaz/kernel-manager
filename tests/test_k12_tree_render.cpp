@@ -17,10 +17,14 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 // k12: offscreen render harness for the kernel tree's Choose cell (D3 lock
-// glyph), Version cell (D4 "— (repo not enabled)" annotation), and the
+// glyph), Version cell (D4 "— (repo not enabled)" annotation), the
 // "Install from directory…" pseudo-row (C3, plan v1.24.0 — the appended
 // 25th row: non-interactive folder-glyph QLabel, no checkbox, the D1
-// tooltips, plus the menu probes below).
+// tooltips, plus the menu probes below), and the Refresh button (plan
+// v1.29.0 D6 — the bottom-row placement contract, a real click driving
+// the guarded manual re-scan: the shared progress dialog, the tree
+// rebuild, the D4 stale-row purge, and the idempotent 36 → 36 header
+// re-extraction, plus the K12-DUMP-REFRESH stability dump below).
 //
 // Follows the tests/run_chunk2_ui.sh recipe: compiles the REAL source
 // closure of the app (km-window.cpp + conf-window.cpp + kernel.cpp +
@@ -67,13 +71,28 @@
 //       "Install from directory…" (the action is NEVER clicked — no real
 //       pkexec/terminal/folder-dialog launch); a live data row's menu
 //       keeps the pre-C3 shape (3 or 4 actions) as the no-regression gate
+//   (7) Refresh (plan v1.29.0 D6): the button's existence / text /
+//       tooltip / bottom-row layout order; a real click on it (the
+//       direct connection runs on_refresh synchronously) → the shared
+//       progress dialog is hidden again, the header is idempotent (36 →
+//       36 labels, kiMainTitle unique, kiKtRelease unchanged), the tree
+//       carries no !has_pkg() && !is_installed() row (the D4 complement)
+//       with the directory row surviving exactly once, and the surviving
+//       data rows == the re-fetched has_pkg || installed set. The
+//       m_running / configure-clone guards are not exercisable offscreen
+//       (no worker transaction, no clone) — verified by code audit.
 // The K12-DUMP row dump must be byte-stable across two runs (deterministic
 // order; the directory row dumps with the "folder" marker — checkbox rows
-// "checkbox", lock rows "lock"); run_k12.sh checks that.
+// "checkbox", lock rows "lock"); run_k12.sh checks that. The post-refresh
+// K12-DUMP-REFRESH dump (section 6f) must be byte-stable across the two
+// runs for the same determinism reason.
 //
 // The harness never writes: alpm is opened read-only (no root), no
 // terminal is launched, no row is checked, the menu actions are never
-// clicked (no folder dialog opens), /etc/pacman.conf is untouched.
+// clicked (no folder dialog opens), /etc/pacman.conf is untouched. The
+// Refresh click (section 6c) runs init_kernels' read-only re-parse +
+// re-fetch on the existing handle — no DB mutation, no install, no
+// transaction (m_running stays false, so no worker is woken).
 
 // C3 (plan v1.24.0) menu probes: the spec's private->public pre-include
 // hack (the C5/E14 throwaway pattern) is NOT used here — under this
@@ -106,8 +125,12 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QFrame>
 #include <QLabel>
+#include <QLayout>
 #include <QMenu>
+#include <QProgressDialog>
+#include <QPushButton>
 #include <QTimer>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
@@ -467,6 +490,182 @@ int main(int argc, char** argv) {
         const bool checkable = (item->flags() & Qt::ItemIsUserCheckable) == Qt::ItemIsUserCheckable;
         const bool directory = item->text(static_cast<int>(TreeCol::PkgName)) == kDirectoryRow;
         std::printf("K12-DUMP: %s | %s | %s | %s | %s\n",
+            item->text(static_cast<int>(TreeCol::PkgName)).toUtf8().constData(),
+            item->text(static_cast<int>(TreeCol::Version)).toUtf8().constData(),
+            item->text(static_cast<int>(TreeCol::Install)).toUtf8().constData(),
+            item->text(static_cast<int>(TreeCol::Category)).toUtf8().constData(),
+            checkable ? "checkbox" : (directory ? "folder" : "lock"));
+    }
+
+    // ------------------------------------------------------------------
+    // 6. Refresh (plan v1.29.0 D6): the new button + the manual re-scan
+    //    it drives, exercised by a REAL click on the real button (the
+    //    direct connection runs on_refresh synchronously on this thread —
+    //    no nested event loop, no exec()). The m_running /
+    //    configure-clone guards are not exercisable offscreen (no worker
+    //    transaction, no clone) — their logic is verified by code audit
+    //    in review (two early-returns mirroring on_execute).
+    // ------------------------------------------------------------------
+    // 6a. The button: existence, text, tooltip, and the bottom-row
+    //     layout order (the D1 placement contract — the widget items of
+    //     the horizontalLayout, in order; the spacer item is skipped).
+    auto* refresh_button = window.findChild<QPushButton*>("refresh");
+    check(refresh_button != nullptr, "refresh button exists (objectName 'refresh')");
+    check(refresh_button != nullptr && refresh_button->text() == QStringLiteral("Refresh"), "refresh button text == 'Refresh'");
+    check(refresh_button != nullptr && refresh_button->toolTip().contains(QStringLiteral("Re-scan")), "refresh button tooltip names the re-scan");
+    auto* bottom_row = window.findChild<QWidget*>("widget");
+    check(bottom_row != nullptr, "the bottom-row 'widget' container exists");
+    if (bottom_row != nullptr) {
+        auto* row_layout = bottom_row->layout();
+        check(row_layout != nullptr, "the bottom row carries a layout");
+        std::vector<std::string> row_order{};
+        if (row_layout != nullptr) {
+            for (int i = 0; i < row_layout->count(); ++i) {
+                if (auto* layout_item = row_layout->itemAt(i)) {
+                    if (auto* w = layout_item->widget()) {
+                        row_order.emplace_back(w->objectName().toStdString());
+                    }
+                }
+            }
+        }
+        const std::vector<std::string> expected_row_order{"buildDirCaption", "buildDirLabel", "browse", "schedext", "configure", "refresh", "cancel", "ok"};
+        std::string joined{};
+        for (const auto& n : row_order) {
+            joined += (joined.empty() ? "" : ", ") + n;
+        }
+        check(row_order == expected_row_order, (std::string{"bottom-row widget order == buildDirCaption, buildDirLabel, browse, schedext, configure, refresh, cancel, ok (got: " + joined + ")"}).c_str());
+    }
+
+    // 6b. The header idempotency (plan v1.29.0 D3): the ctor built the
+    //     header once — 36 labels with unique objectNames (the v1.28.0
+    //     shape); after a refresh click the same 36 must exist (not 72),
+    //     kiMainTitle exactly once, and the spot value unchanged
+    //     (session-invariant).
+    auto* header_frame = window.findChild<QFrame*>("kernelInfoHeader");
+    check(header_frame != nullptr, "the kernelInfoHeader frame exists");
+    int labels_before = 0;
+    std::set<std::string> names_before{};
+    QString release_before{};
+    if (header_frame != nullptr) {
+        for (auto* l : header_frame->findChildren<QLabel*>()) {
+            ++labels_before;
+            check(!l->objectName().isEmpty(), "header label carries an objectName (pre-refresh)");
+            names_before.insert(l->objectName().toStdString());
+            if (l->objectName() == QStringLiteral("kiKtRelease")) {
+                release_before = l->text();
+            }
+        }
+        check(names_before.size() == static_cast<std::size_t>(labels_before), "header label objectNames unique (pre-refresh)");
+    }
+    check(labels_before == 36, "header label count == 36 (pre-refresh, the v1.28.0 shape)");
+    check(!release_before.isEmpty(), "kiKtRelease non-empty (pre-refresh)");
+
+    // 6c. The real click (the direct connection runs on_refresh
+    //     synchronously: the shared progress dialog flashes "Initializing
+    //     kernels..", the alpm handle is re-parsed + re-fetched, the tree
+    //     is rebuilt, the stale rows purged, and the header re-extracted
+    //     idempotently).
+    if (refresh_button != nullptr) {
+        refresh_button->click();
+    }
+    check(refresh_button != nullptr, "the refresh button is still present after the click");
+    // The shared progress dialog: exactly one (m_conf_progress_dialog —
+    // no other QProgressDialog exists) and hidden again (init_kernels
+    // hides it on every path).
+    const auto progress_dialogs = window.findChildren<QProgressDialog*>();
+    check(progress_dialogs.size() == 1, "exactly one QProgressDialog (the shared m_conf_progress_dialog)");
+    check(progress_dialogs.size() == 1 && !progress_dialogs.at(0)->isVisible(), "progress dialog hidden after the refresh");
+
+    // 6d. The header after the click: still 36 (not 72), the same
+    //     objectName set, kiMainTitle unique, the spot value unchanged.
+    int labels_after = 0;
+    int main_titles  = 0;
+    QString release_after{};
+    std::set<std::string> names_after{};
+    if (header_frame != nullptr) {
+        for (auto* l : header_frame->findChildren<QLabel*>()) {
+            ++labels_after;
+            names_after.insert(l->objectName().toStdString());
+            if (l->objectName() == QStringLiteral("kiMainTitle")) {
+                ++main_titles;
+            }
+            if (l->objectName() == QStringLiteral("kiKtRelease")) {
+                release_after = l->text();
+            }
+        }
+    }
+    check(labels_after == 36, "header label count still 36 after the refresh (no duplication)");
+    check(names_after == names_before, "header label objectName set unchanged after the refresh");
+    check(main_titles == 1, "kiMainTitle appears exactly once after the refresh");
+    check(!release_after.isEmpty() && release_after == release_before, "kiKtRelease non-empty and unchanged after the refresh");
+
+    // 6e. The purge (the D4 complement): re-fetch the ground truth from
+    //     the driver's own read-only handle (the existing expected-set
+    //     machinery — a refresh is read-only, so the re-fetch is
+    //     identical to the pre-refresh set) and assert the post-refresh
+    //     tree carries no row whose kernel is !has_pkg() &&
+    //     !is_installed(), the directory row still exactly one, and the
+    //     surviving data rows == the has_pkg || installed set (a
+    //     data-driven count that proves the click ran a full refresh +
+    //     purge).
+    {
+        struct Fresh {
+            bool has_pkg   = false;
+            bool installed = false;
+        };
+        std::map<std::string, Fresh> fresh{};  // keyed by the bare name
+        for (const auto& k : Kernel::get_kernels(handle)) {
+            const std::string name{km::kernel_name_from_raw(k.get_raw())};
+            Fresh f{};
+            f.has_pkg   = k.has_pkg();
+            f.installed = localdb != nullptr && alpm_db_get_pkg(localdb, name.c_str()) != nullptr;
+            fresh.emplace(name, std::move(f));
+        }
+        check(fresh.size() == expected.size(), "re-fetched ground truth matches the pre-refresh set (read-only refresh)");
+        int post_data_rows = 0;
+        int post_dir_rows  = 0;
+        int stale_rows     = 0;
+        std::set<std::string> post_names{};
+        for (int r = 0; r < tree->topLevelItemCount(); ++r) {
+            auto* item            = tree->topLevelItem(r);
+            const QString pkg_raw = item->text(static_cast<int>(TreeCol::PkgName));
+            if (pkg_raw == kDirectoryRow) {
+                ++post_dir_rows;
+                continue;
+            }
+            ++post_data_rows;
+            const auto it = fresh.find(std::string{km::kernel_name_from_raw(pkg_raw.toStdString())});
+            check(it != fresh.end(), (std::string{"post-refresh row maps to the re-fetched ground truth (" + pkg_raw.toStdString() + ")"}).c_str());
+            if (it != fresh.end()) {
+                if (!it->second.has_pkg && !it->second.installed) {
+                    ++stale_rows;
+                }
+                post_names.insert(it->first);
+            } else {
+                post_names.insert(pkg_raw.toStdString());
+            }
+        }
+        check(stale_rows == 0, "no post-refresh row is !has_pkg() && !is_installed() (the D4 complement)");
+        check(post_dir_rows == 1, "the directory row survives the refresh (exactly one)");
+        int survivors = 0;
+        for (const auto& [name, f] : fresh) {
+            if (f.has_pkg || f.installed) {
+                ++survivors;
+            }
+        }
+        check(post_data_rows == survivors, (std::string{"post-refresh data rows == the has_pkg || installed set (" + std::to_string(post_data_rows) + " of " + std::to_string(fresh.size()) + ")"}).c_str());
+        check(post_names.size() == static_cast<std::size_t>(post_data_rows), "no duplicate post-refresh rows");
+    }
+
+    // 6f. The post-refresh row dump: run_k12.sh runs the harness twice —
+    //     the K12-DUMP-REFRESH lines must be byte-stable across the runs
+    //     (the same determinism gate as the pre-refresh K12-DUMP above;
+    //     that pre-refresh gate and its lines are untouched).
+    for (int r = 0; r < tree->topLevelItemCount(); ++r) {
+        auto* item           = tree->topLevelItem(r);
+        const bool checkable = (item->flags() & Qt::ItemIsUserCheckable) == Qt::ItemIsUserCheckable;
+        const bool directory = item->text(static_cast<int>(TreeCol::PkgName)) == kDirectoryRow;
+        std::printf("K12-DUMP-REFRESH: %s | %s | %s | %s | %s\n",
             item->text(static_cast<int>(TreeCol::PkgName)).toUtf8().constData(),
             item->text(static_cast<int>(TreeCol::Version)).toUtf8().constData(),
             item->text(static_cast<int>(TreeCol::Install)).toUtf8().constData(),

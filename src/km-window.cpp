@@ -513,12 +513,15 @@ MainWindow::MainWindow(QWidget* parent)
     setWindowTitle(tr("Kernel Manager %1").arg(APP_VERSION));
     statusBar()->addPermanentWidget(new QLabel(tr("v%1").arg(APP_VERSION)));
 
-    // The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4):
-    // build + populate it once per session (the booted kernel is invariant
-    // while the app runs — no re-extraction on the init_kernels refreshes;
-    // the module bounds its own cost — a ≤ 8-sample disassembly budget + a
-    // 2 MiB cap). The frame + scroll area exist from setupUi; the grid and
-    // its labels are code-built.
+    // The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4;
+    // plan v1.29.0 D3): build + populate it — this ctor call is the
+    // initial (one-shot) build; on_refresh is the second, idempotent
+    // caller (the builder's teardown preamble keeps a repeat call from
+    // duplicating the grid + labels; the module caches its expensive
+    // work per file — a ≤ 8-sample disassembly budget + a 2 MiB cap —
+    // so a repeat extraction is a fast re-read). The booted kernel is
+    // invariant while the app runs. The frame + scroll area exist from
+    // setupUi; the grid and its labels are code-built.
     build_kernel_info_header();
 
     // The D7 persistent banner (chunk 3): a permanent, hidden-by-default
@@ -669,6 +672,9 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_ui->cancel, &QPushButton::clicked, this, &MainWindow::on_cancel);
     connect(m_ui->ok, &QPushButton::clicked, this, &MainWindow::on_execute);
     connect(m_ui->configure, &QPushButton::clicked, this, &MainWindow::on_configure);
+    // Refresh (plan v1.29.0 D2): the bottom-row button between Configure
+    // and Close — the manual re-scan (on_refresh).
+    connect(m_ui->refresh, &QPushButton::clicked, this, &MainWindow::on_refresh);
 #ifdef WITH_SCX_MANAGER
     if (m_sched_window != nullptr) {
         connect(m_ui->schedext, &QPushButton::clicked, this, &MainWindow::on_schedext_config);
@@ -740,13 +746,18 @@ void MainWindow::set_progress_dialog() noexcept {
     m_conf_progress_dialog->reset();
 }
 
-// The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4): the
-// read-only, color-coded panel at the top of the MainWindow showing the
-// BOOTED kernel's parameters in 5 sections — Kernel & Toolchain, CPU Arch
-// Target, Optimization & LTO, Scheduling & Latency, Runtime Subsystems.
-// The data is kernel_info::extract_kernel_info() — one call per session
-// (the booted kernel is invariant while the app runs; D5: no re-extraction
-// on the init_kernels refreshes). The uic-created QFrame
+// The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4;
+// idempotent, plan v1.29.0 D3): the read-only, color-coded panel at the
+// top of the MainWindow showing the BOOTED kernel's parameters in 5
+// sections — Kernel & Toolchain, CPU Arch Target, Optimization & LTO,
+// Scheduling & Latency, Runtime Subsystems.
+// The data is kernel_info::extract_kernel_info() — the booted kernel is
+// invariant while the app runs, and the module caches its expensive work
+// per file (the ≤ 8-sample disassembly budget is process-wide), so a
+// repeat extraction is a fast re-read, not a re-scan. Callers: the ctor
+// (the initial one-shot build) and on_refresh (the second, idempotent
+// caller — the D3 teardown preamble below keeps a repeat call from
+// stacking a duplicate grid + labels). The uic-created QFrame
 // (m_ui->kernelInfoHeader, inside the kernelInfoScroll QScrollArea — the
 // first layout item) hosts a code-built QGridLayout: 1 main-title row
 // (column-span 5) + 1 section-title row + ≤ 4 key/value rows per column =
@@ -765,10 +776,32 @@ void MainWindow::build_kernel_info_header() noexcept {
     if (frame == nullptr) {
         return;
     }
-    m_kernel_info_header = frame;
+    // Idempotency preamble (plan v1.29.0 D3): the member is null before
+    // the first build (the one-shot ctor call) and aliased to the frame
+    // on it, so a non-null member here marks a repeat call (on_refresh).
+    // Tear down the previous build before the unchanged build path below
+    // re-renders it byte-identically:
+    //   1. delete frame->layout() — the QGridLayout; the nested per-cell
+    //      QHBoxLayouts are QObject children of it (probe-verified on
+    //      this Qt), so they die with it and no item survives dangling.
+    //   2. qDeleteAll(frame->findChildren<QWidget*>()) — the 36 labels
+    //      (direct children of the frame; findChildren excludes the
+    //      frame itself, so the uic-owned frame survives).
+    // The order is layout-then-labels: the layout's item wrappers are
+    // destroyed while their target widgets are still alive (a wrapper
+    // holds a non-owning pointer and never dereferences it in its
+    // destructor), and the labels are destroyed only after no layout
+    // references them — no dangling item at any point.
+    const bool already_built = (m_kernel_info_header != nullptr);
+    m_kernel_info_header     = frame;
+    if (already_built) {
+        delete frame->layout();
+        qDeleteAll(frame->findChildren<QWidget*>());
+    }
 
-    // The one-shot extraction (the module's probes all degrade to "" —
-    // no signal, no crash — and none of them prints).
+    // The extraction (the module's probes all degrade to "" — no signal,
+    // no crash — and none of them prints; a repeat call is a fast
+    // re-read — the per-file cache + the process-wide sample budget).
     const kernel_info::KernelInfo info = kernel_info::extract_kernel_info();
 
     // The subtle background + border (plan D4/D6: the gray-alpha overlay is
@@ -1461,6 +1494,111 @@ void MainWindow::init_kernels() noexcept {
 
     tree_kernels->blockSignals(false);
     m_conf_progress_dialog->hide();
+}
+
+// Refresh (plan v1.29.0 D2): the manual re-scan — the bottom-row button
+// between Configure and Close. Fixed step order:
+//   1. Guards (silent no-op): a transaction in flight (m_running — the
+//      worker's post-transaction auto-refresh is authoritative) or the
+//      Configure clone flow owning the shared progress dialog
+//      (m_future_watcher) → return; both mirror on_execute's m_running
+//      early-return.
+//   2. init_kernels() — the existing full refresh, reused verbatim (the
+//      auto-refresh and the manual refresh share one code path, so they
+//      are idempotent together): the shared progress dialog with its own
+//      label, the alpm re-parse under m_mutex, the Kernel::get_kernels
+//      re-fetch, the tree clear + rebuild. If the re-parse fails, its
+//      existing path (critical box + hide + early return) leaves the
+//      previous tree intact; the purge + header steps below still run
+//      (both are data-driven over m_kernels and idempotent — harmless).
+//   3. purge_stale_rows() — the D4 stale-row removal over the rebuilt
+//      tree.
+//   4. build_kernel_info_header() — the idempotent re-extraction (the D3
+//      teardown preamble keeps a repeat call at 36 → 36 labels).
+// The progress dialog is the shared m_conf_progress_dialog; step 2 hides
+// it on every path, so nothing is left open here. Threading: reachable
+// only on the main thread (the worker's auto-refresh is a queued
+// invokeMethod, the manual click is the event loop) — no new lock
+// interaction beyond init_kernels' existing m_mutex use. A rapid
+// double-click serializes in the event loop and is a clean no-op
+// re-fetch (steps 3–4 are idempotent by construction).
+void MainWindow::on_refresh() noexcept {
+    if (m_running.load(std::memory_order_relaxed)) {
+        return;  // a transaction is in flight — its auto-refresh is authoritative
+    }
+    if (m_future_watcher.isRunning()) {
+        return;  // the Configure clone flow owns the shared progress dialog
+    }
+    init_kernels();
+    purge_stale_rows();
+    build_kernel_info_header();
+}
+
+// The Refresh flow's stale-row purge (plan v1.29.0 D4): remove the
+// rebuilt tree rows whose kernel is neither a real repo/AUR package
+// (no has_pkg() — the non-selectable info-rows with the lock glyph) nor
+// present in the local DB (no is_installed() — built/folder kernels that
+// are no longer installed). This is exactly what lingers after a
+// built/folder kernel is uninstalled: the ghost row Refresh clears.
+// Data-driven: each row maps to its Kernel in m_kernels by get_raw()
+// (raw names are unique per row — the k12 no-duplicate assertion); a row
+// with no mapped kernel is never purged (a mismatch is no evidence), and
+// cell text is never parsed. The "Install from directory…" pseudo-row
+// (D1 v1.24.0) is not a kernel — it has no m_kernels entry and always
+// survives every refresh (its comment contract). Never touched: any
+// has_pkg() row (a live repo/AUR package) and any is_installed() row
+// (an installed kernel, in any class). View-level only: m_kernels, the
+// curated list, /etc/pacman.conf, and the local DB are untouched — a
+// refresh remains a read-only alpm operation (the k13/k14 system-state
+// gates apply). Top-level items are walked bottom-up (a removal shifts
+// the indices below it).
+//
+// Guardrail outcome (D4 implementer-inspection duty) — observed on the
+// live machine behind the k12 harness (pre-refresh dump: 18 live +
+// 7 info disabled-repo + 0 info enabled-repo + 1 directory): the
+// predicate catches exactly the 7 curated info-rows whose repos are
+// not enabled in /etc/pacman.conf and which are not installed
+// (chaotic-aur/linux-mainline, -xanmod, -xanmod-edge, -xanmod-lts,
+// -xanmod-rt, liquorix/linux-lqx, chaotic-aur/linux-clear — all
+// Install "—") — outcome (a): the stale residue is exactly the user's
+// complaint (uninstalled built/folder ghosts — already dropped by the
+// fresh re-fetch's pass 4 — plus disabled-repo info-rows; the purge is
+// the backstop for both classes). No installed info-row exists on this
+// machine, so no row the user still wants is at risk. A merely-disabled
+// repo's row is transient by design (it reappears on the next refresh
+// while the state persists — the row's right-click "Add repo" or
+// `pacman -Sy` is the permanent resolution, design doc Edge Cases).
+void MainWindow::purge_stale_rows() noexcept {
+    auto* tree_kernels = m_ui->treeKernels;
+    for (int r = tree_kernels->topLevelItemCount() - 1; r >= 0; --r) {
+        auto* item            = tree_kernels->topLevelItem(r);
+        const QString pkg_raw = item->text(static_cast<int>(TreeCol::PkgName));
+        // The directory pseudo-row (D1 v1.24.0) is not a kernel — it
+        // must survive every refresh (its comment contract).
+        if (pkg_raw == tr(kDirectoryRowRaw)) {
+            continue;
+        }
+        const auto it = std::ranges::find_if(m_kernels, [&pkg_raw](const Kernel& k) { return k.get_raw() == pkg_raw.toStdString(); });
+        if (it == m_kernels.end()) {
+            continue;  // no mapped kernel — never purge on a mismatch
+        }
+        if (!it->has_pkg() && !it->is_installed()) {
+            // Detach + delete the row's item widget (the info-row lock
+            // QLabel) before the row goes: deleting the item alone
+            // orphans the widget on the tree (Qt never deletes an item
+            // widget — probe P2a), and removeItemWidget cleans the
+            // tree's item-widget hash entry first (probe P2b), so no
+            // later clear() dereferences a dangling widget.
+            for (int c = 0; c < item->columnCount(); ++c) {
+                if (auto* w = tree_kernels->itemWidget(item, c)) {
+                    tree_kernels->removeItemWidget(item, c);
+                    delete w;
+                }
+            }
+            tree_kernels->takeTopLevelItem(r);
+            delete item;
+        }
+    }
 }
 
 void MainWindow::on_execute() noexcept {
