@@ -118,6 +118,21 @@ class MainWindow final : public QMainWindow {
 
  private:
     void on_cancel() noexcept;
+    // Refresh (plan v1.29.0 D2): the manual re-scan — the bottom-row button
+    // between Configure and Close. A silent no-op while a transaction is
+    // in flight (m_running — the worker's post-transaction auto-refresh is
+    // authoritative) or the Configure clone flow owns the shared progress
+    // dialog (m_future_watcher); otherwise init_kernels() (the verbatim
+    // shared refresh), purge_stale_rows(), and the idempotent
+    // build_kernel_info_header() re-extraction — all on the main thread.
+    void on_refresh() noexcept;
+    // The Refresh flow's stale-row purge step (plan v1.29.0 D4): removes
+    // the rebuilt tree rows whose kernel is neither a real repo/AUR
+    // package (has_pkg) nor installed (is_installed) — the greyed-out
+    // built/folder residue. View-level only: m_kernels, the curated list,
+    // /etc/pacman.conf, and the local DB are untouched; the "Install from
+    // directory…" pseudo-row always survives.
+    void purge_stale_rows() noexcept;
     void on_execute() noexcept;
     void on_schedext_config() noexcept;
     void on_configure() noexcept;
@@ -175,11 +190,16 @@ class MainWindow final : public QMainWindow {
     // driver-gate decline, hidden on a successful migration.
     QLabel* m_driver_banner = nullptr;
 
-    // The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4):
-    // the uic-created QFrame (m_ui->kernelInfoHeader, inside the
-    // kernelInfoScroll QScrollArea — the first layout item). Aliased here
-    // so the builder (build_kernel_info_header) and any future refresh path
-    // address the same widget directly.
+    // The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4;
+    // re-extractable on Refresh, plan v1.29.0 D3): the uic-created QFrame
+    // (m_ui->kernelInfoHeader, inside the kernelInfoScroll QScrollArea —
+    // the first layout item). Aliased here so the builder
+    // (build_kernel_info_header) and the Refresh path (on_refresh) address
+    // the same widget directly. The null state is the frame's "not yet
+    // built" flag the builder's idempotent teardown preamble keys on: the
+    // member is set on the first (one-shot ctor) call, and a non-null
+    // state on a later call marks a rebuild (teardown + byte-identical
+    // re-render).
     QFrame* m_kernel_info_header = nullptr;
 
     QThread* m_worker_th = new QThread(this);
@@ -200,12 +220,18 @@ class MainWindow final : public QMainWindow {
     void build_change_list(QTreeWidgetItem* item) noexcept;
     void set_progress_dialog() noexcept;
     // The "Active Kernel Information" header builder (chunk 2, plan
-    // v1.28.0 D4): one kernel_info::extract_kernel_info() per session,
-    // then a 5-column grid on m_ui->kernelInfoHeader — 1 main title +
-    // 5 section titles + 15 key/value rows = 36 labels with
-    // deterministic objectNames, palette-coded value colors (the
+    // v1.28.0 D4; idempotent, plan v1.29.0 D3): one
+    // kernel_info::extract_kernel_info() per call (the module caches its
+    // expensive work per file, so a repeat call is a fast re-read, not a
+    // re-scan), then a 5-column grid on m_ui->kernelInfoHeader —
+    // 1 main title + 5 section titles + 15 key/value rows = 36 labels
+    // with deterministic objectNames, palette-coded value colors (the
     // file-local info_color rule) and the system fixed font. Read-only:
-    // no signals, no interactive widgets.
+    // no signals, no interactive widgets. Idempotent: a repeat call
+    // (on_refresh — the second caller; the one-shot ctor call is the
+    // initial build) first tears down the previous grid + labels (the
+    // uic-owned frame survives) and re-renders them byte-identically
+    // (36 → 36, no duplication).
     void build_kernel_info_header() noexcept;
 };
 

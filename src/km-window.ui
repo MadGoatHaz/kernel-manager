@@ -176,6 +176,16 @@
         </widget>
        </item>
        <item>
+         <widget class="QPushButton" name="refresh">
+          <property name="text">
+           <string>Refresh</string>
+          </property>
+          <property name="toolTip">
+           <string>Re-scan the kernel list and clear stale built/folder entries.</string>
+          </property>
+         </widget>
+       </item>
+       <item>
          <widget class="QPushButton" name="cancel">
           <property name="text">
            <string>Close</string>
