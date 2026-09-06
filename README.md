@@ -4,7 +4,7 @@ Build and install custom Linux kernels on Arch — from a clean Qt6 desktop app.
 
 [![Build](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/build.yml/badge.svg)](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/build.yml)
 [![Checks](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/checks.yml/badge.svg)](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/checks.yml)
-[![AUR version](https://img.shields.io/badge/AUR-kernel--manager--1.30.1--1-blue.svg)](https://aur.archlinux.org/packages/kernel-manager)
+[![AUR version](https://img.shields.io/aur/v/kernel-manager.svg)](https://aur.archlinux.org/packages/kernel-manager)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue)](LICENSE)
 
 Pick a kernel, choose your build options, hit install. kernel-manager builds it (`makepkg`) and installs it (`pacman -U`); your distro's own hooks handle the rest — DKMS drivers, initramfs, bootloader entry. 21 kernel variants supported across official Arch, CachyOS, and community repos.
