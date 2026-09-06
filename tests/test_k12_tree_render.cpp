@@ -85,6 +85,14 @@
 //       data rows == the re-fetched has_pkg || installed set. The
 //       m_running / configure-clone guards are not exercisable offscreen
 //       (no worker transaction, no clone) — verified by code audit.
+//   (8) The 3-column card geometry (plan v1.30.0 D1): the header frame's
+//       layout is a QGridLayout with columnCount() == 3, the main title
+//       spans the full width (itemAtPosition(0, 2) resolves to
+//       kiMainTitle — Qt reports a spanning item at every covered cell),
+//       the frame carries the 800 px minimum width AND the natural-height
+//       minimum (== the grid's sizeHint — the widgetResizable clipping
+//       fix), and the kernelInfoScroll band's vertical policy is
+//       AsNeeded.
 // The K12-DUMP row dump must be byte-stable across two runs (deterministic
 // order; the directory row dumps with the "folder" marker — checkbox rows
 // "checkbox", lock rows "lock"); run_k12.sh checks that. The post-refresh
@@ -130,11 +138,13 @@
 #include <QAction>
 #include <QApplication>
 #include <QFrame>
+#include <QGridLayout>
 #include <QLabel>
 #include <QLayout>
 #include <QMenu>
 #include <QProgressDialog>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QStringList>
 #include <QTimer>
 #include <QTreeWidget>
@@ -608,6 +618,28 @@ int main(int argc, char** argv) {
     }
     check(labels_before == 36, "header label count == 36 (pre-refresh, the v1.28.0 shape)");
     check(!release_before.isEmpty(), "kiKtRelease non-empty (pre-refresh)");
+
+    // 6b2. The 3-column card geometry (plan v1.30.0 D1): the frame's
+    //     layout is a QGridLayout with 3 columns, the main title spans
+    //     the full width (Qt reports a spanning item at every covered
+    //     cell), the frame carries the 800 px minimum width AND the
+    //     natural-height minimum (== the grid's sizeHint — the
+    //     widgetResizable clipping fix), and the scroll band's vertical
+    //     policy is AsNeeded.
+    auto* kernel_info_scroll = window.findChild<QScrollArea*>("kernelInfoScroll");
+    if (header_frame != nullptr) {
+        auto* grid = qobject_cast<QGridLayout*>(header_frame->layout());
+        check(grid != nullptr && grid->columnCount() == 3, "header layout is a QGridLayout with columnCount() == 3");
+        if (grid != nullptr) {
+            auto* span_item = grid->itemAtPosition(0, 2);
+            check(span_item != nullptr && span_item->widget() != nullptr && span_item->widget()->objectName() == QStringLiteral("kiMainTitle"),
+                "the main title spans the full width (itemAtPosition(0, 2) resolves to kiMainTitle)");
+            check(header_frame->minimumWidth() == 800 && header_frame->minimumHeight() == grid->sizeHint().height(),
+                "header frame minimumWidth() == 800 AND minimumHeight() == the grid's sizeHint height (the natural-height relation)");
+        }
+    }
+    check(kernel_info_scroll != nullptr && kernel_info_scroll->verticalScrollBarPolicy() == Qt::ScrollBarAsNeeded,
+        "kernelInfoScroll vertical scrollBarPolicy() == AsNeeded (the dynamic band)");
 
     // 6c. The real click (the direct connection runs on_refresh
     //     synchronously: the shared progress dialog flashes "Initializing
