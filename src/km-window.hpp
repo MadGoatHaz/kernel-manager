@@ -106,6 +106,14 @@ class KernelTreeWidgetItem : public QTreeWidgetItem {
     bool operator<(const QTreeWidgetItem& other) const override;
 };
 
+// The file-local resize-time ellipsis filter (plan v1.30.0 D5) for the
+// long-string labels — defined in km-window.cpp at global scope right
+// after the anonymous namespace (a namespaced definition would be a
+// distinct class this declaration could not name); the member below is
+// a raw pointer to its window-parented instance, so only the
+// declaration is needed here (the definition never leaves the .cpp).
+class ElideFilter;
+
 class MainWindow final : public QMainWindow {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(MainWindow)
@@ -189,6 +197,15 @@ class MainWindow final : public QMainWindow {
     // hidden-by-default label next to the version label; shown on a
     // driver-gate decline, hidden on a successful migration.
     QLabel* m_driver_banner = nullptr;
+
+    // The shared resize-time ellipsis filter (plan v1.30.0 D5, the
+    // file-local ElideFilter above): window-parented (created in the
+    // ctor, so it outlives the per-build header labels — the idempotent
+    // rebuild re-installs fresh labels, never a stale filter), installed
+    // on the build-dir path label (once) and on each header value label
+    // as it is created; it elides the "km_full_text" property to the
+    // current width on resize (short values stay byte-identical).
+    ElideFilter* m_elide_filter = nullptr;
 
     // The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4;
     // re-extractable on Refresh, plan v1.29.0 D3): the uic-created QFrame
