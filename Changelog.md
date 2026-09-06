@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.30.1 (2026-09-06)
+
+### Changed
+- Unified the kernel-info header into a single 4×4 grid: the kernel release spans columns 1–2 as the hero, with Compiler and Arch anchored to columns 3 and 4 for vertical alignment with the metrics below.
+- Shortened the build date display from the full `uname -v` string to a compact `Mon DD, YYYY HH:MM` format, eliminating the awkward column-1 gap.
+
+### Fixed
+- The "Build date" field no longer shows the `#1 SMP PREEMPT_DYNAMIC` prefix — only the date portion is displayed.
+
+## v1.30.0 (2026-09-06)
+
+### Added
+- Dynamic pacman-lock warning banner: a slim amber alert appears above the package list only while a pacman instance holds the database lock (2 s poll, non-blocking `flock` probe). Disappears within 2 s of the lock releasing. Warning-only — Execute is never disabled.
+- Text ellipsis with tooltips for long values in the kernel-info header and the build directory path. Full text is always one hover away.
+- Minimum window width of 830 px to prevent the header card from clipping at narrow sizes.
+
+### Changed
+- The kernel-info header is now a 3-column elevated card with neutral keys, light-gray values, and a desaturated-sage semantic green (`#5E8A6E`). The card uses a subtle 1 px border and 8 px radius.
+- The instruction panel is a single caption; secondary semantics (install/uninstall, auto-refresh) moved to the Execute and Refresh button tooltips.
+- The static pacman warning text is replaced by the dynamic lock banner (see Added).
+- The header card uses dynamic column stretching — columns share available width evenly with no per-column minimums.
+
+## v1.29.0 (2026-09-06)
+
+### Added
+- Refresh button: re-scans the kernel list on demand, purges stale built/folder kernel entries, and re-renders the kernel-info header. Positioned between Configure and Close in the bottom action row.
+- The kernel-info header is now idempotent — safe to call `build_kernel_info_header()` multiple times without stacking duplicate widgets.
+
+### Changed
+- Instruction text updated to reference the Refresh button.
+
 ### v1.28.0 (2026-09-05)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/016eea3...6b449a5)

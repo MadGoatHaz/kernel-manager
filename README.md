@@ -10,17 +10,20 @@ Pick a kernel, choose your build options, hit install. kernel-manager builds it 
 
 ## Screenshots
 
-_Screenshot coming soon._
+The main window is a single screen: the **Active Kernel Information** card at the top (the booted kernel's release, compiler, and architecture as the hero row, plus 12 runtime metrics in a unified 4-column grid), the kernel list in the middle, and the action row (Configure, Refresh, Execute, Close) with the build-directory selector at the bottom. Every command the app runs is mirrored in a live terminal window, and a dynamic banner warns you while a pacman instance holds the database lock.
 
 ## Features
 
-- **Build custom kernels** — from AUR PKGBUILDs with configurable, per-kernel build options (the full 17-option CachyOS suite, CPU-optimization + modprobed-db for XanMod, and more), compiled with `makepkg`.
-- **21 supported kernel variants** — official Arch, CachyOS, and community kernels (XanMod, TKG, Liquorix, Clear, mainline), each mapped to its own build source.
-- **One-click install** — the app runs a single `pacman` install and leaves the post-install work (NVIDIA DKMS, initramfs regeneration, bootloader entry) to the distro's own alpm hooks.
+- **Multi-kernel management** — install, remove, and configure Arch, CachyOS, and community kernels (21 maintained variants, each mapped to its own build source) from a single interface.
+- **Active kernel telemetry** — a compact hero header showing your booted kernel's release, compiler, architecture, and 12 runtime metrics in a unified 4-column grid.
+- **Refresh & purge** — re-scan the kernel list on demand and clear stale built or folder-based entries with one click.
+- **Custom kernel builds** — per-kernel build options (the full 17-option CachyOS suite, CPU-optimization + modprobed-db for XanMod, and more), compiled with `makepkg`; post-install work (NVIDIA DKMS, initramfs, bootloader entry) is left to the distro's own alpm hooks.
+- **sched_ext support** — optional integration with `scx-manager` to enable and configure sched-ext (BPF) schedulers on supported kernels.
+- **Dynamic pacman-lock awareness** — a warning banner appears automatically while a pacman instance holds the database lock, and disappears within 2 s of the lock releasing.
+- **Driver gate** — detects GPU driver packaging before kernel operations and warns about conflicts (offering a one-click migration from precompiled to DKMS nvidia drivers).
 - **Distribution-aware** — detects the distro family from `/etc/os-release` (Arch, EndeavourOS, Manjaro, CachyOS, Garuda, and other Arch-based systems) and adapts the initramfs tool and BLS path accordingly.
-- **Clear install feedback** — every install reports a two-state result: **Installed** (green) or **Failed** (red, with the real exit code). The terminal output is the source of truth — no silent skips.
-- **Optional scx-manager integration** — manage sched-ext (BPF) schedulers when `scx-manager` is installed.
-- **Version visible in the UI** — the running version is shown in the window title and the status bar.
+- **Multi-architecture** — supports x86_64, i686, aarch64, loongarch64, and riscv64 kernel builds.
+- **Clear install feedback** — every install reports a two-state result: **Installed** (green) or **Failed** (red, with the real exit code). The terminal output is the source of truth — no silent skips. The running version is shown in the window title and the status bar.
 
 ## Supported kernels
 
@@ -64,7 +67,7 @@ kernel-manager tracks 21 maintained Arch kernel variants, each mapped to its own
 
 ## How it works
 
-Pick a kernel and its build options — kernel-manager clones the AUR source, builds it with `makepkg`, and installs it with a single `pacman -U`. The distro's own post-transaction hooks (NVIDIA DKMS, `kernel-install`/dracut) then rebuild drivers, regenerate the initramfs, and create the bootloader entry. kernel-manager reports success or failure with the real exit code — no silent skips and no ambiguous "probably fine" states — and a bootloader-aware dialog walks you through selecting the new kernel at your next start.
+kernel-manager opens on the **Active Kernel Information** header — the release, compiler, architecture, and 12 runtime metrics of the kernel currently booted, at a glance. Below it, pick a kernel and its build options: kernel-manager either installs the pre-compiled package or clones the AUR source, builds it with `makepkg`, and installs it with a single `pacman` command. The distro's own post-transaction hooks (NVIDIA DKMS, `kernel-install`/dracut) then rebuild drivers, regenerate the initramfs, and create the bootloader entry. Use **Refresh** at any time to re-scan the kernel list and purge stale built or folder-based entries. kernel-manager reports success or failure with the real exit code — no silent skips and no ambiguous "probably fine" states — and a bootloader-aware dialog walks you through selecting the new kernel at your next start.
 
 ## Requirements
 
@@ -161,7 +164,7 @@ cmake --build build -j$(nproc)
 ./build/kernel-manager
 ```
 
-**Run the tests** — the project ships a standalone unit-test suite of 15 harnesses under `tests/` (one `run_*.sh` driver each), which compile the relevant sources with the project's full warning set and assert against the real APIs. The full suite is expected to pass with zero compiler warnings:
+**Run the tests** — the project ships a standalone unit-test suite of 17 harnesses under `tests/` (one `run_*.sh` driver each), which compile the relevant sources with the project's full warning set and assert against the real APIs. The full suite is expected to pass with zero compiler warnings:
 
 ```sh
 for t in tests/run_*.sh; do bash "$t"; done

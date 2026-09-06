@@ -8,23 +8,34 @@
 #
 # --------------------------------------------------------------------------
 # VERSIONING
-#   pkgver mirrors the version of the pinned source tree: the v1.28.0 tag
-#   (the fork's eighth tag after the distro-agnostic rename to
-#   `kernel-manager`). The pre-rebrand tags (incl. v1.19.0) package the
-#   WRONG (CachyOS-branded) content and are not used.
+#   pkgver mirrors the version of the pinned source tree. The pre-rebrand
+#   tags (incl. v1.19.0) package the WRONG (CachyOS-branded) content and are
+#   not used.
 #
-#   The stable source below is pinned to the v1.28.0 release commit
-#   769abaa (the version-bump commit `CMakeLists.txt 1.27.1 -> 1.28.0`,
-#   one commit BEFORE the v1.28.0 tag). The tag itself sits on the PKGBUILD
-#   re-pin (this file), so it includes both the version bump and the re-pin;
-#   `_commit` points at the version-bump commit (not the tag) so the archived
-#   source is a stable, non-circular snapshot (pinning the tag's own commit
-#   would make `sha256sums` self-referential). The v1.28.0 cycle: the Active
-#   Kernel Information header (booted-kernel toolchain, CPU target,
-#   optimization, scheduling, runtime parameters) + the instruction-text
-#   rewrite (checkbox + Execute behavior: install, uninstall, auto-refresh).
-#   When the next release tag is cut, bump pkgver and re-pin `_commit` to
-#   that release's version-bump commit (+ refresh `sha256sums`).
+#   The stable source below is pinned to the v1.30.0 release: the
+#   version-bump commit debe3512c (`release: bump version to 1.30.0`) is the
+#   TAG TARGET (the annotated tag v1.30.0 sits on it) and the `_commit` this
+#   package fetches. Because `_commit` points at the version-bump commit
+#   (not at this re-pin), the archived source is a stable, non-circular
+#   snapshot. The v1.30.0 cycle: the UI/UX overhaul — the elevated
+#   kernel-info card (3-column grid, desaturated-sage color hierarchy), the
+#   single-caption instruction panel, the dynamic pacman-lock banner, the
+#   830 px window minimum + text ellipsis with tooltips.
+#
+#   RELEASE PROCEDURE (v1.30.x and later):
+#     1. Bump the CMake VERSION — the version-bump commit is the tag target.
+#     2. Re-pin THIS file to that commit: bump `pkgver`, set `_commit` to
+#        the version-bump commit's full SHA, and refresh `sha256sums` from
+#        a REAL double-fetched GitHub archive (two independent fetches
+#        verified byte-identical before the sum is recorded).
+#     3. Cut the annotated tag on the version-bump commit.
+#     4. Publish the GitHub release with
+#        `gh --repo MadGoatHaz/kernel-manager` (ALWAYS pass --repo — from
+#        this directory `gh` infers the upstream CachyOS/kernel-manager and
+#        404s / runs against the wrong repo).
+#   The pending v1.30.1 cut (the 4x4 kernel-info grid unification + the
+#   compact build-date format on main @ e845dd4) follows exactly this
+#   procedure and re-pins this file to v1.30.1's version-bump commit.
 #
 # --------------------------------------------------------------------------
 # DEPENDENCIES  (verified against `ldd` on the built binary + the CMake build)
