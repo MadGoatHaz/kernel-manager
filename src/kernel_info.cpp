@@ -374,6 +374,23 @@ namespace {
         return std::string{tool} + " " + version;
     }
 
+    // The date portion of a `uname -v` value: the string starts with the SMP/
+    // PREEMPT build flags ("#1 SMP PREEMPT_DYNAMIC ...") and the date always
+    // begins with a day-of-week abbreviation, so take the substring from the
+    // first such token on; if the format is unexpected (none found), degrade
+    // to the full trimmed value (never emptier than the input).
+    [[nodiscard]] std::string build_date_from_uname_v(std::string_view uname_v) {
+        const std::string_view full                = trim(uname_v);
+        const std::array<std::string_view, 7> dows = {"Mon, ", "Tue, ", "Wed, ", "Thu, ", "Fri, ", "Sat, ", "Sun, "};
+        std::size_t pos                            = std::string::npos;
+        for (const auto& dow : dows) {
+            if (const std::size_t found = full.find(dow); found != std::string::npos && (pos == std::string::npos || found < pos)) {
+                pos = found;
+            }
+        }
+        return std::string{trim(pos == std::string::npos ? full : full.substr(pos))};
+    }
+
     // The bracketed token of a sysfs multi-option value ("always [madvise]
     // never" => "madvise"); "" when there are no (well-formed) brackets.
     [[nodiscard]] std::string bracketed_word(const std::string& value) {
@@ -612,7 +629,7 @@ KernelInfo extract_kernel_info(const KernelInfoProbe& probe) {
 
     // Kernel & Toolchain.
     info.release    = std::string{trim(ask_str(probe.uname_r))};
-    info.build_date = std::string{trim(ask_str(probe.uname_v))};
+    info.build_date = build_date_from_uname_v(ask_str(probe.uname_v));  // date portion (SMP/PREEMPT flags stripped)
     info.compiler   = detect_compiler(ask_str(probe.proc_version));
 
     // CPU Arch Target (kconfig-derived; gated on a non-empty config).

@@ -57,7 +57,7 @@ struct KernelInfoProbe {
 // layer.
 struct KernelInfo {
     std::string release;                 // "7.2.3-1-cachyos-custom"
-    std::string build_date;              // "#1 SMP PREEMPT_DYNAMIC Thu, 03 Sep 2026 21:56:27 +0000"
+    std::string build_date;              // "Thu, 03 Sep 2026 21:56:27 +0000" (the date portion; SMP/PREEMPT flags stripped)
     std::string compiler;                // "clang 22.1.8" / "gcc 13.2.1"
     std::string target_arch;             // "Native" / "Family Optimized [CONFIG_M...]" / "Generic" / "Custom"
     std::string isa_level;               // "x86-64-v<N>" ("x86-64-v1" = the baseline; "" = not configured)
