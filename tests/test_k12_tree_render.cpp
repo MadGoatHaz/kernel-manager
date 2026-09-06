@@ -85,11 +85,16 @@
 //       data rows == the re-fetched has_pkg || installed set. The
 //       m_running / configure-clone guards are not exercisable offscreen
 //       (no worker transaction, no clone) — verified by code audit.
-//   (8) The hero + 4-column grid geometry (this cycle): the header
-//       frame's layout is a QVBoxLayout (the hero line + the grid), the
-//       grid is a QGridLayout with columnCount() == 4, and the frame
-//       carries the 800 px minimum width (the scroll-area band + the
-//       natural-height minimum were removed with it).
+//   (8) The unified 4x4 grid geometry (this cycle): the header frame's
+//       layout is a single QGridLayout with columnCount() == 4 and
+//       rowCount() == 4 — the hero row (Release spanning columns 0-1
+//       — itemAtPosition(0, 1) resolves to the Release cell, Compiler
+//       at (0, 2), Arch at (0, 3)) sits in the same grid as the
+//       12-parameter rows — and the frame carries the 800 px minimum
+//       width (the scroll-area band + the natural-height minimum were
+//       removed with it); the build date renders in the compact "Mon
+//       DD, YYYY HH:MM" form (no day-of-week prefix, no seconds, no
+//       UTC offset).
 //   (9) The color hierarchy (plan v1.30.0 D2): the frame's styleSheet()
 //       equals the elevated card string exactly, the 15 keys carry the
 //       neutral tier (the frame's WindowText — the theme's primary
@@ -178,7 +183,6 @@
 #include <QTimer>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
-#include <QVBoxLayout>
 
 namespace {
 
@@ -661,20 +665,107 @@ int main(int argc, char** argv) {
     check(labels_before == 30, "header label count == 30 (pre-refresh: 6 hero + 24 grid labels)");
     check(!release_before.isEmpty(), "kiHeroRelease non-empty (pre-refresh)");
 
-    // 6b2. The hero + grid geometry (this cycle): the frame's layout
-    //     is a QVBoxLayout (the hero line + the grid), the grid is a
-    //     QGridLayout with 4 columns, and the frame carries the 800 px
-    //     minimum width (the scroll-area band + the natural-height
-    //     minimum were removed with it).
+    // 6b2. The unified 4x4 grid geometry (this cycle): the frame's
+    //     layout is a single QGridLayout with 4 columns and 4 rows —
+    //     the hero row (Release spanning columns 0-1, Compiler at
+    //     (0, 2), Arch at (0, 3)) sits in the same grid as the
+    //     12-parameter rows 1-3 (the vbox + hero-line wrappers are
+    //     gone) — and the frame carries the 800 px minimum width
+    //     (the scroll-area band + the natural-height minimum were
+    //     removed with it).
     if (header_frame != nullptr) {
-        auto* outer = header_frame->layout();
-        check(outer != nullptr && qobject_cast<QVBoxLayout*>(outer) != nullptr,
-            "header layout is a QVBoxLayout (the hero line + the grid)");
-        auto* grid = header_frame->findChild<QGridLayout*>();
-        check(grid != nullptr && grid->columnCount() == 4,
-            "the header grid is a QGridLayout with columnCount() == 4 (the 4x3 layout)");
+        auto* grid = qobject_cast<QGridLayout*>(header_frame->layout());
+        check(grid != nullptr, "header layout is a single QGridLayout (the unified 4x4 grid)");
         check(header_frame->minimumWidth() == 800,
             "header frame minimumWidth() == 800 (the 4-column grid floor)");
+        if (grid != nullptr) {
+            check(grid->columnCount() == 4,
+                "the header grid has columnCount() == 4 (the unified 4-column layout)");
+            check(grid->rowCount() == 4,
+                "the header grid has rowCount() == 4 (the hero row + the 3 parameter rows)");
+            // A grid item wraps the cell's [key, value] HBox; the cell
+            // carries the key + the value label (addressed by
+            // objectName).
+            const auto cell_is = [](const QLayout* item_layout, const QString& value_name) {
+                if (item_layout == nullptr) {
+                    return false;
+                }
+                for (int i = 0; i < item_layout->count(); ++i) {
+                    if (const auto* w = item_layout->itemAt(i)->widget()) {
+                        if (w->objectName() == value_name) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+            const auto cell_at = [&](int row, int col) -> QLayout* {
+                auto* item = grid->itemAtPosition(row, col);
+                return item != nullptr ? item->layout() : nullptr;
+            };
+            // The hero row: Release spans columns 0-1 — itemAtPosition
+            // (0, 1) resolves to the SAME item as (0, 0) (the span-2
+            // contract), and both cells are the Release cell; Compiler
+            // sits at (0, 2), Arch at (0, 3).
+            check(grid->itemAtPosition(0, 1) == grid->itemAtPosition(0, 0) && grid->itemAtPosition(0, 0) != nullptr,
+                "grid (0, 1) resolves to the same item as (0, 0) (the Release span-2 contract)");
+            check(cell_is(cell_at(0, 0), QStringLiteral("kiHeroRelease")), "the Release cell occupies grid (0, 0)");
+            check(cell_is(cell_at(0, 1), QStringLiteral("kiHeroRelease")), "grid (0, 1) is the Release cell (span-2)");
+            check(cell_is(cell_at(0, 2), QStringLiteral("kiHeroCompiler")), "the Compiler cell sits at grid (0, 2)");
+            check(cell_is(cell_at(0, 3), QStringLiteral("kiHeroArch")), "the Arch cell sits at grid (0, 3)");
+        }
+    }
+
+    // 6b2b. The build date's compact form (this cycle): "Mon DD, YYYY
+    //     HH:MM" — 18 chars: a 3-letter month, a 2-digit day, a
+    //     comma, a 4-digit year, and a 5-char HH:MM clock; no
+    //     day-of-week prefix, no seconds, no UTC offset. An empty
+    //     value renders "—" (the non-empty contract is k20's) — in
+    //     that case the format sub-checks are skipped.
+    if (header_frame != nullptr) {
+        auto* build_date_label = header_frame->findChild<QLabel*>("kiKtBuildDate");
+        check(build_date_label != nullptr, "kiKtBuildDate value label exists");
+        if (build_date_label != nullptr) {
+            const QString build_date = build_date_label->text();
+            const bool has_date      = !build_date.isEmpty() && build_date != QStringLiteral("—");
+            check(has_date, "kiKtBuildDate carries a date value (not empty / —)");
+            if (has_date) {
+                const auto is_alpha = [](const QString& s, int from, int len) {
+                    for (int k = from; k < from + len; ++k) {
+                        if (!s.at(k).isLetter()) {
+                            return false;
+                        }
+                    }
+                    return true;
+                };
+                const auto is_digit = [](const QString& s, int from, int len) {
+                    for (int k = from; k < from + len; ++k) {
+                        if (!s.at(k).isDigit()) {
+                            return false;
+                        }
+                    }
+                    return true;
+                };
+                const bool ok_form = build_date.size() == 18
+                    && is_alpha(build_date, 0, 3)
+                    && build_date.at(3) == QLatin1Char(' ')
+                    && is_digit(build_date, 4, 2)
+                    && build_date.at(6) == QLatin1Char(',')
+                    && build_date.at(7) == QLatin1Char(' ')
+                    && is_digit(build_date, 8, 4)
+                    && build_date.at(12) == QLatin1Char(' ')
+                    && is_digit(build_date, 13, 2)
+                    && build_date.at(15) == QLatin1Char(':')
+                    && is_digit(build_date, 16, 2);
+                check(ok_form, (std::string{"kiKtBuildDate matches 'Mon DD, YYYY HH:MM' (got: " + build_date.toStdString() + ")"}).c_str());
+                check(!build_date.contains(QStringLiteral("+0000")), "kiKtBuildDate carries no UTC offset ('+0000')");
+                bool dow_prefix = false;
+                for (const auto& dow : {QStringLiteral("Mon, "), QStringLiteral("Tue, "), QStringLiteral("Wed, "), QStringLiteral("Thu, "), QStringLiteral("Fri, "), QStringLiteral("Sat, "), QStringLiteral("Sun, ")}) {
+                    dow_prefix = dow_prefix || build_date.startsWith(dow);
+                }
+                check(!dow_prefix, "kiKtBuildDate carries no day-of-week prefix");
+            }
+        }
     }
 
     // 6b3. The color hierarchy (plan v1.30.0 D2): the elevated card
