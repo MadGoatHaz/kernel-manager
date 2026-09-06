@@ -58,7 +58,6 @@
 #include <QProcess>
 #include <QPushButton>
 #include <QScreen>
-#include <QScrollArea>
 #include <QShortcut>
 #include <QStatusBar>
 #include <QTextEdit>
@@ -603,8 +602,8 @@ MainWindow::MainWindow(QWidget* parent)
     // duplicating the grid + labels; the module caches its expensive
     // work per file — a ≤ 8-sample disassembly budget + a 2 MiB cap —
     // so a repeat extraction is a fast re-read). The booted kernel is
-    // invariant while the app runs. The frame + scroll area exist from
-    // setupUi; the grid and its labels are code-built.
+    // invariant while the app runs. The frame exists from setupUi; the
+    // hero line + grid layout tree and its labels are code-built.
     build_kernel_info_header();
 
     // The D7 persistent banner (chunk 3): a permanent, hidden-by-default
@@ -845,44 +844,42 @@ void MainWindow::set_progress_dialog() noexcept {
 }
 
 // The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4;
-// idempotent, plan v1.29.0 D3; the 3-column card reflow, plan v1.30.0
-// D1): the read-only, color-coded panel at the top of the MainWindow
-// showing the BOOTED kernel's parameters in 5 sections — Kernel &
-// Toolchain, CPU Arch Target, Optimization & LTO, Scheduling & Latency,
-// Runtime Subsystems.
+// idempotent, plan v1.29.0 D3; the color hierarchy, plan v1.30.0 D2;
+// the hero line + 4x3 grid reflow, this cycle): the read-only,
+// color-coded panel at the top of the MainWindow showing the BOOTED
+// kernel's parameters — no main title, no section titles, no scroll
+// area: the Release value is the hero of the card, and the remaining
+// 12 values reflow into a 4-column x 3-row grid.
 // The data is kernel_info::extract_kernel_info() — the booted kernel is
 // invariant while the app runs, and the module caches its expensive work
 // per file (the ≤ 8-sample disassembly budget is process-wide), so a
 // repeat extraction is a fast re-read, not a re-scan. Callers: the ctor
 // (the initial one-shot build) and on_refresh (the second, idempotent
 // caller — the D3 teardown preamble below keeps a repeat call from
-// stacking a duplicate grid + labels). The uic-created QFrame
-// (m_ui->kernelInfoHeader, inside the kernelInfoScroll QScrollArea — the
-// first layout item) hosts a code-built QGridLayout: three equal-stretch
-// columns (no per-column minimum — the 800 px frame minimum is the only
-// width floor; below it the band scrolls horizontally as needed) laid
-// out by the section-major 13-row placement map of plan v1.30.0 D1 —
-// row 0 the kiMainTitle (span 3), then per section a span-3 title row +
-// its key/value cells in rows of 3 (Release/BuildDate/Compiler,
-// TargetArch/IsaLevel/IsaValidation, Lto/Optimization, TickRate/
-// SchedExt/Preemption, Mglru/Thp/TcpCongestion/Clocksource) = 36 labels
-// (1 + 5 + 15 keys + 15 values), each with a deterministic objectName
-// (kiMainTitle, kiTitle1..5, ki<Section><Key> / …Key) so a test driver
-// can address them. The card keeps its natural height: the frame's
-// minimum is pinned to the grid's sizeHint (the load-bearing line at the
-// builder's end — the scroll area is widgetResizable, so without it the
-// 13-row card is squeezed to the 150 px band and clipped with no
-// scrollbar), and the band scrolls vertically as needed (the .ui's
-// AsNeeded policy). Styling per plan v1.30.0 D2: the elevated card
+// stacking a duplicate layout tree + labels). The uic-created QFrame
+// (m_ui->kernelInfoHeader — the first layout item of the central
+// verticalLayout; the v1.30.0 scroll-area band was removed with the
+// section titles) hosts a code-built QVBoxLayout (margins
+// 10/8/10/8, spacing 6) with two children: (1) the hero line — a
+// QHBoxLayout (spacing 14) of three key/value pairs, Release (the value
+// in the +2 pt bold hero font — the largest text in the card),
+// Compiler, and Arch (the regular value font); (2) a QGridLayout (4
+// equal-stretch columns, spacing 14h/4v) of the remaining 12
+// key/value pairs in 3 rows — Build date | ISA level | ISA validation |
+// LTO, Optimization | Tick rate | sched_ext | Preemption, MGLRU | THP |
+// TCP congestion | Clocksource = 30 labels (15 keys + 15 values), each
+// with a deterministic objectName (kiHero<Param> / …Key for the hero
+// pairs, ki<Section><Key> / …Key for the grid cells) so a test driver
+// can address them. Styling per plan v1.30.0 D2: the elevated card
 // (the theme-neutral gray-alpha overlay + 1 px border + 8 px radius),
-// section titles bold +1 pt with a bottom border, keys in the smaller
-// neutral font (the theme's primary text — secondary by size, not by
-// color), and values in the system fixed font color-coded by
-// info_color (desaturated-sage green active / degraded amber / the Mid
-// light-gray off-or-unknown — an empty value renders "—" in the Mid
-// gray). No signals,
-// no interactive widgets — the header is informational only; the tree
-// below keeps all interaction.
+// keys in the smaller neutral font (the theme's primary text —
+// secondary by size, not by color), and values in the system fixed font
+// color-coded by info_color (desaturated-sage green active / degraded
+// amber / the Mid light-gray off-or-unknown — an empty value renders
+// "—" in the Mid gray). The frame's 800 px minimum width is the only
+// width floor (the .ui carries it too). No signals, no interactive
+// widgets — the header is informational only; the tree below keeps all
+// interaction.
 void MainWindow::build_kernel_info_header() noexcept {
     auto* frame = m_ui->kernelInfoHeader;
     if (frame == nullptr) {
@@ -893,10 +890,12 @@ void MainWindow::build_kernel_info_header() noexcept {
     // on it, so a non-null member here marks a repeat call (on_refresh).
     // Tear down the previous build before the unchanged build path below
     // re-renders it byte-identically:
-    //   1. delete frame->layout() — the QGridLayout; the nested per-cell
-    //      QHBoxLayouts are QObject children of it (probe-verified on
-    //      this Qt), so they die with it and no item survives dangling.
-    //   2. qDeleteAll(frame->findChildren<QWidget*>()) — the 36 labels
+    //   1. delete frame->layout() — the QVBoxLayout; the hero line +
+    //      the grid are its QObject children (probe-verified on this
+    //      Qt), and the nested per-cell QHBoxLayouts are QObject
+    //      children of those, so the whole layout tree dies with it and
+    //      no item survives dangling.
+    //   2. qDeleteAll(frame->findChildren<QWidget*>()) — the 30 labels
     //      (direct children of the frame; findChildren excludes the
     //      frame itself, so the uic-owned frame survives).
     // The order is layout-then-labels: the layout's item wrappers are
@@ -926,29 +925,26 @@ void MainWindow::build_kernel_info_header() noexcept {
         "#kernelInfoHeader { background: rgba(127,127,127,40); border: 1px solid rgba(127,127,127,110); border-radius: 8px; }"));
     frame->setMinimumWidth(800);
 
-    auto* grid = new QGridLayout(frame);
-    grid->setContentsMargins(10, 8, 10, 8);
-    grid->setHorizontalSpacing(14);
-    grid->setVerticalSpacing(4);
-    for (int col = 0; col < 3; ++col) {
-        grid->setColumnStretch(col, 1);
-    }
+    auto* vbox = new QVBoxLayout(frame);
+    vbox->setContentsMargins(10, 8, 10, 8);
+    vbox->setSpacing(6);
 
     // The label fonts: the keys derive from the window's base font one
-    // point smaller (secondary text); the section titles +1 point bold;
-    // the values use the system fixed font (a semi-monospace feel without
-    // hardcoding a family). A pixel-based base font (no point size) keeps
-    // its size for the keys and only gains the bold for the titles.
+    // point smaller (secondary text); the hero Release value +2 points
+    // bold (the largest text in the card); the values use the system
+    // fixed font (a semi-monospace feel without hardcoding a family).
+    // A pixel-based base font (no point size) keeps its size for the
+    // keys and only gains the size + bold for the hero value.
     const QFont base_font = font();
     const qreal base_pt   = base_font.pointSizeF();
     QFont key_font        = base_font;
     if (base_pt > 0.0) {
         key_font.setPointSizeF(base_pt - 1.0);
     }
-    QFont section_font = base_font;
-    section_font.setBold(true);
+    QFont hero_font = base_font;
+    hero_font.setBold(true);
     if (base_pt > 0.0) {
-        section_font.setPointSizeF(base_pt + 1.0);
+        hero_font.setPointSizeF(base_pt + 2.0);
     }
     const QFont value_font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
 
@@ -957,7 +953,7 @@ void MainWindow::build_kernel_info_header() noexcept {
     // dark over the card's overlay); gray is the palette's Mid (the
     // theme-adaptive light-gray value base). Keys are neutral — the
     // frame's WindowText, the theme's primary text (set at the
-    // key-palette site in add_row below; secondary by size, not by
+    // key-palette site in make_pair below; secondary by size, not by
     // color). Tiers: desaturated-sage green #5E8A6E active; the
     // degraded amber #9A7700 preserved (the brief-silence reading — it
     // stands unchanged); the Mid light gray for off-or-unknown values.
@@ -965,18 +961,14 @@ void MainWindow::build_kernel_info_header() noexcept {
     const QColor yellow{0x9a, 0x77, 0x00};
     const QColor gray = frame->palette().color(QPalette::Mid);
 
-    // The main title (row 0, column-span 3, bold).
-    auto* main_title = new QLabel(tr("Active Kernel Information"), frame);
-    main_title->setObjectName(QStringLiteral("kiMainTitle"));
-    main_title->setFont(section_font);
-    grid->addWidget(main_title, 0, 0, 1, 3);
-
-    // One key/value row in (row, col): the nested [key, value] HBox — the
-    // key in the smaller neutral font (the frame's WindowText — the
-    // theme's primary text; secondary by size, not color), the value in
-    // the fixed font color-coded by info_color (an empty value renders
-    // "—" in the Mid gray).
-    const auto add_row = [&](int row, int col, const QString& key_text, const QString& value_name, const std::string& value) {
+    // One key/value pair (shared by the hero line and the grid cells):
+    // the nested [key, value] HBox — the key in the smaller neutral
+    // font (the frame's WindowText — the theme's primary text;
+    // secondary by size, not color), the value in the fixed font
+    // color-coded by info_color (an empty value renders "—" in the Mid
+    // gray); is_hero lifts the Release value to the +2 pt bold hero
+    // font (the hero treatment — the largest text in the card).
+    const auto make_pair = [&](const QString& key_text, const QString& value_name, const std::string& value, bool is_hero) -> QLayout* {
         auto* key = new QLabel(key_text, frame);
         key->setObjectName(value_name + "Key");
         key->setFont(key_font);
@@ -987,7 +979,7 @@ void MainWindow::build_kernel_info_header() noexcept {
         const QString shown = value.empty() ? QStringLiteral("—") : QString::fromStdString(value);
         auto* value_label   = new QLabel(shown, frame);
         value_label->setObjectName(value_name);
-        value_label->setFont(value_font);
+        value_label->setFont(is_hero ? hero_font : value_font);
         const InfoColor color = info_color(value);
         QColor value_color    = gray;
         if (color == InfoColor::Green) {
@@ -1013,64 +1005,55 @@ void MainWindow::build_kernel_info_header() noexcept {
         cell->setSpacing(6);
         cell->addWidget(key);
         cell->addWidget(value_label);
-        grid->addLayout(cell, row, col);
+        return cell;
     };
 
-    // One section title (a dedicated row, spanning all 3 columns): bold
-    // +1 pt with the subtle bottom border.
-    const auto add_section_title = [&](int row, const QString& title, const QString& name) {
-        auto* section_title = new QLabel(title, frame);
-        section_title->setObjectName(name);
-        section_title->setFont(section_font);
-        section_title->setStyleSheet(QStringLiteral("border-bottom: 1px solid rgba(127,127,127,90);"));
-        grid->addWidget(section_title, row, 0, 1, 3);
+    // The hero line: Release (the +2 pt bold value — the hero of the
+    // card), Compiler, and Arch as key/value pairs in one horizontal
+    // run.
+    auto* hero = new QHBoxLayout();
+    hero->setContentsMargins(0, 0, 0, 0);
+    hero->setSpacing(14);
+    hero->addLayout(make_pair(tr("Release"), QStringLiteral("kiHeroRelease"), info.release, true));
+    hero->addLayout(make_pair(tr("Compiler"), QStringLiteral("kiHeroCompiler"), info.compiler, false));
+    hero->addLayout(make_pair(tr("Arch"), QStringLiteral("kiHeroArch"), info.target_arch, false));
+    vbox->addLayout(hero);
+
+    // The 4-column x 3-row grid: the remaining 12 key/value pairs
+    // (equal-stretch columns — the 800 px frame minimum is the only
+    // width floor).
+    auto* grid = new QGridLayout();
+    grid->setContentsMargins(0, 0, 0, 0);
+    grid->setHorizontalSpacing(14);
+    grid->setVerticalSpacing(4);
+    for (int col = 0; col < 4; ++col) {
+        grid->setColumnStretch(col, 1);
+    }
+
+    // One grid cell: the [key, value] pair placed in (row, col).
+    const auto add_row = [&](int row, int col, const QString& key_text, const QString& value_name, const std::string& value) {
+        grid->addLayout(make_pair(key_text, value_name, value, false), row, col);
     };
 
-    // 1 — Kernel & Toolchain.
-    add_section_title(1, tr("Kernel & Toolchain"), QStringLiteral("kiTitle1"));
-    add_row(2, 0, tr("Release"), QStringLiteral("kiKtRelease"), info.release);
-    add_row(2, 1, tr("Build date"), QStringLiteral("kiKtBuildDate"), info.build_date);
-    add_row(2, 2, tr("Compiler"), QStringLiteral("kiKtCompiler"), info.compiler);
+    // Row 0: Build Date | ISA Level | ISA Validation | LTO.
+    add_row(0, 0, tr("Build date"), QStringLiteral("kiKtBuildDate"), info.build_date);
+    add_row(0, 1, tr("ISA level"), QStringLiteral("kiCtIsaLevel"), info.isa_level);
+    add_row(0, 2, tr("ISA validation"), QStringLiteral("kiCtIsaValidation"), info.instruction_validation);
+    add_row(0, 3, tr("LTO"), QStringLiteral("kiOlLto"), info.lto_status);
 
-    // 2 — CPU Arch Target.
-    add_section_title(3, tr("CPU Arch Target"), QStringLiteral("kiTitle2"));
-    add_row(4, 0, tr("Target arch"), QStringLiteral("kiCtTargetArch"), info.target_arch);
-    add_row(4, 1, tr("ISA level"), QStringLiteral("kiCtIsaLevel"), info.isa_level);
-    add_row(4, 2, tr("ISA validation"), QStringLiteral("kiCtIsaValidation"), info.instruction_validation);
+    // Row 1: Optimization | Tick Rate | sched_ext | Preemption.
+    add_row(1, 0, tr("Optimization"), QStringLiteral("kiOlOptimization"), info.optimization_flag);
+    add_row(1, 1, tr("Tick rate"), QStringLiteral("kiSlTickRate"), info.tick_rate);
+    add_row(1, 2, tr("sched_ext"), QStringLiteral("kiSlSchedExt"), info.sched_ext);
+    add_row(1, 3, tr("Preemption"), QStringLiteral("kiSlPreemption"), info.preemption_model);
 
-    // 3 — Optimization & LTO.
-    add_section_title(5, tr("Optimization & LTO"), QStringLiteral("kiTitle3"));
-    add_row(6, 0, tr("LTO"), QStringLiteral("kiOlLto"), info.lto_status);
-    add_row(6, 1, tr("Optimization"), QStringLiteral("kiOlOptimization"), info.optimization_flag);
+    // Row 2: MGLRU | THP | TCP Congestion | Clocksource.
+    add_row(2, 0, tr("MGLRU"), QStringLiteral("kiOsMglru"), info.mglru);
+    add_row(2, 1, tr("THP"), QStringLiteral("kiOsThp"), info.thp);
+    add_row(2, 2, tr("TCP congestion"), QStringLiteral("kiOsTcpCongestion"), info.tcp_congestion);
+    add_row(2, 3, tr("Clocksource"), QStringLiteral("kiOsClocksource"), info.clocksource);
 
-    // 4 — Scheduling & Latency.
-    add_section_title(7, tr("Scheduling & Latency"), QStringLiteral("kiTitle4"));
-    add_row(8, 0, tr("Tick rate"), QStringLiteral("kiSlTickRate"), info.tick_rate);
-    add_row(8, 1, tr("sched_ext"), QStringLiteral("kiSlSchedExt"), info.sched_ext);
-    add_row(8, 2, tr("Preemption"), QStringLiteral("kiSlPreemption"), info.preemption_model);
-
-    // 5 — Runtime Subsystems.
-    add_section_title(9, tr("Runtime Subsystems"), QStringLiteral("kiTitle5"));
-    add_row(10, 0, tr("MGLRU"), QStringLiteral("kiOsMglru"), info.mglru);
-    add_row(10, 1, tr("THP"), QStringLiteral("kiOsThp"), info.thp);
-    add_row(10, 2, tr("TCP congestion"), QStringLiteral("kiOsTcpCongestion"), info.tcp_congestion);
-    add_row(11, 0, tr("Clocksource"), QStringLiteral("kiOsClocksource"), info.clocksource);
-
-    // The frame's 150 px-tall slack (the .ui maximumSize) is absorbed by an
-    // invisible stretch row below the last value row, so the grid rows stay
-    // compact and top-anchored instead of stretching unevenly.
-    grid->setRowStretch(12, 1);
-
-    // The natural-height minimum (plan v1.30.0 D1 — the load-bearing line):
-    // the scroll area is widgetResizable, so it resizes the frame to the
-    // viewport — with the frame's minimum height at 0 a 13-row card is
-    // squeezed to the 150 px band and clipped with no scrollbar (the
-    // resize rule is qMax(viewport, minimumSize), not the sizeHint).
-    // Pinning the minimum to the grid's sizeHint keeps the card at its
-    // natural height, makes the band scroll vertically as needed, and
-    // re-computes on every idempotent rebuild (the new grid's sizeHint is
-    // the source of truth).
-    frame->setMinimumHeight(grid->sizeHint().height());
+    vbox->addLayout(grid);
 }
 
 void MainWindow::check_uncheck_item() noexcept {
@@ -1671,7 +1654,7 @@ void MainWindow::init_kernels() noexcept {
 //   3. purge_stale_rows() — the D4 stale-row removal over the rebuilt
 //      tree.
 //   4. build_kernel_info_header() — the idempotent re-extraction (the D3
-//      teardown preamble keeps a repeat call at 36 → 36 labels).
+//      teardown preamble keeps a repeat call at 30 → 30 labels).
 // The progress dialog is the shared m_conf_progress_dialog; step 2 hides
 // it on every path, so nothing is left open here. Threading: reachable
 // only on the main thread (the worker's auto-refresh is a queued

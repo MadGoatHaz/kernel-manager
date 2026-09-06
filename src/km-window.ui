@@ -25,33 +25,13 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <widget class="QScrollArea" name="kernelInfoScroll">
-      <property name="frameShape">
-       <enum>QFrame::Shape::NoFrame</enum>
-      </property>
-      <property name="horizontalScrollBarPolicy">
-       <enum>Qt::ScrollBarPolicy::ScrollBarAsNeeded</enum>
-      </property>
-      <property name="verticalScrollBarPolicy">
-       <enum>Qt::ScrollBarPolicy::ScrollBarAsNeeded</enum>
-      </property>
-      <property name="widgetResizable">
-       <bool>true</bool>
-      </property>
-      <property name="maximumSize">
+     <widget class="QFrame" name="kernelInfoHeader">
+      <property name="minimumSize">
        <size>
-        <width>16777215</width>
-        <height>150</height>
+        <width>800</width>
+        <height>0</height>
        </size>
       </property>
-      <widget class="QFrame" name="kernelInfoHeader">
-       <property name="minimumSize">
-        <size>
-         <width>800</width>
-         <height>0</height>
-        </size>
-       </property>
-      </widget>
      </widget>
     </item>
     <item>
@@ -59,9 +39,12 @@
       <property name="text">
        <string>&lt;html&gt;
 &lt;body&gt;
-&lt;p&gt;Below is a list of installed and available Linux kernels. Check a kernel and press Execute to install it; uncheck an installed kernel and press Execute to uninstall it.&lt;/p&gt;
+&lt;p&gt;Select kernels to install or remove, then click Execute.&lt;/p&gt;
 &lt;/body&gt;
 &lt;/html&gt;</string>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
       </property>
      </widget>
     </item>

@@ -223,14 +223,15 @@ class MainWindow final : public QMainWindow {
 
     // The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4;
     // re-extractable on Refresh, plan v1.29.0 D3): the uic-created QFrame
-    // (m_ui->kernelInfoHeader, inside the kernelInfoScroll QScrollArea —
-    // the first layout item). Aliased here so the builder
-    // (build_kernel_info_header) and the Refresh path (on_refresh) address
-    // the same widget directly. The null state is the frame's "not yet
-    // built" flag the builder's idempotent teardown preamble keys on: the
-    // member is set on the first (one-shot ctor) call, and a non-null
-    // state on a later call marks a rebuild (teardown + byte-identical
-    // re-render).
+    // (m_ui->kernelInfoHeader) — a direct child of the central
+    // verticalLayout (the first layout item; the v1.30.0 scroll-area band
+    // was removed with the section-title reflow). Aliased here so the
+    // builder (build_kernel_info_header) and the Refresh path (on_refresh)
+    // address the same widget directly. The null state is the frame's
+    // "not yet built" flag the builder's idempotent teardown preamble keys
+    // on: the member is set on the first (one-shot ctor) call, and a
+    // non-null state on a later call marks a rebuild (teardown +
+    // byte-identical re-render).
     QFrame* m_kernel_info_header = nullptr;
 
     QThread* m_worker_th = new QThread(this);
@@ -251,22 +252,26 @@ class MainWindow final : public QMainWindow {
     void build_change_list(QTreeWidgetItem* item) noexcept;
     void set_progress_dialog() noexcept;
     // The "Active Kernel Information" header builder (chunk 2, plan
-    // v1.28.0 D4; idempotent, plan v1.29.0 D3; the 3-column card reflow
-    // + color hierarchy, plan v1.30.0 D1/D2): one
-    // kernel_info::extract_kernel_info() per call (the module caches its
-    // expensive work per file, so a repeat call is a fast re-read, not a
-    // re-scan), then a 3-column grid on m_ui->kernelInfoHeader —
-    // 1 main title + 5 section titles + 15 key/value rows = 36 labels
-    // with deterministic objectNames, neutral keys (the theme's primary
-    // text), a light-gray value base (the palette Mid), the
-    // desaturated-sage green and the degraded amber per the file-local
-    // info_color rule, and the system fixed font — over the elevated
-    // card stylesheet (the gray-alpha overlay + 1 px border + 8 px
-    // radius). Read-only: no signals, no interactive widgets.
+    // v1.28.0 D4; idempotent, plan v1.29.0 D3; the color hierarchy,
+    // plan v1.30.0 D2; the hero line + 4x3 grid reflow, this cycle):
+    // one kernel_info::extract_kernel_info() per call (the module
+    // caches its expensive work per file, so a repeat call is a fast
+    // re-read, not a re-scan), then a QVBoxLayout on
+    // m_ui->kernelInfoHeader — the hero line (Release in the +2 pt
+    // bold value font, Compiler + Arch in the regular one) + a
+    // 4-column x 3-row grid of the remaining 12 key/value pairs =
+    // 30 labels (15 keys + 15 values) with deterministic objectNames,
+    // neutral keys (the theme's primary text), a light-gray value
+    // base (the palette Mid), the desaturated-sage green and the
+    // degraded amber per the file-local info_color rule, and the
+    // system fixed font — over the elevated card stylesheet (the
+    // gray-alpha overlay + 1 px border + 8 px radius). No main
+    // title, no section titles, no scroll area. Read-only: no
+    // signals, no interactive widgets.
     // Idempotent: a repeat call (on_refresh — the second caller; the
     // one-shot ctor call is the initial build) first tears down the
-    // previous grid + labels (the uic-owned frame survives) and
-    // re-renders them byte-identically (36 → 36, no duplication).
+    // previous layout tree + labels (the uic-owned frame survives)
+    // and re-renders them byte-identically (30 → 30, no duplication).
     void build_kernel_info_header() noexcept;
 };
 
