@@ -22,10 +22,12 @@
 #include "conf-window.hpp"
 #include "install_kernel.hpp"
 #include "kernel.hpp"
+#include "kernel_info.hpp"
 #include "known_kernels.hpp"
 #include "utils.hpp"
 
-#include <algorithm>   // for any_of, find_if
+#include <algorithm>   // for any_of, find_if, max
+#include <cctype>      // for tolower
 #include <filesystem>  // for exists
 #include <future>
 #include <ranges>       // for ranges::*
@@ -35,17 +37,25 @@
 
 #include <fmt/core.h>
 
+#include <QColor>
 #include <QCoreApplication>
 #include <QDialog>
 #include <QFileDialog>
+#include <QFont>
+#include <QFontDatabase>
+#include <QFrame>
 #include <QFutureWatcher>
+#include <QGridLayout>
+#include <QHBoxLayout>
 #include <QIcon>
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
+#include <QPalette>
 #include <QProcess>
 #include <QPushButton>
 #include <QScreen>
+#include <QScrollArea>
 #include <QShortcut>
 #include <QStatusBar>
 #include <QTextEdit>
@@ -452,6 +462,44 @@ void bring_window_forward(QWidget* window) {
     }
     return true;
 }
+
+// ── The Active Kernel Information header (chunk 2, plan v1.28.0 D4) ─────
+// The header's value-label color rule: file-local, pure, and TOTAL — every
+// possible kernel_info display value yields exactly one color (the rule is
+// over the value, not the field: each field's value set is classified by
+// its meaning). Gray = empty (unknown / not available) or a feature
+// explicitly off (disabled / none / never / off — the module's display
+// strings vary in case, so the comparison is case-insensitive). Yellow =
+// working but degraded: a non-native CPU target (generic / custom), lazy or
+// voluntary preemption, -O2, thin LTO. Green = every other non-empty fact
+// (an active/present value — native, a family target, x86-64-vN, full LTO,
+// -O3, 1000 Hz, enabled, dynamic/full preemption, active MGLRU,
+// madvise/always THP, bbr, tsc, …).
+enum class InfoColor : std::uint8_t { Green,
+    Yellow,
+    Gray };
+
+// Lowercased copy (the color rule compares case-insensitively — the
+// kernel_info lower() precedent).
+[[gnu::pure]] [[nodiscard]] std::string to_lower(std::string_view value) {
+    std::string out{};
+    out.reserve(value.size());
+    for (const char c : value) {
+        out.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+    }
+    return out;
+}
+
+[[gnu::pure]] [[nodiscard]] InfoColor info_color(const std::string& value) {
+    const std::string v = to_lower(value);
+    if (v.empty() || v == "disabled" || v == "none" || v == "never" || v == "off") {
+        return InfoColor::Gray;
+    }
+    if (v == "generic" || v == "custom" || v == "lazy" || v == "voluntary" || v == "o2" || v == "-o2" || v == "thin lto") {
+        return InfoColor::Yellow;
+    }
+    return InfoColor::Green;
+}
 }  // namespace
 
 MainWindow::MainWindow(QWidget* parent)
@@ -464,6 +512,14 @@ MainWindow::MainWindow(QWidget* parent)
     // permanent status-bar label, so the running build is easy to identify.
     setWindowTitle(tr("Kernel Manager %1").arg(APP_VERSION));
     statusBar()->addPermanentWidget(new QLabel(tr("v%1").arg(APP_VERSION)));
+
+    // The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4):
+    // build + populate it once per session (the booted kernel is invariant
+    // while the app runs — no re-extraction on the init_kernels refreshes;
+    // the module bounds its own cost — a ≤ 8-sample disassembly budget + a
+    // 2 MiB cap). The frame + scroll area exist from setupUi; the grid and
+    // its labels are code-built.
+    build_kernel_info_header();
 
     // The D7 persistent banner (chunk 3): a permanent, hidden-by-default
     // status-bar label next to the version label (created in the member
@@ -682,6 +738,163 @@ void MainWindow::set_progress_dialog() noexcept {
     m_conf_progress_dialog->setBar(m_conf_progress_bar);
     m_conf_progress_bar->setTextVisible(false);
     m_conf_progress_dialog->reset();
+}
+
+// The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4): the
+// read-only, color-coded panel at the top of the MainWindow showing the
+// BOOTED kernel's parameters in 5 sections — Kernel & Toolchain, CPU Arch
+// Target, Optimization & LTO, Scheduling & Latency, Runtime Subsystems.
+// The data is kernel_info::extract_kernel_info() — one call per session
+// (the booted kernel is invariant while the app runs; D5: no re-extraction
+// on the init_kernels refreshes). The uic-created QFrame
+// (m_ui->kernelInfoHeader, inside the kernelInfoScroll QScrollArea — the
+// first layout item) hosts a code-built QGridLayout: 1 main-title row
+// (column-span 5) + 1 section-title row + ≤ 4 key/value rows per column =
+// 36 labels (1 + 5 + 15 keys + 15 values), each with a deterministic
+// objectName (kiMainTitle, kiTitle1..5, ki<Section><Key> / …Key) so a test
+// driver can address them. Styling per the brief: the frame's subtle
+// theme-neutral background + border, a ≈ 950 px minimum width (5 × ~190;
+// narrower windows scroll horizontally via the QScrollArea), section
+// titles bold +1 pt with a bottom border, keys in the smaller mid-gray,
+// and values in the system fixed font color-coded by info_color (green
+// active / yellow degraded / gray off-or-unknown — an empty value renders
+// "—" in gray). No signals, no interactive widgets — the header is
+// informational only; the tree below keeps all interaction.
+void MainWindow::build_kernel_info_header() noexcept {
+    auto* frame = m_ui->kernelInfoHeader;
+    if (frame == nullptr) {
+        return;
+    }
+    m_kernel_info_header = frame;
+
+    // The one-shot extraction (the module's probes all degrade to "" —
+    // no signal, no crash — and none of them prints).
+    const kernel_info::KernelInfo info = kernel_info::extract_kernel_info();
+
+    // The subtle background + border (plan D4/D6: the gray-alpha overlay is
+    // theme-neutral in light and dark) + the ≈ 950 px minimum width (the
+    // .ui carries it too — this keeps the intent visible in code).
+    frame->setStyleSheet(QStringLiteral(
+        "#kernelInfoHeader { background: rgba(127,127,127,26); border: 1px solid rgba(127,127,127,64); border-radius: 4px; }"));
+    frame->setMinimumWidth(950);
+
+    auto* grid = new QGridLayout(frame);
+    grid->setContentsMargins(10, 8, 10, 8);
+    grid->setHorizontalSpacing(14);
+    grid->setVerticalSpacing(4);
+    for (int col = 0; col < 5; ++col) {
+        grid->setColumnMinimumWidth(col, 190);
+    }
+
+    // The label fonts: the keys derive from the window's base font one
+    // point smaller (secondary text); the section titles +1 point bold;
+    // the values use the system fixed font (a semi-monospace feel without
+    // hardcoding a family). A pixel-based base font (no point size) keeps
+    // its size for the keys and only gains the bold for the titles.
+    const QFont base_font = font();
+    const qreal base_pt   = base_font.pointSizeF();
+    QFont key_font        = base_font;
+    if (base_pt > 0.0) {
+        key_font.setPointSizeF(base_pt - 1.0);
+    }
+    QFont section_font = base_font;
+    section_font.setBold(true);
+    if (base_pt > 0.0) {
+        section_font.setPointSizeF(base_pt + 1.0);
+    }
+    const QFont value_font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+
+    // The value colors: green + yellow are fixed (no QPalette green role
+    // exists — the dark amber stays readable on light and dark); gray is
+    // the palette's Mid (the theme-adaptive secondary text).
+    const QColor green{0x2e, 0x7d, 0x32};
+    const QColor yellow{0x9a, 0x77, 0x00};
+    const QColor gray = frame->palette().color(QPalette::Mid);
+
+    // The main title (row 0, column-span 5, bold).
+    auto* main_title = new QLabel(tr("Active Kernel Information"), frame);
+    main_title->setObjectName(QStringLiteral("kiMainTitle"));
+    main_title->setFont(section_font);
+    grid->addWidget(main_title, 0, 0, 1, 5);
+
+    // One key/value row in (row, col): the nested [key, value] HBox — the
+    // key in the smaller gray font, the value in the fixed font
+    // color-coded by info_color (an empty value renders "—" in gray).
+    const auto add_row = [&](int row, int col, const QString& key_text, const QString& value_name, const std::string& value) {
+        auto* key = new QLabel(key_text, frame);
+        key->setObjectName(value_name + "Key");
+        key->setFont(key_font);
+        QPalette key_palette = key->palette();
+        key_palette.setColor(QPalette::WindowText, gray);
+        key->setPalette(key_palette);
+
+        const QString shown = value.empty() ? QStringLiteral("—") : QString::fromStdString(value);
+        auto* value_label   = new QLabel(shown, frame);
+        value_label->setObjectName(value_name);
+        value_label->setFont(value_font);
+        const InfoColor color = info_color(value);
+        QColor value_color    = gray;
+        if (color == InfoColor::Green) {
+            value_color = green;
+        } else if (color == InfoColor::Yellow) {
+            value_color = yellow;
+        }
+        QPalette value_palette = value_label->palette();
+        value_palette.setColor(QPalette::WindowText, value_color);
+        value_label->setPalette(value_palette);
+
+        auto* cell = new QHBoxLayout();
+        cell->setContentsMargins(0, 0, 0, 0);
+        cell->setSpacing(6);
+        cell->addWidget(key);
+        cell->addWidget(value_label);
+        grid->addLayout(cell, row, col);
+    };
+
+    // One section title (row 1, the column's header): bold +1 pt with the
+    // subtle bottom border.
+    const auto add_section_title = [&](int col, const QString& title, const QString& name) {
+        auto* section_title = new QLabel(title, frame);
+        section_title->setObjectName(name);
+        section_title->setFont(section_font);
+        section_title->setStyleSheet(QStringLiteral("border-bottom: 1px solid rgba(127,127,127,90);"));
+        grid->addWidget(section_title, 1, col);
+    };
+
+    // 1 — Kernel & Toolchain.
+    add_section_title(0, tr("Kernel & Toolchain"), QStringLiteral("kiTitle1"));
+    add_row(2, 0, tr("Release"), QStringLiteral("kiKtRelease"), info.release);
+    add_row(3, 0, tr("Build date"), QStringLiteral("kiKtBuildDate"), info.build_date);
+    add_row(4, 0, tr("Compiler"), QStringLiteral("kiKtCompiler"), info.compiler);
+
+    // 2 — CPU Arch Target.
+    add_section_title(1, tr("CPU Arch Target"), QStringLiteral("kiTitle2"));
+    add_row(2, 1, tr("Target arch"), QStringLiteral("kiCtTargetArch"), info.target_arch);
+    add_row(3, 1, tr("ISA level"), QStringLiteral("kiCtIsaLevel"), info.isa_level);
+    add_row(4, 1, tr("ISA validation"), QStringLiteral("kiCtIsaValidation"), info.instruction_validation);
+
+    // 3 — Optimization & LTO.
+    add_section_title(2, tr("Optimization & LTO"), QStringLiteral("kiTitle3"));
+    add_row(2, 2, tr("LTO"), QStringLiteral("kiOlLto"), info.lto_status);
+    add_row(3, 2, tr("Optimization"), QStringLiteral("kiOlOptimization"), info.optimization_flag);
+
+    // 4 — Scheduling & Latency.
+    add_section_title(3, tr("Scheduling & Latency"), QStringLiteral("kiTitle4"));
+    add_row(2, 3, tr("Tick rate"), QStringLiteral("kiSlTickRate"), info.tick_rate);
+    add_row(3, 3, tr("sched_ext"), QStringLiteral("kiSlSchedExt"), info.sched_ext);
+    add_row(4, 3, tr("Preemption"), QStringLiteral("kiSlPreemption"), info.preemption_model);
+
+    // 5 — Runtime Subsystems.
+    add_section_title(4, tr("Runtime Subsystems"), QStringLiteral("kiTitle5"));
+    add_row(2, 4, tr("MGLRU"), QStringLiteral("kiOsMglru"), info.mglru);
+    add_row(3, 4, tr("THP"), QStringLiteral("kiOsThp"), info.thp);
+    add_row(4, 4, tr("TCP congestion"), QStringLiteral("kiOsTcpCongestion"), info.tcp_congestion);
+    add_row(5, 4, tr("Clocksource"), QStringLiteral("kiOsClocksource"), info.clocksource);
+
+    // The frame's 150 px-tall slack (the .ui maximumSize) is absorbed by an
+    // invisible stretch row below the last value row, so the grid rows stay
+    // compact and top-anchored instead of stretching unevenly.
+    grid->setRowStretch(6, 1);
 }
 
 void MainWindow::check_uncheck_item() noexcept {

@@ -13,6 +13,10 @@
 # menu actions never clicked, /etc/pacman.conf untouched). install_kernel.cpp
 # resolves its D6 pairing default to driver_gate (chunk 5), so
 # src/driver_gate.cpp is in the compile list (the k8/k14 companion).
+# km-window.cpp's Active Kernel Information header (chunk 2, plan v1.28.0)
+# calls kernel_info::extract_kernel_info, so src/kernel_info.cpp joins the
+# compile list too (the k19/k20 companion — without it the driver fails to
+# link).
 #
 # Recipe shape (one forced deviation from the single driver command, the
 # k19 precedent): the TUs are compiled separately with the project's GCC
@@ -139,6 +143,7 @@ TUS=(
     src/utils.cpp
     src/install_kernel.cpp
     src/driver_gate.cpp
+    src/kernel_info.cpp
     src/aur_kernel.cpp
     src/boot_instructions.cpp
     src/bootloader.cpp

@@ -19,12 +19,43 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
+     <widget class="QScrollArea" name="kernelInfoScroll">
+      <property name="frameShape">
+       <enum>QFrame::Shape::NoFrame</enum>
+      </property>
+      <property name="horizontalScrollBarPolicy">
+       <enum>Qt::ScrollBarPolicy::ScrollBarAsNeeded</enum>
+      </property>
+      <property name="verticalScrollBarPolicy">
+       <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+      </property>
+      <property name="widgetResizable">
+       <bool>true</bool>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>150</height>
+       </size>
+      </property>
+      <widget class="QFrame" name="kernelInfoHeader">
+       <property name="minimumSize">
+        <size>
+         <width>950</width>
+         <height>0</height>
+        </size>
+       </property>
+      </widget>
+     </widget>
+    </item>
+    <item>
      <widget class="QLabel" name="label">
       <property name="text">
        <string>&lt;html&gt;
 &lt;body&gt;
-&lt;p&gt;Here you'll see information about currently installed and available Linux kernels.&lt;/p&gt;
-&lt;p&gt;You can install/uninstall kernel packages using the checkboxes on the leftmost column.&lt;/p&gt;
+&lt;p&gt;Below is a list of installed and available Linux kernels.&lt;/p&gt;
+&lt;p&gt;Check a kernel and press Execute to install it (or keep it installed). Uncheck an installed kernel and press Execute to uninstall it.&lt;/p&gt;
+&lt;p&gt;After each execution the list refreshes automatically — removed kernels disappear from the view.&lt;/p&gt;
 &lt;p&gt;This app won't work if you are already running a pacman instance.&lt;/p&gt;
 &lt;/body&gt;
 &lt;/html&gt;</string>
