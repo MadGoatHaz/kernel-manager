@@ -2,6 +2,9 @@
 
 ## v1.30.1 (2026-09-06)
 
+### Added
+- `kernel-manager` published to the Arch User Repository (v1.30.1-1).
+
 ### Changed
 - Unified the kernel-info header into a single 4×4 grid: the kernel release spans columns 1–2 as the hero, with Compiler and Arch anchored to columns 3 and 4 for vertical alignment with the metrics below.
 - Shortened the build date display from the full `uname -v` string to a compact `Mon DD, YYYY HH:MM` format, eliminating the awkward column-1 gap.

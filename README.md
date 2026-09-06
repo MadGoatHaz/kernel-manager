@@ -4,6 +4,7 @@ Build and install custom Linux kernels on Arch — from a clean Qt6 desktop app.
 
 [![Build](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/build.yml/badge.svg)](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/build.yml)
 [![Checks](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/checks.yml/badge.svg)](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/checks.yml)
+[![AUR version](https://img.shields.io/aur/v/kernel-manager.svg)](https://aur.archlinux.org/packages/kernel-manager)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue)](LICENSE)
 
 Pick a kernel, choose your build options, hit install. kernel-manager builds it (`makepkg`) and installs it (`pacman -U`); your distro's own hooks handle the rest — DKMS drivers, initramfs, bootloader entry. 21 kernel variants supported across official Arch, CachyOS, and community repos.
@@ -92,17 +93,16 @@ sudo pacman -S \
 
 ### From the AUR
 
-The project is packaged for the AUR in two variants:
-
-- `kernel-manager` — stable release package
-- `kernel-manager-git` — tracks the `main` branch
+`kernel-manager` is published on the [Arch User Repository](https://aur.archlinux.org/packages/kernel-manager):
 
 ```sh
 # with any AUR helper (yay, paru, trizen, ...)
 yay -S kernel-manager
-# or the git-based variant
-yay -S kernel-manager-git
+# or
+paru -S kernel-manager
 ```
+
+A rolling `kernel-manager-git` variant (tracking the `main` branch) is not currently on the AUR and may be offered in a future release.
 
 ### From source
 
