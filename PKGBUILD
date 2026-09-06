@@ -8,20 +8,21 @@
 #
 # --------------------------------------------------------------------------
 # VERSIONING
-#   pkgver mirrors the version of the pinned source tree: the v1.27.1 tag
-#   (the fork's seventh tag after the distro-agnostic rename to
+#   pkgver mirrors the version of the pinned source tree: the v1.28.0 tag
+#   (the fork's eighth tag after the distro-agnostic rename to
 #   `kernel-manager`). The pre-rebrand tags (incl. v1.19.0) package the
 #   WRONG (CachyOS-branded) content and are not used.
 #
-#   The stable source below is pinned to the v1.27.1 release commit
-#   326ac07 (the version-bump commit `CMakeLists.txt 1.27.0 -> 1.27.1`,
-#   one commit BEFORE the v1.27.1 tag). The tag itself sits on the PKGBUILD
+#   The stable source below is pinned to the v1.28.0 release commit
+#   769abaa (the version-bump commit `CMakeLists.txt 1.27.1 -> 1.28.0`,
+#   one commit BEFORE the v1.28.0 tag). The tag itself sits on the PKGBUILD
 #   re-pin (this file), so it includes both the version bump and the re-pin;
 #   `_commit` points at the version-bump commit (not the tag) so the archived
 #   source is a stable, non-circular snapshot (pinning the tag's own commit
-#   would make `sha256sums` self-referential). The v1.27.1 cycle: the
-#   driver-gate local-folder-headers fix — installing a pre-built kernel
-#   from a directory no longer falsely warns that headers are unavailable.
+#   would make `sha256sums` self-referential). The v1.28.0 cycle: the Active
+#   Kernel Information header (booted-kernel toolchain, CPU target,
+#   optimization, scheduling, runtime parameters) + the instruction-text
+#   rewrite (checkbox + Execute behavior: install, uninstall, auto-refresh).
 #   When the next release tag is cut, bump pkgver and re-pin `_commit` to
 #   that release's version-bump commit (+ refresh `sha256sums`).
 #
@@ -71,7 +72,7 @@
 #   conflict + provide make it drop-in replace the CachyOS package cleanly.
 
 pkgname=kernel-manager
-pkgver=1.27.1
+pkgver=1.28.0
 pkgrel=1
 pkgdesc="Qt6 GUI for kernel configuration, compilation, and sched-ext (BPF) scheduler management"
 arch=(x86_64)
@@ -88,11 +89,11 @@ makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polki
 # Defensive polkit reload so the shipped policy is picked up on (re)install.
 install=kernel-manager.install
 
-# Pinned v1.27.1 release commit (the version-bump commit, one before the
-# v1.27.1 tag — see the VERSIONING note above).
-_commit=326ac073a8d660ea5289352173eefa113070e8e9
+# Pinned v1.28.0 release commit (the version-bump commit, one before the
+# v1.28.0 tag — see the VERSIONING note above).
+_commit=769abaa0a1acb06d6bb5161342c9544b7533de02
 source=("https://github.com/MadGoatHaz/kernel-manager/archive/${_commit}.tar.gz")
-sha256sums=("d5d0f723777c8172aaa10f108dac82df933aa95670678b2ba4b4a33b37d1b4b4")
+sha256sums=("f6a5a9ec0e823634675b138ae5aebc53710f6cecb69c09c57cc4fc4f57fcd6a7")
 
 # GitHub archive top dir for a commit is `<repo>-<full-sha>`.
 _srcdir="kernel-manager-${_commit}"
