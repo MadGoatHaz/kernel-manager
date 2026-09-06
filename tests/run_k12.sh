@@ -16,7 +16,9 @@
 # km-window.cpp's Active Kernel Information header (chunk 2, plan v1.28.0)
 # calls kernel_info::extract_kernel_info, so src/kernel_info.cpp joins the
 # compile list too (the k19/k20 companion — without it the driver fails to
-# link).
+# link). The k12 banner dynamics probe (plan v1.30.0 D4, test section 7)
+# is the one documented exception to "never writes": a transient flock()
+# on /var/lib/pacman/db.lck (read-only, ≤ 6 s) to exercise the banner cycle.
 #
 # Recipe shape (one forced deviation from the single driver command, the
 # k19 precedent): the TUs are compiled separately with the project's GCC

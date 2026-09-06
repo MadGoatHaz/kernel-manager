@@ -112,6 +112,18 @@
 //       hidden widget gets its layout geometry but no show/resize
 //       event, probe-verified on this Qt); the dumps (5 + 6f) run
 //       around it untouched (tree cell text is visibility-independent).
+//   (11) The dynamic pacman-lock banner (plan v1.30.0 D4): the
+//       hidden-by-default QLabel between the caption and the spacer —
+//       its existence, the D4 "pacman instance" text, and the ctor-set
+//       amber stylesheet (no stylesheet in the .ui); the isVisible ==
+//       harness-probe relation (always asserted — flake-proof: it pins
+//       the banner to the real lock state at this instant, held or
+//       free); and the dynamics probe — only when the relation says
+//       FREE and the lock file exists: the harness takes the real
+//       flock, the 2 s tick shows the banner, the release + next tick
+//       hides it (≤ 6 s each way); skipped with a printed note when a
+//       real pacman runs (the relation already covered the visible
+//       state) or no db.lck exists (the hidden one).
 // The K12-DUMP row dump must be byte-stable across two runs (deterministic
 // order; the directory row dumps with the "folder" marker — checkbox rows
 // "checkbox", lock rows "lock"); run_k12.sh checks that. The post-refresh
@@ -150,6 +162,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <sys/file.h>
 #include <thread>
 #include <utility>  // for pair
 #include <vector>   // for vector
@@ -875,6 +888,84 @@ int main(int argc, char** argv) {
             item->text(static_cast<int>(TreeCol::Install)).toUtf8().constData(),
             item->text(static_cast<int>(TreeCol::Category)).toUtf8().constData(),
             checkable ? "checkbox" : (directory ? "folder" : "lock"));
+    }
+
+    // ------------------------------------------------------------------
+    // 7. The dynamic pacman-lock banner (plan v1.30.0 D4): the
+    //    hidden-by-default QLabel between the caption and the spacer —
+    //    its existence, the D4 text, and the ctor-set amber stylesheet
+    //    (no stylesheet in the .ui — the ctor owns it); then the
+    //    isVisible == harness-probe relation (always asserted —
+    //    flake-proof: it pins the banner to the real lock state at
+    //    this instant, held or free); and the dynamics probe — only
+    //    when the relation says FREE and the lock file exists: the
+    //    harness takes the real flock, the 2 s tick shows the banner,
+    //    the release + next tick hides it (≤ 6 s each way). Skipped
+    //    with a printed note when a real pacman runs (the relation
+    //    already covered the visible state — the harness never
+    //    contends with a real lock holder) or no db.lck exists (the
+    //    hidden state, already covered).
+    // ------------------------------------------------------------------
+    auto* banner = window.findChild<QLabel*>("pacmanLockBanner");
+    check(banner != nullptr, "the pacmanLockBanner exists on the real MainWindow");
+    if (banner != nullptr) {
+        check(banner->text().contains("pacman instance"), "banner text carries the D4 'pacman instance' warning");
+        check(banner->styleSheet().contains("rgba(154,119,0"), "banner stylesheet carries the ctor-set D4 amber prefix");
+    }
+    // The harness mirror of the D4 probe (k11 "own ground truth" style):
+    // the same read-only fd (fopen/fileno) + non-blocking flock LOCK_NB
+    // + fclose on utils::alpm_libdir + "db.lck" — any failure ⇒
+    // conservatively held, a missing file ⇒ not held.
+    auto harness_pacman_lock_held = [] {
+        const auto lock_path = std::string{utils::alpm_libdir} + "db.lck";
+        FILE* file           = std::fopen(lock_path.c_str(), "r");
+        if (file == nullptr) {
+            return false;  // no file → not held
+        }
+        const int fd = ::fileno(file);
+        const int rc = ::flock(fd, LOCK_EX | LOCK_NB);
+        std::fclose(file);  // also closes the fd
+        return rc != 0;     // any failure → conservatively "held"
+    };
+    const bool held_now = harness_pacman_lock_held();
+    check(banner != nullptr && banner->isVisible() == held_now,
+        (std::string{"banner isVisible() == the harness lock probe (held: "} + (held_now ? "yes" : "no") + ")").c_str());
+    {
+        const auto lock_path = std::string{utils::alpm_libdir} + "db.lck";
+        if (held_now) {
+            std::printf("INFO: banner dynamics probe SKIPPED — a pacman instance holds the lock (the relation asserted the visible state)\n");
+        } else if (::access(lock_path.c_str(), F_OK) != 0) {
+            std::printf("INFO: banner dynamics probe SKIPPED — no db.lck on this machine (the relation asserted the hidden state)\n");
+        } else {
+            FILE* dyn_file = std::fopen(lock_path.c_str(), "r");
+            check(dyn_file != nullptr, "dynamics probe: db.lck opened read-only");
+            if (dyn_file != nullptr) {
+                // The relation just proved nobody holds the lock, so a
+                // plain blocking flock is safe (a user's pacman
+                // starting inside the window merely waits a moment).
+                const int dyn_fd = ::fileno(dyn_file);
+                const int rc     = ::flock(dyn_fd, LOCK_EX);
+                check(rc == 0, "dynamics probe: the harness now holds the real flock");
+                if (rc == 0) {
+                    const auto show_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
+                    while (banner != nullptr && !banner->isVisible() && std::chrono::steady_clock::now() < show_deadline) {
+                        app.processEvents();
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                    }
+                    check(banner != nullptr && banner->isVisible(),
+                        "dynamics probe: the 2 s tick showed the banner while the harness held the lock");
+                    ::flock(dyn_fd, LOCK_UN);
+                    const auto hide_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
+                    while (banner != nullptr && banner->isVisible() && std::chrono::steady_clock::now() < hide_deadline) {
+                        app.processEvents();
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                    }
+                    check(banner != nullptr && !banner->isVisible(),
+                        "dynamics probe: the next tick hid the banner after the release");
+                }
+                std::fclose(dyn_file);  // also closes the fd
+            }
+        }
     }
 
     utils::release_alpm(handle, &err);

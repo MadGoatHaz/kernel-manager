@@ -175,6 +175,12 @@ class MainWindow final : public QMainWindow {
     // — the module's; this method only owns the label). Shown on a
     // declined fix, hidden on a successful migration.
     void show_driver_banner(const QString& text);
+    // D4 (plan v1.30.0): show/hide the pacmanLockBanner per the
+    // file-local pacman_lock_held() probe. The 2 s poll
+    // (m_pacman_lock_timer) drives it; hidden by default; the ctor's
+    // one initial call pins the state at startup. Warning only —
+    // Execute is never disabled.
+    void update_pacman_lock_banner() noexcept;
 
     void check_uncheck_item() noexcept;
 
@@ -197,6 +203,14 @@ class MainWindow final : public QMainWindow {
     // hidden-by-default label next to the version label; shown on a
     // driver-gate decline, hidden on a successful migration.
     QLabel* m_driver_banner = nullptr;
+
+    // D4 (plan v1.30.0): the dynamic pacman-lock banner poll — the
+    // 2 s QTimer that re-runs the file-local pacman_lock_held() probe
+    // and shows/hides the hidden-by-default pacmanLockBanner (the
+    // ctor's one initial call pins the state at startup). Value
+    // member, parented to the window (stops with it). Warning only:
+    // it never disables Execute.
+    QTimer m_pacman_lock_timer;
 
     // The shared resize-time ellipsis filter (plan v1.30.0 D5, the
     // file-local ElideFilter above): window-parented (created in the
