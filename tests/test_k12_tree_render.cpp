@@ -100,6 +100,18 @@
 //       desaturated-sage green #5E8A6E, the degraded amber #9A7700, or
 //       the Mid light gray — the theme-adaptive base); every "—"
 //       (empty-value) label renders in the Mid tier.
+//   (10) Robustness (plan v1.30.0 D5): the window's 830 px minimum width
+//       (from the .ui), the guaranteed-full contract on every value
+//       label + the build-dir label (the km_full_text dynamic property
+//       is valid, non-empty, and equals the tooltip), and the filter's
+//       no-op path — after the offscreen show + event settle, each
+//       value label's displayed text is exactly its full text elided to
+//       the current width (a fit or an elision, never a stale or
+//       double-elided string). The show is what delivers the QShowEvent
+//       the filter keys on (the harness window is hidden until then — a
+//       hidden widget gets its layout geometry but no show/resize
+//       event, probe-verified on this Qt); the dumps (5 + 6f) run
+//       around it untouched (tree cell text is visibility-independent).
 // The K12-DUMP row dump must be byte-stable across two runs (deterministic
 // order; the directory row dumps with the "folder" marker — checkbox rows
 // "checkbox", lock rows "lock"); run_k12.sh checks that. The post-refresh
@@ -689,6 +701,56 @@ int main(int argc, char** argv) {
         }
         check(key_labels == 15, "15 key labels found (the 36-label contract: 1 + 5 + 15 keys + 15 values)");
         check(value_labels == 15, "15 value labels found (the 36-label contract: 1 + 5 + 15 keys + 15 values)");
+    }
+
+    // 6b4. Robustness (plan v1.30.0 D5): the window's 830 px minimum
+    //     width (from the .ui — the card's 800 px minimum + margin
+    //     slack, so the card never horizontally scrolls at any legal
+    //     window size), and the guaranteed-full contract: the
+    //     km_full_text dynamic property is valid, non-empty, and
+    //     equals the tooltip on every value label + the build-dir
+    //     label (the full text is always one hover away). The filter's
+    //     no-op path: after the offscreen show + the event settle,
+    //     each value label's displayed text is exactly its full text
+    //     elided to the current width — the same elidedText
+    //     recomputation the filter runs, so a stale or double-elided
+    //     string fails here (a short value that fits renders
+    //     byte-identical: no-op fit or real elision, both equal). The
+    //     show() is what delivers the QShowEvent the filter keys on
+    //     (the harness window is hidden until here — a hidden widget
+    //     gets its layout geometry but no show/resize event,
+    //     probe-verified on this Qt); it paints nowhere (offscreen)
+    //     and the tree cell text is visibility-independent, so both
+    //     dump families below stay byte-stable.
+    check(window.minimumWidth() == 830, "window minimumWidth() == 830 (the D5 constant, from the .ui)");
+    window.show();
+    app.processEvents();
+    app.processEvents();
+    if (header_frame != nullptr) {
+        for (auto* l : header_frame->findChildren<QLabel*>()) {
+            const std::string name{l->objectName().toStdString()};
+            if (name == "kiMainTitle" || name.rfind("kiTitle", 0) == 0) {
+                continue;  // the main title + the 5 section titles carry no km_full_text
+            }
+            if (name.size() > 3 && name.compare(name.size() - 3, 3, "Key") == 0) {
+                continue;  // the key labels are static short text (the values are tracked)
+            }
+            const auto prop = l->property("km_full_text");
+            check(prop.isValid() && !prop.toString().isEmpty(),
+                (std::string{"value label " + name + " carries a valid, non-empty km_full_text property"}).c_str());
+            check(prop.toString() == l->toolTip(),
+                (std::string{"value label " + name + " km_full_text == the tooltip (the guaranteed-full contract)"}).c_str());
+            const QString elided = l->fontMetrics().elidedText(prop.toString(), Qt::ElideRight, qMax(0, l->width()));
+            check(l->text() == elided,
+                (std::string{"value label " + name + " displayed text == full text elided to the current width (no-op path; width " + std::to_string(l->width()) + ")"}).c_str());
+        }
+    }
+    auto* build_dir_label = window.findChild<QLabel*>("buildDirLabel");
+    check(build_dir_label != nullptr, "buildDirLabel exists on the real MainWindow");
+    if (build_dir_label != nullptr) {
+        const auto prop = build_dir_label->property("km_full_text");
+        check(prop.isValid() && !prop.toString().isEmpty(), "buildDirLabel carries a valid, non-empty km_full_text property");
+        check(prop.toString() == build_dir_label->toolTip(), "buildDirLabel km_full_text == the tooltip (the guaranteed-full contract)");
     }
 
     // 6c. The real click (the direct connection runs on_refresh

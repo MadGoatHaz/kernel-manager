@@ -40,6 +40,7 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QDialog>
+#include <QEvent>
 #include <QFileDialog>
 #include <QFont>
 #include <QFontDatabase>
@@ -500,11 +501,64 @@ enum class InfoColor : std::uint8_t { Green,
     }
     return InfoColor::Green;
 }
+
 }  // namespace
 
+// D5 (plan v1.30.0): the resize-time ellipsis for the long-string labels —
+// the header's 15 value labels (installed in add_row) and the build-dir
+// path label (installed in the ctor). File-local (the definition exists in
+// this one TU only; the hpp carries the matching forward declaration the
+// raw-pointer member keys on — global scope, NOT the anonymous namespace:
+// a namespaced definition would be a distinct class the hpp declaration
+// cannot name). It keys on the "km_full_text" dynamic property (the
+// unelided value — the tooltip source), elides it right-truncated to the
+// label's current width on Resize + Show, and re-sets the text only when
+// it differs (a short value that fits renders byte-identical — the elide
+// is a no-op fit check, so a label that never needs truncation stays
+// exactly as the builder left it). Every other event type returns false
+// untouched; the filter is passive (it never consumes an event) and
+// outlives the per-build labels (window-parented; the idempotent rebuild
+// re-installs fresh labels, the old ones are deleted with the frame's
+// children — no dangling).
+class ElideFilter final : public QObject {
+ public:
+    using QObject::QObject;
+    bool eventFilter(QObject* obj, QEvent* event) override;
+};
+
+bool ElideFilter::eventFilter(QObject* obj, QEvent* event) {
+    if (event->type() != QEvent::Resize && event->type() != QEvent::Show) {
+        return false;  // every other event type is untouched
+    }
+    const auto full_prop = obj->property("km_full_text");
+    if (!full_prop.isValid()) {
+        return false;  // not a tracked label (no full text to elide)
+    }
+    auto* label = qobject_cast<QLabel*>(obj);
+    if (label == nullptr) {
+        return false;
+    }
+    const QString full   = full_prop.toString();
+    const QString elided = label->fontMetrics().elidedText(full, Qt::ElideRight, qMax(0, label->width()));
+    if (elided != label->text()) {
+        label->setText(elided);  // a no-op fit keeps the original text
+    }
+    if (label->toolTip().isEmpty()) {
+        label->setToolTip(full);  // the full text is always one tooltip away
+    }
+    return false;  // passive: the label handles the event normally after
+}
+
 MainWindow::MainWindow(QWidget* parent)
-  : QMainWindow(parent), m_driver_banner(new QLabel(parent)) {
+  : QMainWindow(parent), m_driver_banner(new QLabel(parent)), m_elide_filter(new ElideFilter(this)) {
     m_ui->setupUi(this);
+    // D5 (plan v1.30.0): the shared resize-time ellipsis filter — created
+    // once in the member-initializer-list above (window-parented, so it
+    // outlives the per-build header labels) and installed here on the
+    // build-dir path label (the widget exists from setupUi); the header's
+    // value labels install it in build_kernel_info_header as they are
+    // created.
+    m_ui->buildDirLabel->installEventFilter(m_elide_filter);
     setWindowIcon(QApplication::windowIcon());  // explicit dedicated icon; the .ui no longer overrides; robust to Qt app-fallback semantics
 
     // Version display (v1.25.0 follow-up): the PROJECT_VERSION from CMake
@@ -900,6 +954,15 @@ void MainWindow::build_kernel_info_header() noexcept {
         QPalette value_palette = value_label->palette();
         value_palette.setColor(QPalette::WindowText, value_color);
         value_label->setPalette(value_palette);
+
+        // D5 (plan v1.30.0): the guaranteed-full contract — the dynamic
+        // property carries the unelided value (the ElideFilter's source),
+        // the tooltip always shows it, and the shared filter elides the
+        // displayed text on resize (a value that fits stays verbatim —
+        // the no-op fit check).
+        value_label->setProperty("km_full_text", shown);
+        value_label->setToolTip(shown);
+        value_label->installEventFilter(m_elide_filter);
 
         auto* cell = new QHBoxLayout();
         cell->setContentsMargins(0, 0, 0, 0);
@@ -1482,6 +1545,11 @@ void MainWindow::update_build_dir_label() noexcept {
     const auto path = utils::build_repo_path().string();
     m_ui->buildDirLabel->setText(QString::fromStdString(path));
     m_ui->buildDirLabel->setToolTip(QString::fromStdString(path));
+    // D5 (plan v1.30.0): the guaranteed-full contract — the label's text
+    // may now be elided at any width (the shared ElideFilter), so the
+    // dynamic property carries the full path; the tooltip above already
+    // does (the D6 v1.24.0 contract, preserved + extended).
+    m_ui->buildDirLabel->setProperty("km_full_text", QString::fromStdString(path));
 }
 
 void MainWindow::on_cancel() noexcept {
