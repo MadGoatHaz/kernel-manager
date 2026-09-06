@@ -72,7 +72,7 @@
 #   conflict + provide make it drop-in replace the CachyOS package cleanly.
 
 pkgname=kernel-manager
-pkgver=1.28.0
+pkgver=1.30.0
 pkgrel=1
 pkgdesc="Qt6 GUI for kernel configuration, compilation, and sched-ext (BPF) scheduler management"
 arch=(x86_64)
@@ -89,11 +89,11 @@ makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polki
 # Defensive polkit reload so the shipped policy is picked up on (re)install.
 install=kernel-manager.install
 
-# Pinned v1.28.0 release commit (the version-bump commit, one before the
-# v1.28.0 tag — see the VERSIONING note above).
-_commit=769abaa0a1acb06d6bb5161342c9544b7533de02
+# Pinned v1.30.0 release commit (the version-bump commit, one before the
+# v1.30.0 tag — see the VERSIONING note above).
+_commit=debe3512c412cffa881770fbbb9ed9fd924b3eba
 source=("https://github.com/MadGoatHaz/kernel-manager/archive/${_commit}.tar.gz")
-sha256sums=("f6a5a9ec0e823634675b138ae5aebc53710f6cecb69c09c57cc4fc4f57fcd6a7")
+sha256sums=("96aa20ae6a55c75b34dc9d2fcc05a1e8d61b66f7a9c4aeaf9f02f35c079b0865")
 
 # GitHub archive top dir for a commit is `<repo>-<full-sha>`.
 _srcdir="kernel-manager-${_commit}"
