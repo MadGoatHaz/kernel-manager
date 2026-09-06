@@ -2,7 +2,7 @@
 
 ### v1.28.0 (2026-09-05)
 
-[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/016eea3...884bf30)
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/016eea3...6b449a5)
 
 #### Added
 - **Active Kernel Information header** — an Active Kernel Information header at the top of the main window, showing the booted kernel's toolchain, CPU target, optimization, scheduling, and runtime subsystem parameters.
