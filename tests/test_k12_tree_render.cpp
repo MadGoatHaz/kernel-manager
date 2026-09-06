@@ -27,7 +27,7 @@
 // Refresh button (plan v1.29.0 D6 — the bottom-row placement contract,
 // a real click driving the guarded manual re-scan: the shared progress
 // dialog, the tree rebuild, the D4 stale-row purge, and the idempotent
-// 36 → 36 header re-extraction, plus the K12-DUMP-REFRESH stability
+// 30 → 30 header re-extraction, plus the K12-DUMP-REFRESH stability
 // dump below).
 //
 // Follows the tests/run_chunk2_ui.sh recipe: compiles the REAL source
@@ -78,21 +78,18 @@
 //   (7) Refresh (plan v1.29.0 D6): the button's existence / text /
 //       tooltip / bottom-row layout order; a real click on it (the
 //       direct connection runs on_refresh synchronously) → the shared
-//       progress dialog is hidden again, the header is idempotent (36 →
-//       36 labels, kiMainTitle unique, kiKtRelease unchanged), the tree
+//       progress dialog is hidden again, the header is idempotent (30 →
+//       30 labels, kiHeroRelease unique, its value unchanged), the tree
 //       carries no !has_pkg() && !is_installed() row (the D4 complement)
 //       with the directory row surviving exactly once, and the surviving
 //       data rows == the re-fetched has_pkg || installed set. The
 //       m_running / configure-clone guards are not exercisable offscreen
 //       (no worker transaction, no clone) — verified by code audit.
-//   (8) The 3-column card geometry (plan v1.30.0 D1): the header frame's
-//       layout is a QGridLayout with columnCount() == 3, the main title
-//       spans the full width (itemAtPosition(0, 2) resolves to
-//       kiMainTitle — Qt reports a spanning item at every covered cell),
-//       the frame carries the 800 px minimum width AND the natural-height
-//       minimum (== the grid's sizeHint — the widgetResizable clipping
-//       fix), and the kernelInfoScroll band's vertical policy is
-//       AsNeeded.
+//   (8) The hero + 4-column grid geometry (this cycle): the header
+//       frame's layout is a QVBoxLayout (the hero line + the grid), the
+//       grid is a QGridLayout with columnCount() == 4, and the frame
+//       carries the 800 px minimum width (the scroll-area band + the
+//       natural-height minimum were removed with it).
 //   (9) The color hierarchy (plan v1.30.0 D2): the frame's styleSheet()
 //       equals the elevated card string exactly, the 15 keys carry the
 //       neutral tier (the frame's WindowText — the theme's primary
@@ -178,10 +175,10 @@
 #include <QPalette>
 #include <QProgressDialog>
 #include <QPushButton>
-#include <QScrollArea>
 #include <QTimer>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
+#include <QVBoxLayout>
 
 namespace {
 
@@ -296,27 +293,27 @@ int main(int argc, char** argv) {
     check(tree->topLevelItemCount() > 0, "rows landed in the tree (timeout-guarded)");
 
     // ------------------------------------------------------------------
-    // 2b. The instruction panel (plan v1.30.0 D3): the static HTML
-    //     label above the tree — a single <p> caption (the merged
-    //     intro + execute sentence), the <p> count == 1 (the
+    // 2b. The instruction panel: the static HTML label above the
+    //     tree — a single <p> caption (the concise select + execute
+    //     sentence, this cycle), the <p> count == 1 (the
     //     single-caption contract), the four removed lines absent
     //     (the auto-refresh sentence, the manual Refresh line, the
     //     pacman warning, the old execute-line form), and the
-    //     secondary semantics now on the button tooltips: the
-    //     Execute tooltip non-empty with the install/uninstall +
-    //     auto-refresh note, the Refresh tooltip's "Re-scan" line
-    //     unchanged (no-regression guard).
+    //     secondary semantics on the button tooltips: the Execute
+    //     tooltip non-empty with the install/uninstall + auto-refresh
+    //     note, the Refresh tooltip's "Re-scan" line unchanged
+    //     (no-regression guard).
     // ------------------------------------------------------------------
     auto* instruction = window.findChild<QLabel*>("label");
     check(instruction != nullptr, "the instruction 'label' exists on the real MainWindow");
     if (instruction != nullptr) {
         const QString text = instruction->text();
-        // The single caption: the merged intro sentence + the merged
-        // execute clause (one paragraph, the D3 contract).
-        check(text.contains("Below is a list of installed and available Linux kernels"),
-            "caption carries the intro sentence");
-        check(text.contains("uncheck an installed kernel"),
-            "caption carries the merged execute clause (uncheck an installed kernel)");
+        // The single caption: the concise select clause + the execute
+        // clause (one paragraph, the single-caption contract).
+        check(text.contains("Select kernels to install or remove"),
+            "caption carries the select clause");
+        check(text.contains("then click Execute"),
+            "caption carries the execute clause (then click Execute)");
         // The <p> count == 1 (exactly one paragraph — the
         // single-caption contract; the closing </p> tags cannot
         // match "<p>").
@@ -641,10 +638,10 @@ int main(int argc, char** argv) {
     }
 
     // 6b. The header idempotency (plan v1.29.0 D3): the ctor built the
-    //     header once — 36 labels with unique objectNames (the v1.28.0
-    //     shape); after a refresh click the same 36 must exist (not 72),
-    //     kiMainTitle exactly once, and the spot value unchanged
-    //     (session-invariant).
+    //     header once — 30 labels with unique objectNames (the hero +
+    //     grid shape, this cycle); after a refresh click the same 30
+    //     must exist (not 60), kiHeroRelease exactly once, and the
+    //     spot value unchanged (session-invariant).
     auto* header_frame = window.findChild<QFrame*>("kernelInfoHeader");
     check(header_frame != nullptr, "the kernelInfoHeader frame exists");
     int labels_before = 0;
@@ -655,36 +652,30 @@ int main(int argc, char** argv) {
             ++labels_before;
             check(!l->objectName().isEmpty(), "header label carries an objectName (pre-refresh)");
             names_before.insert(l->objectName().toStdString());
-            if (l->objectName() == QStringLiteral("kiKtRelease")) {
+            if (l->objectName() == QStringLiteral("kiHeroRelease")) {
                 release_before = l->text();
             }
         }
         check(names_before.size() == static_cast<std::size_t>(labels_before), "header label objectNames unique (pre-refresh)");
     }
-    check(labels_before == 36, "header label count == 36 (pre-refresh, the v1.28.0 shape)");
-    check(!release_before.isEmpty(), "kiKtRelease non-empty (pre-refresh)");
+    check(labels_before == 30, "header label count == 30 (pre-refresh: 6 hero + 24 grid labels)");
+    check(!release_before.isEmpty(), "kiHeroRelease non-empty (pre-refresh)");
 
-    // 6b2. The 3-column card geometry (plan v1.30.0 D1): the frame's
-    //     layout is a QGridLayout with 3 columns, the main title spans
-    //     the full width (Qt reports a spanning item at every covered
-    //     cell), the frame carries the 800 px minimum width AND the
-    //     natural-height minimum (== the grid's sizeHint — the
-    //     widgetResizable clipping fix), and the scroll band's vertical
-    //     policy is AsNeeded.
-    auto* kernel_info_scroll = window.findChild<QScrollArea*>("kernelInfoScroll");
+    // 6b2. The hero + grid geometry (this cycle): the frame's layout
+    //     is a QVBoxLayout (the hero line + the grid), the grid is a
+    //     QGridLayout with 4 columns, and the frame carries the 800 px
+    //     minimum width (the scroll-area band + the natural-height
+    //     minimum were removed with it).
     if (header_frame != nullptr) {
-        auto* grid = qobject_cast<QGridLayout*>(header_frame->layout());
-        check(grid != nullptr && grid->columnCount() == 3, "header layout is a QGridLayout with columnCount() == 3");
-        if (grid != nullptr) {
-            auto* span_item = grid->itemAtPosition(0, 2);
-            check(span_item != nullptr && span_item->widget() != nullptr && span_item->widget()->objectName() == QStringLiteral("kiMainTitle"),
-                "the main title spans the full width (itemAtPosition(0, 2) resolves to kiMainTitle)");
-            check(header_frame->minimumWidth() == 800 && header_frame->minimumHeight() == grid->sizeHint().height(),
-                "header frame minimumWidth() == 800 AND minimumHeight() == the grid's sizeHint height (the natural-height relation)");
-        }
+        auto* outer = header_frame->layout();
+        check(outer != nullptr && qobject_cast<QVBoxLayout*>(outer) != nullptr,
+            "header layout is a QVBoxLayout (the hero line + the grid)");
+        auto* grid = header_frame->findChild<QGridLayout*>();
+        check(grid != nullptr && grid->columnCount() == 4,
+            "the header grid is a QGridLayout with columnCount() == 4 (the 4x3 layout)");
+        check(header_frame->minimumWidth() == 800,
+            "header frame minimumWidth() == 800 (the 4-column grid floor)");
     }
-    check(kernel_info_scroll != nullptr && kernel_info_scroll->verticalScrollBarPolicy() == Qt::ScrollBarAsNeeded,
-        "kernelInfoScroll vertical scrollBarPolicy() == AsNeeded (the dynamic band)");
 
     // 6b3. The color hierarchy (plan v1.30.0 D2): the elevated card
     //     stylesheet exactly, the 15 keys in the neutral tier (the
@@ -706,9 +697,6 @@ int main(int argc, char** argv) {
         int value_labels = 0;
         for (auto* l : header_frame->findChildren<QLabel*>()) {
             const std::string name{l->objectName().toStdString()};
-            if (name == "kiMainTitle" || name.rfind("kiTitle", 0) == 0) {
-                continue;  // the main title + the 5 section titles carry no tier
-            }
             const QColor c{l->palette().color(QPalette::WindowText)};
             const std::string rgb{std::to_string(c.red()) + "," + std::to_string(c.green()) + "," + std::to_string(c.blue())};
             if (name.size() > 3 && name.compare(name.size() - 3, 3, "Key") == 0) {
@@ -723,8 +711,8 @@ int main(int argc, char** argv) {
                 }
             }
         }
-        check(key_labels == 15, "15 key labels found (the 36-label contract: 1 + 5 + 15 keys + 15 values)");
-        check(value_labels == 15, "15 value labels found (the 36-label contract: 1 + 5 + 15 keys + 15 values)");
+        check(key_labels == 15, "15 key labels found (the 30-label contract: 6 hero + 24 grid = 15 keys + 15 values)");
+        check(value_labels == 15, "15 value labels found (the 30-label contract: 6 hero + 24 grid = 15 keys + 15 values)");
     }
 
     // 6b4. Robustness (plan v1.30.0 D5): the window's 830 px minimum
@@ -753,9 +741,6 @@ int main(int argc, char** argv) {
     if (header_frame != nullptr) {
         for (auto* l : header_frame->findChildren<QLabel*>()) {
             const std::string name{l->objectName().toStdString()};
-            if (name == "kiMainTitle" || name.rfind("kiTitle", 0) == 0) {
-                continue;  // the main title + the 5 section titles carry no km_full_text
-            }
             if (name.size() > 3 && name.compare(name.size() - 3, 3, "Key") == 0) {
                 continue;  // the key labels are static short text (the values are tracked)
             }
@@ -793,28 +778,27 @@ int main(int argc, char** argv) {
     check(progress_dialogs.size() == 1, "exactly one QProgressDialog (the shared m_conf_progress_dialog)");
     check(progress_dialogs.size() == 1 && !progress_dialogs.at(0)->isVisible(), "progress dialog hidden after the refresh");
 
-    // 6d. The header after the click: still 36 (not 72), the same
-    //     objectName set, kiMainTitle unique, the spot value unchanged.
-    int labels_after = 0;
-    int main_titles  = 0;
+    // 6d. The header after the click: still 30 (not 60), the same
+    //     objectName set, kiHeroRelease unique, the spot value
+    //     unchanged.
+    int labels_after  = 0;
+    int hero_releases = 0;
     QString release_after{};
     std::set<std::string> names_after{};
     if (header_frame != nullptr) {
         for (auto* l : header_frame->findChildren<QLabel*>()) {
             ++labels_after;
             names_after.insert(l->objectName().toStdString());
-            if (l->objectName() == QStringLiteral("kiMainTitle")) {
-                ++main_titles;
-            }
-            if (l->objectName() == QStringLiteral("kiKtRelease")) {
+            if (l->objectName() == QStringLiteral("kiHeroRelease")) {
+                ++hero_releases;
                 release_after = l->text();
             }
         }
     }
-    check(labels_after == 36, "header label count still 36 after the refresh (no duplication)");
+    check(labels_after == 30, "header label count still 30 after the refresh (no duplication)");
     check(names_after == names_before, "header label objectName set unchanged after the refresh");
-    check(main_titles == 1, "kiMainTitle appears exactly once after the refresh");
-    check(!release_after.isEmpty() && release_after == release_before, "kiKtRelease non-empty and unchanged after the refresh");
+    check(hero_releases == 1, "kiHeroRelease appears exactly once after the refresh");
+    check(!release_after.isEmpty() && release_after == release_before, "kiHeroRelease non-empty and unchanged after the refresh");
 
     // 6e. The purge (the D4 complement): re-fetch the ground truth from
     //     the driver's own read-only handle (the existing expected-set
