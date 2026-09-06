@@ -1,5 +1,17 @@
 # Changelog
 
+### v1.28.0 (2026-09-05)
+
+[Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/016eea3...884bf30)
+
+#### Added
+- **Active Kernel Information header** — an Active Kernel Information header at the top of the main window, showing the booted kernel's toolchain, CPU target, optimization, scheduling, and runtime subsystem parameters.
+
+#### Changed
+- **Instruction text rewritten** — the instruction text now clearly explains checkbox + Execute behavior (install, uninstall, auto-refresh).
+
+> Note: full QA on merged main green — 17/17 harnesses (incl. the new k20 kernel-info harness, 26/26), 0 code warnings, offscreen smoke 124/0B/0B.
+
 ### v1.27.1 (2026-09-05)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/a8dda06...016eea3)
