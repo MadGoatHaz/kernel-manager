@@ -11,7 +11,7 @@ Pick a kernel, choose your build options, hit install. kernel-manager builds it 
 
 ## Screenshots
 
-The main window is a single screen: the **Active Kernel Information** card at the top (the booted kernel's release, compiler, and architecture as the hero row, plus 12 runtime metrics in a unified 4-column grid), the kernel list in the middle, and the action row (Configure, Refresh, Execute, Close) with the build-directory selector at the bottom. Every command the app runs is mirrored in a live terminal window, and a dynamic banner warns you while a pacman instance holds the database lock.
+![kernel-manager screenshot](img/Screenshot.png)
 
 ## Features
 
