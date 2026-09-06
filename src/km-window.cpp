@@ -28,11 +28,13 @@
 
 #include <algorithm>   // for any_of, find_if, max
 #include <cctype>      // for tolower
+#include <cstdio>      // for fopen, fileno, fclose
 #include <filesystem>  // for exists
 #include <future>
 #include <ranges>       // for ranges::*
 #include <span>         // for span
 #include <string_view>  // for string_view
+#include <sys/file.h>   // for flock, LOCK_EX, LOCK_NB
 #include <thread>       // for this_thread
 
 #include <fmt/core.h>
@@ -502,6 +504,33 @@ enum class InfoColor : std::uint8_t { Green,
     return InfoColor::Green;
 }
 
+// D4 (plan v1.30.0): the transient pacman-lock probe for the dynamic
+// warning banner — open the alpm db.lck read-only (works non-root on
+// the 0644 root-owned file; the fd comes via fopen/fileno — the same
+// read-only fd, chosen over the vararg POSIX open the plan sketched
+// because the pinned .clang-tidy flags the latter and the no-new-
+// NOLINT gate allows neither) and try a NON-BLOCKING exclusive flock:
+// any failure (EWOULDBLOCK — a pacman instance holds the lock) ⇒
+// "held" (conservative by design: a false positive is a nuisance, a
+// false negative is the bug), success ⇒ free (the test lock
+// self-releases microseconds later; a concurrent pacman starting
+// inside the window merely waits, never corrupts). A missing file
+// (open failure) ⇒ not held (degrades silently — the probe never
+// throws or prints). The ctor re-runs it once at startup (the
+// hidden-by-default banner's pinned state) and the 2 s timer re-runs
+// it periodically (update_pacman_lock_banner).
+bool pacman_lock_held() noexcept {
+    const auto lock_path = std::string{utils::alpm_libdir} + "db.lck";
+    FILE* file           = std::fopen(lock_path.c_str(), "r");
+    if (file == nullptr) {
+        return false;  // no file → not held
+    }
+    const int fd = ::fileno(file);
+    const int rc = ::flock(fd, LOCK_EX | LOCK_NB);
+    std::fclose(file);  // also closes the fd
+    return rc != 0;     // any failure → conservatively "held"
+}
+
 }  // namespace
 
 // D5 (plan v1.30.0): the resize-time ellipsis for the long-string labels —
@@ -588,6 +617,21 @@ MainWindow::MainWindow(QWidget* parent)
     // is the source of truth).
     m_driver_banner->hide();
     statusBar()->addPermanentWidget(m_driver_banner);
+
+    // D4 (plan v1.30.0): the dynamic pacman-lock warning banner — the
+    // hidden-by-default QLabel between the caption and the spacer (the
+    // .ui shape; no stylesheet there — the ctor owns it, the v1.29.0
+    // driver-banner + header code-side-styling precedent). Warning
+    // only: it never disables Execute (a transaction started against a
+    // locked DB fails cleanly inside pacman with the usual error
+    // dialog — the m_running guards are untouched).
+    m_ui->pacmanLockBanner->setStyleSheet(
+        "background: rgba(154,119,0,36); border: 1px solid rgba(154,119,0,120); border-radius: 6px; padding: 6px 10px;");
+    // The one initial call pins the banner state at startup (the 2 s
+    // poll below is the dynamism).
+    update_pacman_lock_banner();
+    connect(&m_pacman_lock_timer, &QTimer::timeout, this, &MainWindow::update_pacman_lock_banner);
+    m_pacman_lock_timer.start(2000);
 
     setAttribute(Qt::WA_NativeWindow);
     setWindowFlags(Qt::Window);  // for the close, min and max buttons
@@ -1514,6 +1558,15 @@ void MainWindow::show_driver_banner(const QString& text) {
     }
     m_driver_banner->setText(QCoreApplication::translate("MainWindow", qPrintable(text)));
     m_driver_banner->show();
+}
+
+// D4 (plan v1.30.0): show/hide the pacmanLockBanner per the file-local
+// pacman_lock_held() probe — the 2 s timer's slot, plus the one
+// initial ctor call (the pinned startup state). Warning only: the
+// banner owns no other state and never touches Execute (the lock
+// contention is pacman's own to report).
+void MainWindow::update_pacman_lock_banner() noexcept {
+    m_ui->pacmanLockBanner->setVisible(pacman_lock_held());
 }
 
 // D6 (plan v1.24.0): the "Browse…" flow — a folder picker whose default

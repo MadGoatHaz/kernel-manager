@@ -66,6 +66,16 @@
      </widget>
     </item>
     <item>
+     <widget class="QLabel" name="pacmanLockBanner">
+      <property name="visible">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string>A pacman instance is already running — this app won't work until it exits.</string>
+      </property>
+     </widget>
+    </item>
+    <item>
      <spacer name="horizontalSpacer_3">
       <property name="orientation">
        <enum>Qt::Orientation::Horizontal</enum>
