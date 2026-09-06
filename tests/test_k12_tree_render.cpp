@@ -93,6 +93,13 @@
 //       minimum (== the grid's sizeHint — the widgetResizable clipping
 //       fix), and the kernelInfoScroll band's vertical policy is
 //       AsNeeded.
+//   (9) The color hierarchy (plan v1.30.0 D2): the frame's styleSheet()
+//       equals the elevated card string exactly, the 15 keys carry the
+//       neutral tier (the frame's WindowText — the theme's primary
+//       text), and the 15 values carry one of the three tiers (the
+//       desaturated-sage green #5E8A6E, the degraded amber #9A7700, or
+//       the Mid light gray — the theme-adaptive base); every "—"
+//       (empty-value) label renders in the Mid tier.
 // The K12-DUMP row dump must be byte-stable across two runs (deterministic
 // order; the directory row dumps with the "folder" marker — checkbox rows
 // "checkbox", lock rows "lock"); run_k12.sh checks that. The post-refresh
@@ -137,11 +144,13 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QColor>
 #include <QFrame>
 #include <QGridLayout>
 #include <QLabel>
 #include <QLayout>
 #include <QMenu>
+#include <QPalette>
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QScrollArea>
@@ -640,6 +649,47 @@ int main(int argc, char** argv) {
     }
     check(kernel_info_scroll != nullptr && kernel_info_scroll->verticalScrollBarPolicy() == Qt::ScrollBarAsNeeded,
         "kernelInfoScroll vertical scrollBarPolicy() == AsNeeded (the dynamic band)");
+
+    // 6b3. The color hierarchy (plan v1.30.0 D2): the elevated card
+    //     stylesheet exactly, the 15 keys in the neutral tier (the
+    //     frame's WindowText — the theme's primary text), and the 15
+    //     values in one of the three tiers (the desaturated-sage green
+    //     #5E8A6E, the degraded amber #9A7700, or the Mid light gray —
+    //     the theme-adaptive base); every "—" (empty-value) label
+    //     renders in the Mid tier.
+    if (header_frame != nullptr) {
+        const QString card_sheet{"#kernelInfoHeader { background: rgba(127,127,127,40); border: 1px solid rgba(127,127,127,110); border-radius: 8px; }"};
+        check(header_frame->styleSheet() == card_sheet,
+            (std::string{"frame styleSheet() == the D2 elevated card string (got: " + header_frame->styleSheet().toStdString() + ")"}).c_str());
+
+        const QColor neutral{header_frame->palette().color(QPalette::WindowText)};
+        const QColor sage{0x5e, 0x8a, 0x6e};
+        const QColor amber{0x9a, 0x77, 0x00};
+        const QColor mid{header_frame->palette().color(QPalette::Mid)};
+        int key_labels   = 0;
+        int value_labels = 0;
+        for (auto* l : header_frame->findChildren<QLabel*>()) {
+            const std::string name{l->objectName().toStdString()};
+            if (name == "kiMainTitle" || name.rfind("kiTitle", 0) == 0) {
+                continue;  // the main title + the 5 section titles carry no tier
+            }
+            const QColor c{l->palette().color(QPalette::WindowText)};
+            const std::string rgb{std::to_string(c.red()) + "," + std::to_string(c.green()) + "," + std::to_string(c.blue())};
+            if (name.size() > 3 && name.compare(name.size() - 3, 3, "Key") == 0) {
+                ++key_labels;
+                check(c == neutral, (std::string{"key label " + name + " WindowText == the frame's WindowText (neutral tier, got rgb(" + rgb + "))"}).c_str());
+            } else {
+                ++value_labels;
+                check(c == sage || c == amber || c == mid,
+                    (std::string{"value label " + name + " WindowText is one of {sage #5E8A6E, amber #9A7700, Mid} (got rgb(" + rgb + "))"}).c_str());
+                if (l->text() == QStringLiteral("—")) {
+                    check(c == mid, (std::string{"value label " + name + " renders '—' in the Mid (light gray) tier (got rgb(" + rgb + "))"}).c_str());
+                }
+            }
+        }
+        check(key_labels == 15, "15 key labels found (the 36-label contract: 1 + 5 + 15 keys + 15 values)");
+        check(value_labels == 15, "15 value labels found (the 36-label contract: 1 + 5 + 15 keys + 15 values)");
+    }
 
     // 6c. The real click (the direct connection runs on_refresh
     //     synchronously: the shared progress dialog flashes "Initializing
