@@ -220,18 +220,22 @@ class MainWindow final : public QMainWindow {
     void build_change_list(QTreeWidgetItem* item) noexcept;
     void set_progress_dialog() noexcept;
     // The "Active Kernel Information" header builder (chunk 2, plan
-    // v1.28.0 D4; idempotent, plan v1.29.0 D3): one
+    // v1.28.0 D4; idempotent, plan v1.29.0 D3; the 3-column card reflow
+    // + color hierarchy, plan v1.30.0 D1/D2): one
     // kernel_info::extract_kernel_info() per call (the module caches its
     // expensive work per file, so a repeat call is a fast re-read, not a
-    // re-scan), then a 5-column grid on m_ui->kernelInfoHeader —
+    // re-scan), then a 3-column grid on m_ui->kernelInfoHeader —
     // 1 main title + 5 section titles + 15 key/value rows = 36 labels
-    // with deterministic objectNames, palette-coded value colors (the
-    // file-local info_color rule) and the system fixed font. Read-only:
-    // no signals, no interactive widgets. Idempotent: a repeat call
-    // (on_refresh — the second caller; the one-shot ctor call is the
-    // initial build) first tears down the previous grid + labels (the
-    // uic-owned frame survives) and re-renders them byte-identically
-    // (36 → 36, no duplication).
+    // with deterministic objectNames, neutral keys (the theme's primary
+    // text), a light-gray value base (the palette Mid), the
+    // desaturated-sage green and the degraded amber per the file-local
+    // info_color rule, and the system fixed font — over the elevated
+    // card stylesheet (the gray-alpha overlay + 1 px border + 8 px
+    // radius). Read-only: no signals, no interactive widgets.
+    // Idempotent: a repeat call (on_refresh — the second caller; the
+    // one-shot ctor call is the initial build) first tears down the
+    // previous grid + labels (the uic-owned frame survives) and
+    // re-renders them byte-identically (36 → 36, no duplication).
     void build_kernel_info_header() noexcept;
 };
 

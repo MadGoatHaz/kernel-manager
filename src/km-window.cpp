@@ -775,11 +775,14 @@ void MainWindow::set_progress_dialog() noexcept {
 // builder's end — the scroll area is widgetResizable, so without it the
 // 13-row card is squeezed to the 150 px band and clipped with no
 // scrollbar), and the band scrolls vertically as needed (the .ui's
-// AsNeeded policy). Styling per the brief: the frame's subtle
-// theme-neutral background + border, section titles bold +1 pt with a
-// bottom border, keys in the smaller mid-gray, and values in the system
-// fixed font color-coded by info_color (green active / yellow degraded /
-// gray off-or-unknown — an empty value renders "—" in gray). No signals,
+// AsNeeded policy). Styling per plan v1.30.0 D2: the elevated card
+// (the theme-neutral gray-alpha overlay + 1 px border + 8 px radius),
+// section titles bold +1 pt with a bottom border, keys in the smaller
+// neutral font (the theme's primary text — secondary by size, not by
+// color), and values in the system fixed font color-coded by
+// info_color (desaturated-sage green active / degraded amber / the Mid
+// light-gray off-or-unknown — an empty value renders "—" in the Mid
+// gray). No signals,
 // no interactive widgets — the header is informational only; the tree
 // below keeps all interaction.
 void MainWindow::build_kernel_info_header() noexcept {
@@ -815,11 +818,14 @@ void MainWindow::build_kernel_info_header() noexcept {
     // re-read — the per-file cache + the process-wide sample budget).
     const kernel_info::KernelInfo info = kernel_info::extract_kernel_info();
 
-    // The subtle background + border (plan D4/D6: the gray-alpha overlay is
-    // theme-neutral in light and dark) + the 800 px minimum width (the .ui
-    // carries it too — this keeps the intent visible in code).
+    // The elevated card (plan v1.30.0 D2: the gray-alpha overlay raised
+    // 26 → 40 so it reads as a panel, not a wash, the border alpha
+    // 64 → 110 for the 1 px subtle edge, the radius 4 → 8 px for the
+    // card shape; theme-neutral in light and dark, the v1.28.0 D4
+    // precedent) + the 800 px minimum width (the .ui carries it too —
+    // this keeps the intent visible in code).
     frame->setStyleSheet(QStringLiteral(
-        "#kernelInfoHeader { background: rgba(127,127,127,26); border: 1px solid rgba(127,127,127,64); border-radius: 4px; }"));
+        "#kernelInfoHeader { background: rgba(127,127,127,40); border: 1px solid rgba(127,127,127,110); border-radius: 8px; }"));
     frame->setMinimumWidth(800);
 
     auto* grid = new QGridLayout(frame);
@@ -848,10 +854,16 @@ void MainWindow::build_kernel_info_header() noexcept {
     }
     const QFont value_font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
 
-    // The value colors: green + yellow are fixed (no QPalette green role
-    // exists — the dark amber stays readable on light and dark); gray is
-    // the palette's Mid (the theme-adaptive secondary text).
-    const QColor green{0x2e, 0x7d, 0x32};
+    // The color hierarchy (plan v1.30.0 D2): green + yellow are fixed
+    // (no QPalette green role exists — both stay readable on light and
+    // dark over the card's overlay); gray is the palette's Mid (the
+    // theme-adaptive light-gray value base). Keys are neutral — the
+    // frame's WindowText, the theme's primary text (set at the
+    // key-palette site in add_row below; secondary by size, not by
+    // color). Tiers: desaturated-sage green #5E8A6E active; the
+    // degraded amber #9A7700 preserved (the brief-silence reading — it
+    // stands unchanged); the Mid light gray for off-or-unknown values.
+    const QColor green{0x5e, 0x8a, 0x6e};
     const QColor yellow{0x9a, 0x77, 0x00};
     const QColor gray = frame->palette().color(QPalette::Mid);
 
@@ -862,14 +874,16 @@ void MainWindow::build_kernel_info_header() noexcept {
     grid->addWidget(main_title, 0, 0, 1, 3);
 
     // One key/value row in (row, col): the nested [key, value] HBox — the
-    // key in the smaller gray font, the value in the fixed font
-    // color-coded by info_color (an empty value renders "—" in gray).
+    // key in the smaller neutral font (the frame's WindowText — the
+    // theme's primary text; secondary by size, not color), the value in
+    // the fixed font color-coded by info_color (an empty value renders
+    // "—" in the Mid gray).
     const auto add_row = [&](int row, int col, const QString& key_text, const QString& value_name, const std::string& value) {
         auto* key = new QLabel(key_text, frame);
         key->setObjectName(value_name + "Key");
         key->setFont(key_font);
         QPalette key_palette = key->palette();
-        key_palette.setColor(QPalette::WindowText, gray);
+        key_palette.setColor(QPalette::WindowText, frame->palette().color(QPalette::WindowText));
         key->setPalette(key_palette);
 
         const QString shown = value.empty() ? QStringLiteral("—") : QString::fromStdString(value);
