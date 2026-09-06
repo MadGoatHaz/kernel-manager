@@ -27,7 +27,7 @@
        <enum>Qt::ScrollBarPolicy::ScrollBarAsNeeded</enum>
       </property>
       <property name="verticalScrollBarPolicy">
-       <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+       <enum>Qt::ScrollBarPolicy::ScrollBarAsNeeded</enum>
       </property>
       <property name="widgetResizable">
        <bool>true</bool>
@@ -41,7 +41,7 @@
       <widget class="QFrame" name="kernelInfoHeader">
        <property name="minimumSize">
         <size>
-         <width>950</width>
+         <width>800</width>
          <height>0</height>
         </size>
        </property>

@@ -747,10 +747,11 @@ void MainWindow::set_progress_dialog() noexcept {
 }
 
 // The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4;
-// idempotent, plan v1.29.0 D3): the read-only, color-coded panel at the
-// top of the MainWindow showing the BOOTED kernel's parameters in 5
-// sections — Kernel & Toolchain, CPU Arch Target, Optimization & LTO,
-// Scheduling & Latency, Runtime Subsystems.
+// idempotent, plan v1.29.0 D3; the 3-column card reflow, plan v1.30.0
+// D1): the read-only, color-coded panel at the top of the MainWindow
+// showing the BOOTED kernel's parameters in 5 sections — Kernel &
+// Toolchain, CPU Arch Target, Optimization & LTO, Scheduling & Latency,
+// Runtime Subsystems.
 // The data is kernel_info::extract_kernel_info() — the booted kernel is
 // invariant while the app runs, and the module caches its expensive work
 // per file (the ≤ 8-sample disassembly budget is process-wide), so a
@@ -759,18 +760,28 @@ void MainWindow::set_progress_dialog() noexcept {
 // caller — the D3 teardown preamble below keeps a repeat call from
 // stacking a duplicate grid + labels). The uic-created QFrame
 // (m_ui->kernelInfoHeader, inside the kernelInfoScroll QScrollArea — the
-// first layout item) hosts a code-built QGridLayout: 1 main-title row
-// (column-span 5) + 1 section-title row + ≤ 4 key/value rows per column =
-// 36 labels (1 + 5 + 15 keys + 15 values), each with a deterministic
-// objectName (kiMainTitle, kiTitle1..5, ki<Section><Key> / …Key) so a test
-// driver can address them. Styling per the brief: the frame's subtle
-// theme-neutral background + border, a ≈ 950 px minimum width (5 × ~190;
-// narrower windows scroll horizontally via the QScrollArea), section
-// titles bold +1 pt with a bottom border, keys in the smaller mid-gray,
-// and values in the system fixed font color-coded by info_color (green
-// active / yellow degraded / gray off-or-unknown — an empty value renders
-// "—" in gray). No signals, no interactive widgets — the header is
-// informational only; the tree below keeps all interaction.
+// first layout item) hosts a code-built QGridLayout: three equal-stretch
+// columns (no per-column minimum — the 800 px frame minimum is the only
+// width floor; below it the band scrolls horizontally as needed) laid
+// out by the section-major 13-row placement map of plan v1.30.0 D1 —
+// row 0 the kiMainTitle (span 3), then per section a span-3 title row +
+// its key/value cells in rows of 3 (Release/BuildDate/Compiler,
+// TargetArch/IsaLevel/IsaValidation, Lto/Optimization, TickRate/
+// SchedExt/Preemption, Mglru/Thp/TcpCongestion/Clocksource) = 36 labels
+// (1 + 5 + 15 keys + 15 values), each with a deterministic objectName
+// (kiMainTitle, kiTitle1..5, ki<Section><Key> / …Key) so a test driver
+// can address them. The card keeps its natural height: the frame's
+// minimum is pinned to the grid's sizeHint (the load-bearing line at the
+// builder's end — the scroll area is widgetResizable, so without it the
+// 13-row card is squeezed to the 150 px band and clipped with no
+// scrollbar), and the band scrolls vertically as needed (the .ui's
+// AsNeeded policy). Styling per the brief: the frame's subtle
+// theme-neutral background + border, section titles bold +1 pt with a
+// bottom border, keys in the smaller mid-gray, and values in the system
+// fixed font color-coded by info_color (green active / yellow degraded /
+// gray off-or-unknown — an empty value renders "—" in gray). No signals,
+// no interactive widgets — the header is informational only; the tree
+// below keeps all interaction.
 void MainWindow::build_kernel_info_header() noexcept {
     auto* frame = m_ui->kernelInfoHeader;
     if (frame == nullptr) {
@@ -805,18 +816,18 @@ void MainWindow::build_kernel_info_header() noexcept {
     const kernel_info::KernelInfo info = kernel_info::extract_kernel_info();
 
     // The subtle background + border (plan D4/D6: the gray-alpha overlay is
-    // theme-neutral in light and dark) + the ≈ 950 px minimum width (the
-    // .ui carries it too — this keeps the intent visible in code).
+    // theme-neutral in light and dark) + the 800 px minimum width (the .ui
+    // carries it too — this keeps the intent visible in code).
     frame->setStyleSheet(QStringLiteral(
         "#kernelInfoHeader { background: rgba(127,127,127,26); border: 1px solid rgba(127,127,127,64); border-radius: 4px; }"));
-    frame->setMinimumWidth(950);
+    frame->setMinimumWidth(800);
 
     auto* grid = new QGridLayout(frame);
     grid->setContentsMargins(10, 8, 10, 8);
     grid->setHorizontalSpacing(14);
     grid->setVerticalSpacing(4);
-    for (int col = 0; col < 5; ++col) {
-        grid->setColumnMinimumWidth(col, 190);
+    for (int col = 0; col < 3; ++col) {
+        grid->setColumnStretch(col, 1);
     }
 
     // The label fonts: the keys derive from the window's base font one
@@ -844,11 +855,11 @@ void MainWindow::build_kernel_info_header() noexcept {
     const QColor yellow{0x9a, 0x77, 0x00};
     const QColor gray = frame->palette().color(QPalette::Mid);
 
-    // The main title (row 0, column-span 5, bold).
+    // The main title (row 0, column-span 3, bold).
     auto* main_title = new QLabel(tr("Active Kernel Information"), frame);
     main_title->setObjectName(QStringLiteral("kiMainTitle"));
     main_title->setFont(section_font);
-    grid->addWidget(main_title, 0, 0, 1, 5);
+    grid->addWidget(main_title, 0, 0, 1, 3);
 
     // One key/value row in (row, col): the nested [key, value] HBox — the
     // key in the smaller gray font, the value in the fixed font
@@ -884,50 +895,61 @@ void MainWindow::build_kernel_info_header() noexcept {
         grid->addLayout(cell, row, col);
     };
 
-    // One section title (row 1, the column's header): bold +1 pt with the
-    // subtle bottom border.
-    const auto add_section_title = [&](int col, const QString& title, const QString& name) {
+    // One section title (a dedicated row, spanning all 3 columns): bold
+    // +1 pt with the subtle bottom border.
+    const auto add_section_title = [&](int row, const QString& title, const QString& name) {
         auto* section_title = new QLabel(title, frame);
         section_title->setObjectName(name);
         section_title->setFont(section_font);
         section_title->setStyleSheet(QStringLiteral("border-bottom: 1px solid rgba(127,127,127,90);"));
-        grid->addWidget(section_title, 1, col);
+        grid->addWidget(section_title, row, 0, 1, 3);
     };
 
     // 1 — Kernel & Toolchain.
-    add_section_title(0, tr("Kernel & Toolchain"), QStringLiteral("kiTitle1"));
+    add_section_title(1, tr("Kernel & Toolchain"), QStringLiteral("kiTitle1"));
     add_row(2, 0, tr("Release"), QStringLiteral("kiKtRelease"), info.release);
-    add_row(3, 0, tr("Build date"), QStringLiteral("kiKtBuildDate"), info.build_date);
-    add_row(4, 0, tr("Compiler"), QStringLiteral("kiKtCompiler"), info.compiler);
+    add_row(2, 1, tr("Build date"), QStringLiteral("kiKtBuildDate"), info.build_date);
+    add_row(2, 2, tr("Compiler"), QStringLiteral("kiKtCompiler"), info.compiler);
 
     // 2 — CPU Arch Target.
-    add_section_title(1, tr("CPU Arch Target"), QStringLiteral("kiTitle2"));
-    add_row(2, 1, tr("Target arch"), QStringLiteral("kiCtTargetArch"), info.target_arch);
-    add_row(3, 1, tr("ISA level"), QStringLiteral("kiCtIsaLevel"), info.isa_level);
-    add_row(4, 1, tr("ISA validation"), QStringLiteral("kiCtIsaValidation"), info.instruction_validation);
+    add_section_title(3, tr("CPU Arch Target"), QStringLiteral("kiTitle2"));
+    add_row(4, 0, tr("Target arch"), QStringLiteral("kiCtTargetArch"), info.target_arch);
+    add_row(4, 1, tr("ISA level"), QStringLiteral("kiCtIsaLevel"), info.isa_level);
+    add_row(4, 2, tr("ISA validation"), QStringLiteral("kiCtIsaValidation"), info.instruction_validation);
 
     // 3 — Optimization & LTO.
-    add_section_title(2, tr("Optimization & LTO"), QStringLiteral("kiTitle3"));
-    add_row(2, 2, tr("LTO"), QStringLiteral("kiOlLto"), info.lto_status);
-    add_row(3, 2, tr("Optimization"), QStringLiteral("kiOlOptimization"), info.optimization_flag);
+    add_section_title(5, tr("Optimization & LTO"), QStringLiteral("kiTitle3"));
+    add_row(6, 0, tr("LTO"), QStringLiteral("kiOlLto"), info.lto_status);
+    add_row(6, 1, tr("Optimization"), QStringLiteral("kiOlOptimization"), info.optimization_flag);
 
     // 4 — Scheduling & Latency.
-    add_section_title(3, tr("Scheduling & Latency"), QStringLiteral("kiTitle4"));
-    add_row(2, 3, tr("Tick rate"), QStringLiteral("kiSlTickRate"), info.tick_rate);
-    add_row(3, 3, tr("sched_ext"), QStringLiteral("kiSlSchedExt"), info.sched_ext);
-    add_row(4, 3, tr("Preemption"), QStringLiteral("kiSlPreemption"), info.preemption_model);
+    add_section_title(7, tr("Scheduling & Latency"), QStringLiteral("kiTitle4"));
+    add_row(8, 0, tr("Tick rate"), QStringLiteral("kiSlTickRate"), info.tick_rate);
+    add_row(8, 1, tr("sched_ext"), QStringLiteral("kiSlSchedExt"), info.sched_ext);
+    add_row(8, 2, tr("Preemption"), QStringLiteral("kiSlPreemption"), info.preemption_model);
 
     // 5 — Runtime Subsystems.
-    add_section_title(4, tr("Runtime Subsystems"), QStringLiteral("kiTitle5"));
-    add_row(2, 4, tr("MGLRU"), QStringLiteral("kiOsMglru"), info.mglru);
-    add_row(3, 4, tr("THP"), QStringLiteral("kiOsThp"), info.thp);
-    add_row(4, 4, tr("TCP congestion"), QStringLiteral("kiOsTcpCongestion"), info.tcp_congestion);
-    add_row(5, 4, tr("Clocksource"), QStringLiteral("kiOsClocksource"), info.clocksource);
+    add_section_title(9, tr("Runtime Subsystems"), QStringLiteral("kiTitle5"));
+    add_row(10, 0, tr("MGLRU"), QStringLiteral("kiOsMglru"), info.mglru);
+    add_row(10, 1, tr("THP"), QStringLiteral("kiOsThp"), info.thp);
+    add_row(10, 2, tr("TCP congestion"), QStringLiteral("kiOsTcpCongestion"), info.tcp_congestion);
+    add_row(11, 0, tr("Clocksource"), QStringLiteral("kiOsClocksource"), info.clocksource);
 
     // The frame's 150 px-tall slack (the .ui maximumSize) is absorbed by an
     // invisible stretch row below the last value row, so the grid rows stay
     // compact and top-anchored instead of stretching unevenly.
-    grid->setRowStretch(6, 1);
+    grid->setRowStretch(12, 1);
+
+    // The natural-height minimum (plan v1.30.0 D1 — the load-bearing line):
+    // the scroll area is widgetResizable, so it resizes the frame to the
+    // viewport — with the frame's minimum height at 0 a 13-row card is
+    // squeezed to the 150 px band and clipped with no scrollbar (the
+    // resize rule is qMax(viewport, minimumSize), not the sizeHint).
+    // Pinning the minimum to the grid's sizeHint keeps the card at its
+    // natural height, makes the band scroll vertically as needed, and
+    // re-computes on every idempotent rebuild (the new grid's sizeHint is
+    // the source of truth).
+    frame->setMinimumHeight(grid->sizeHint().height());
 }
 
 void MainWindow::check_uncheck_item() noexcept {
