@@ -43,6 +43,7 @@
 #include "conf-window.hpp"
 #include "driver_gate.hpp"
 #include "kernel.hpp"
+#include "kernel_info.hpp"
 #include "utils.hpp"
 
 #ifdef WITH_SCX_MANAGER
@@ -174,6 +175,13 @@ class MainWindow final : public QMainWindow {
     // driver-gate decline, hidden on a successful migration.
     QLabel* m_driver_banner = nullptr;
 
+    // The "Active Kernel Information" header (chunk 2, plan v1.28.0 D4):
+    // the uic-created QFrame (m_ui->kernelInfoHeader, inside the
+    // kernelInfoScroll QScrollArea — the first layout item). Aliased here
+    // so the builder (build_kernel_info_header) and any future refresh path
+    // address the same widget directly.
+    QFrame* m_kernel_info_header = nullptr;
+
     QThread* m_worker_th = new QThread(this);
     Work* m_worker{nullptr};
 
@@ -191,6 +199,14 @@ class MainWindow final : public QMainWindow {
 
     void build_change_list(QTreeWidgetItem* item) noexcept;
     void set_progress_dialog() noexcept;
+    // The "Active Kernel Information" header builder (chunk 2, plan
+    // v1.28.0 D4): one kernel_info::extract_kernel_info() per session,
+    // then a 5-column grid on m_ui->kernelInfoHeader — 1 main title +
+    // 5 section titles + 15 key/value rows = 36 labels with
+    // deterministic objectNames, palette-coded value colors (the
+    // file-local info_color rule) and the system fixed font. Read-only:
+    // no signals, no interactive widgets.
+    void build_kernel_info_header() noexcept;
 };
 
 #endif  // MAINWINDOW_HPP_
