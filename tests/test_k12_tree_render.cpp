@@ -21,9 +21,9 @@
 // "Install from directory…" pseudo-row (C3, plan v1.24.0 — the appended
 // 25th row: non-interactive folder-glyph QLabel, no checkbox, the D1
 // tooltips, plus the menu probes below), the instruction panel (plan
-// v1.29.0 D5 — the five-line HTML text above the tree: the four
-// pre-existing lines verbatim + the manual Refresh line, the <p>
-// count == 5, and the pre-v1.28.0 vague line still absent), and the
+// v1.30.0 D3 — the single <p> caption above the tree: merged intro
+// + execute sentence, the Execute tooltip's install/uninstall +
+// refresh, <p> count == 1, the four removed lines absent), and the
 // Refresh button (plan v1.29.0 D6 — the bottom-row placement contract,
 // a real click driving the guarded manual re-scan: the shared progress
 // dialog, the tree rebuild, the D4 stale-row purge, and the idempotent
@@ -166,7 +166,6 @@
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QScrollArea>
-#include <QStringList>
 #include <QTimer>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
@@ -284,48 +283,60 @@ int main(int argc, char** argv) {
     check(tree->topLevelItemCount() > 0, "rows landed in the tree (timeout-guarded)");
 
     // ------------------------------------------------------------------
-    // 2b. The instruction panel (plan v1.29.0 D5): the static HTML
-    //     label above the tree — five <p> lines in the plan's order:
-    //     the four pre-existing lines verbatim + the new manual
-    //     Refresh line (it names the ACTUAL button text, the D5
-    //     contract), the <p> count == 5 (one per line), and the
-    //     pre-v1.28.0 vague line ("using the checkboxes on the
-    //     leftmost column") still absent (the v1.28.0 assertion
-    //     carried).
+    // 2b. The instruction panel (plan v1.30.0 D3): the static HTML
+    //     label above the tree — a single <p> caption (the merged
+    //     intro + execute sentence), the <p> count == 1 (the
+    //     single-caption contract), the four removed lines absent
+    //     (the auto-refresh sentence, the manual Refresh line, the
+    //     pacman warning, the old execute-line form), and the
+    //     secondary semantics now on the button tooltips: the
+    //     Execute tooltip non-empty with the install/uninstall +
+    //     auto-refresh note, the Refresh tooltip's "Re-scan" line
+    //     unchanged (no-regression guard).
     // ------------------------------------------------------------------
     auto* instruction = window.findChild<QLabel*>("label");
     check(instruction != nullptr, "the instruction 'label' exists on the real MainWindow");
     if (instruction != nullptr) {
         const QString text = instruction->text();
-        // The five lines, in the plan's order. Each search starts at
-        // the end of the previously found line, so both presence and
-        // relative order are asserted (a missing line fails its own
-        // check; later lines are still searched from the same pos).
-        const QStringList lines{
-            QStringLiteral("Below is a list of installed and available Linux kernels."),
-            QStringLiteral("Check a kernel and press Execute to install it (or keep it installed). Uncheck an installed kernel and press Execute to uninstall it."),
-            QStringLiteral("After each execution the list refreshes automatically — removed kernels disappear from the view."),
-            QStringLiteral("Press Refresh any time to re-scan the list and clear greyed-out built or folder kernels."),
-            QStringLiteral("This app won't work if you are already running a pacman instance.")};
-        qsizetype pos = 0;
-        for (const auto& line : lines) {
-            const qsizetype found = text.indexOf(line, pos);
-            check(found >= pos, (std::string{"instruction line present in order: " + line.left(48).toStdString() + "…"}).c_str());
-            if (found >= pos) {
-                pos = found + line.size();
-            }
-        }
-        // The <p> count == 5 (exactly one opening tag per line — no
-        // stray paragraph; the closing </p> tags cannot match "<p>").
+        // The single caption: the merged intro sentence + the merged
+        // execute clause (one paragraph, the D3 contract).
+        check(text.contains("Below is a list of installed and available Linux kernels"),
+            "caption carries the intro sentence");
+        check(text.contains("uncheck an installed kernel"),
+            "caption carries the merged execute clause (uncheck an installed kernel)");
+        // The <p> count == 1 (exactly one paragraph — the
+        // single-caption contract; the closing </p> tags cannot
+        // match "<p>").
         qsizetype p_count = 0;
         for (qsizetype p = 0; (p = text.indexOf("<p>", p)) != -1; p += 3) {
             ++p_count;
         }
-        check(p_count == 5, (std::string{"instruction <p> count == 5 (got " + std::to_string(p_count) + ")"}).c_str());
-        // The pre-v1.28.0 vague line is gone (the v1.28.0 assertion
-        // carried).
-        check(!text.contains("using the checkboxes on the leftmost column"), "the old vague line (leftmost column checkboxes) is absent");
+        check(p_count == 1, (std::string{"instruction <p> count == 1 (got " + std::to_string(p_count) + ")"}).c_str());
+        // The four removed lines are gone from the caption (their
+        // semantics moved to the button tooltips below).
+        check(!text.contains("After each execution the list refreshes automatically"),
+            "caption: the auto-refresh sentence is absent");
+        check(!text.contains("Press Refresh any time to re-scan"),
+            "caption: the manual Refresh line is absent");
+        check(!text.contains("This app won't work if you are already running a pacman instance"),
+            "caption: the pacman warning line is absent");
+        check(!text.contains("Check a kernel and press Execute to install it (or keep it installed)"),
+            "caption: the old execute-line form is absent");
     }
+    // The Execute button's new tooltip (plan v1.30.0 D3): non-empty
+    // and carrying both the install/uninstall semantics and the
+    // auto-refresh note.
+    auto* ok_button = window.findChild<QPushButton*>("ok");
+    check(ok_button != nullptr, "the Execute button exists (objectName 'ok')");
+    check(ok_button != nullptr && !ok_button->toolTip().isEmpty(), "ok button tooltip is non-empty");
+    check(ok_button != nullptr && ok_button->toolTip().contains("uninstall")
+            && ok_button->toolTip().contains("refreshes automatically"),
+        "ok button tooltip carries 'uninstall' + 'refreshes automatically'");
+    // The Refresh tooltip is unchanged (no-regression guard — the
+    // full assertion lives in section 6a).
+    auto* refresh_button_2b = window.findChild<QPushButton*>("refresh");
+    check(refresh_button_2b != nullptr && refresh_button_2b->toolTip().contains("Re-scan"),
+        "refresh button tooltip still carries 'Re-scan' (unchanged)");
 
     // ------------------------------------------------------------------
     // 3. Row-level assertions (mapped by the PkgName text).
