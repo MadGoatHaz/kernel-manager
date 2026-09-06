@@ -12,15 +12,15 @@
 #   tags (incl. v1.19.0) package the WRONG (CachyOS-branded) content and are
 #   not used.
 #
-#   The stable source below is pinned to the v1.30.0 release: the
-#   version-bump commit debe3512c (`release: bump version to 1.30.0`) is the
-#   TAG TARGET (the annotated tag v1.30.0 sits on it) and the `_commit` this
+#   The stable source below is pinned to the v1.30.1 release: the
+#   version-bump commit fed562c9a (`release: bump version to 1.30.1`) is the
+#   TAG TARGET (the annotated tag v1.30.1 sits on it) and the `_commit` this
 #   package fetches. Because `_commit` points at the version-bump commit
 #   (not at this re-pin), the archived source is a stable, non-circular
-#   snapshot. The v1.30.0 cycle: the UI/UX overhaul — the elevated
-#   kernel-info card (3-column grid, desaturated-sage color hierarchy), the
-#   single-caption instruction panel, the dynamic pacman-lock banner, the
-#   830 px window minimum + text ellipsis with tooltips.
+#   snapshot. The v1.30.1 cycle: UI polish — the kernel-info header unified
+#   into a single 4×4 grid (the Release hero spanning columns 1–2, Compiler
+#   and Arch anchored to columns 3–4) and the compact build-date format
+#   (`Mon DD, YYYY HH:MM`, the SMP/PREEMPT prefix dropped).
 #
 #   RELEASE PROCEDURE (v1.30.x and later):
 #     1. Bump the CMake VERSION — the version-bump commit is the tag target.
@@ -33,9 +33,8 @@
 #        `gh --repo MadGoatHaz/kernel-manager` (ALWAYS pass --repo — from
 #        this directory `gh` infers the upstream CachyOS/kernel-manager and
 #        404s / runs against the wrong repo).
-#   The pending v1.30.1 cut (the 4x4 kernel-info grid unification + the
-#   compact build-date format on main @ e845dd4) follows exactly this
-#   procedure and re-pins this file to v1.30.1's version-bump commit.
+#   Each subsequent cut (v1.30.2 and later) follows exactly this procedure
+#   and re-pins this file to the new version-bump commit.
 #
 # --------------------------------------------------------------------------
 # DEPENDENCIES  (verified against `ldd` on the built binary + the CMake build)
@@ -83,7 +82,7 @@
 #   conflict + provide make it drop-in replace the CachyOS package cleanly.
 
 pkgname=kernel-manager
-pkgver=1.30.0
+pkgver=1.30.1
 pkgrel=1
 pkgdesc="Qt6 GUI for kernel configuration, compilation, and sched-ext (BPF) scheduler management"
 arch=(x86_64)
@@ -100,11 +99,11 @@ makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polki
 # Defensive polkit reload so the shipped policy is picked up on (re)install.
 install=kernel-manager.install
 
-# Pinned v1.30.0 release commit (the version-bump commit, one before the
-# v1.30.0 tag — see the VERSIONING note above).
-_commit=debe3512c412cffa881770fbbb9ed9fd924b3eba
+# Pinned v1.30.1 release commit (the version-bump commit, one before the
+# v1.30.1 tag — see the VERSIONING note above).
+_commit=fed562c9a04cc84efb83abaf1f75bd7eba1fe840
 source=("https://github.com/MadGoatHaz/kernel-manager/archive/${_commit}.tar.gz")
-sha256sums=("96aa20ae6a55c75b34dc9d2fcc05a1e8d61b66f7a9c4aeaf9f02f35c079b0865")
+sha256sums=("f0a3396ae91e3e029057a37b51b4aa239f830ae1af166a59b9c4f7fd9e9f1bf5")
 
 # GitHub archive top dir for a commit is `<repo>-<full-sha>`.
 _srcdir="kernel-manager-${_commit}"
