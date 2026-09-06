@@ -374,11 +374,89 @@ namespace {
         return std::string{tool} + " " + version;
     }
 
-    // The date portion of a `uname -v` value: the string starts with the SMP/
-    // PREEMPT build flags ("#1 SMP PREEMPT_DYNAMIC ...") and the date always
-    // begins with a day-of-week abbreviation, so take the substring from the
-    // first such token on; if the format is unexpected (none found), degrade
-    // to the full trimmed value (never emptier than the input).
+    // Token-shape guards for the build-date reformat (each token is
+    // validated before any slicing — an unexpected shape degrades to the
+    // original string, never to something emptier).
+    [[nodiscard]] bool all_digits(std::string_view s, std::size_t n) {
+        if (s.size() != n) {
+            return false;
+        }
+        for (const char c : s) {
+            if (!std::isdigit(static_cast<unsigned char>(c))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    [[nodiscard]] bool all_alpha(std::string_view s, std::size_t n) {
+        if (s.size() != n) {
+            return false;
+        }
+        for (const char c : s) {
+            if (!std::isalpha(static_cast<unsigned char>(c))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // The compact display form of the build date: "Mon DD, YYYY HH:MM"
+    // (e.g. "Thu, 03 Sep 2026 21:56:27 +0000" => "Sep 03, 2026 21:56")
+    // — the day-of-week prefix is dropped, the day reordered ahead of
+    // the month with a comma, and the seconds + the UTC offset dropped.
+    // The shape is validated token by token (a 2-digit day, a 3-letter
+    // month, a 4-digit year, and an HH:MM:SS clock after an optional
+    // leading "Thu," day-of-week token); if any token is unexpected the
+    // ORIGINAL string is returned (graceful degradation).
+    [[nodiscard]] std::string shorten_build_date(std::string_view date_portion) {
+        const std::string_view s = trim(date_portion);
+        std::vector<std::string_view> tokens{};
+        std::size_t pos = 0;
+        while (pos < s.size()) {
+            while (pos < s.size() && s.at(pos) == ' ') {
+                ++pos;
+            }
+            if (pos >= s.size()) {
+                break;
+            }
+            const std::size_t end = s.find(' ', pos);
+            tokens.emplace_back((end == std::string_view::npos) ? s.substr(pos) : s.substr(pos, end - pos));
+            if (end == std::string_view::npos) {
+                break;
+            }
+            pos = end + 1;
+        }
+        // An optional leading day-of-week token ("Thu," — the 4-char
+        // comma form; a bare 3-letter token is not a day and simply
+        // fails the checks below).
+        std::size_t i = 0;
+        if (i < tokens.size() && tokens.at(i).size() == 4 && tokens.at(i).at(3) == ',' && all_alpha(tokens.at(i).substr(0, 3), 3)) {
+            ++i;
+        }
+        if (tokens.size() - i < 4) {
+            return std::string{s};  // unexpected shape → the original
+        }
+        const std::string_view dd    = tokens.at(i);
+        const std::string_view mon   = tokens.at(i + 1);
+        const std::string_view yyyy  = tokens.at(i + 2);
+        const std::string_view clock = tokens.at(i + 3);
+        const bool clock_ok          = clock.size() == 8 && clock.at(2) == ':' && clock.at(5) == ':'
+            && all_digits(clock.substr(0, 2), 2) && all_digits(clock.substr(3, 2), 2) && all_digits(clock.substr(6, 2), 2);
+        if (!all_digits(dd, 2) || !all_alpha(mon, 3) || !all_digits(yyyy, 4) || !clock_ok) {
+            return std::string{s};  // unexpected shape → the original
+        }
+        return std::string{mon} + " " + std::string{dd} + ", " + std::string{yyyy} + " " + std::string{clock.substr(0, 5)};
+    }
+
+    // The compact build date for the header: the `uname -v` value starts
+    // with the SMP/PREEMPT build flags ("#1 SMP PREEMPT_DYNAMIC ...") and
+    // the date always begins with a day-of-week abbreviation, so take the
+    // substring from the first such token on, then shorten it to the
+    // "Mon DD, YYYY HH:MM" display form (the day-of-week prefix, the
+    // seconds, and the UTC offset dropped); if no token is found, degrade
+    // to the full trimmed value (never emptier than the input) and
+    // shorten that too.
     [[nodiscard]] std::string build_date_from_uname_v(std::string_view uname_v) {
         const std::string_view full                = trim(uname_v);
         const std::array<std::string_view, 7> dows = {"Mon, ", "Tue, ", "Wed, ", "Thu, ", "Fri, ", "Sat, ", "Sun, "};
@@ -388,7 +466,8 @@ namespace {
                 pos = found;
             }
         }
-        return std::string{trim(pos == std::string::npos ? full : full.substr(pos))};
+        const std::string_view date_portion = (pos == std::string::npos) ? full : full.substr(pos);
+        return shorten_build_date(date_portion);
     }
 
     // The bracketed token of a sysfs multi-option value ("always [madvise]
@@ -629,7 +708,7 @@ KernelInfo extract_kernel_info(const KernelInfoProbe& probe) {
 
     // Kernel & Toolchain.
     info.release    = std::string{trim(ask_str(probe.uname_r))};
-    info.build_date = build_date_from_uname_v(ask_str(probe.uname_v));  // date portion (SMP/PREEMPT flags stripped)
+    info.build_date = build_date_from_uname_v(ask_str(probe.uname_v));  // "Mon DD, YYYY HH:MM" (SMP/PREEMPT flags + day-of-week + seconds + UTC offset stripped)
     info.compiler   = detect_compiler(ask_str(probe.proc_version));
 
     // CPU Arch Target (kconfig-derived; gated on a non-empty config).
