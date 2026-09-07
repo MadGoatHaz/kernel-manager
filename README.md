@@ -156,6 +156,27 @@ cmake --build build -j$(nproc)
 
 `scx-manager` ships in the CachyOS repository and is available via the AUR on generic Arch; it is declared as an optional dependency (`optdepends`) in the package builds.
 
+## Known Issues
+
+### clang 22.1.8 thin-LTO kernel build crash
+
+As of **2026-09-07**, building a kernel with **clang 22.1.8** and **thin LTO** (`-flto=thin -fsplit-lto-unit`) can crash clang mid-build:
+
+```
+free(): invalid next size (normal)
+clang: error: clang frontend command failed with exit code 139
+```
+
+**This is a confirmed bug in clang 22.1.8** (heap corruption in the constant-expression evaluator during CFG construction for analysis-based warnings, triggered by complex macro expansions such as XFS tracepoints evaluated under LTO), **not a defect in kernel-manager** — your build configuration and kernel source are fine.
+
+**Workarounds:**
+
+- Use a stable clang release (19 or 20) — select it in kernel-manager's Compiler config, or build with `make CC=clang-19`
+- Use GCC, which handles thin LTO without this issue — `make CC=gcc`
+- File a bug with LLVM: <https://github.com/llvm/llvm-project/issues> — attach the preprocessed source and the run script clang writes to `/tmp/` before crashing
+
+The issue is tracked against the clang 22.1.8 release and is expected to be resolved in a subsequent point release.
+
 ## Development
 
 **Build from source** (see [Installing](#from-source)):

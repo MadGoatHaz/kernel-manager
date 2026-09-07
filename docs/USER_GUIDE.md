@@ -188,6 +188,25 @@ The 21 maintained variants, each mapped to its own build source:
 - **New kernel not in the boot menu** — right-click the row → **Show boot instructions**; on GRUB systems run `sudo grub-mkconfig -o /boot/grub/grub.cfg`.
 - **The "sched-ext scheduler config" button is missing** — it appears only when the booted kernel supports sched_ext *and* the app was built with `scx-manager` support; install `scx-manager` (CachyOS repo or AUR) and rebuild/reinstall.
 
+### Known Issue: clang 22.1.8 Thin-LTO Build Crash
+
+If you are building a kernel with **clang 22.1.8** and **thin LTO** (`-flto=thin -fsplit-lto-unit`) — e.g. a CachyOS or TKG kernel with LTO set to `thin` — the build may crash with:
+
+```
+free(): invalid next size (normal)
+clang: error: clang frontend command failed with exit code 139
+```
+
+**This is a confirmed bug in clang 22.1.8** (as of **2026-09-07**), **not a defect in kernel-manager**: heap corruption in the constant-expression evaluator during CFG construction for analysis-based warnings, triggered by complex macro expansions (e.g. XFS tracepoints) evaluated under LTO. Your build configuration and kernel source are fine.
+
+**Workarounds:**
+
+- Use a stable clang release (19 or 20): select it in kernel-manager's Compiler config, or build with `make CC=clang-19`
+- Use GCC (it handles thin LTO without this issue): `make CC=gcc`
+- Report it to LLVM: <https://github.com/llvm/llvm-project/issues> — attach the preprocessed source and the run script that clang writes to `/tmp/` before crashing
+
+This issue is tracked against the clang 22.1.8 release and is expected to be resolved in a subsequent point release.
+
 ## Privacy & Security
 
 - **No data is collected.** Everything the app reads is local: `/proc`, `/sys`, the pacman databases, and `/etc/os-release`. There is no telemetry, no phone-home, and no network activity except what the operations themselves require — pacman repo syncs, `git` clones of build sources, and `paru`/AUR lookups for AUR builds.
