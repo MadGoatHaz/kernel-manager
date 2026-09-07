@@ -45,3 +45,8 @@ config-option-lib/target
 Work/
 # Per-cycle planning docs — local-only (plans/PLAN.md rides the worktree, never uploaded)
 plans/
+
+# Local dev artifacts + scratch docs (never uploaded)
+compile_flags.txt
+DEV_LOG.md
+rebuild and install.md

@@ -238,12 +238,12 @@ install(
 )
 
 install(
-    FILES org.archlinux.kernel-manager.pkexec.policy
+    FILES packaging/org.archlinux.kernel-manager.pkexec.policy
    DESTINATION "${POLKITQT-1_POLICY_FILES_INSTALL_DIR}"
 )
 
 install(
-    FILES org.archlinux.KernelManager.desktop
+    FILES packaging/org.archlinux.KernelManager.desktop
    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
 )
 install(
