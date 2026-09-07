@@ -9,6 +9,8 @@ Build and install custom Linux kernels on Arch — from a clean Qt6 desktop app.
 
 Pick a kernel, choose your build options, hit install. kernel-manager builds it (`makepkg`) and installs it (`pacman -U`); your distro's own hooks handle the rest — DKMS drivers, initramfs, bootloader entry. 21 kernel variants supported across official Arch, CachyOS, and community repos.
 
+📖 **[Full User Guide](docs/USER_GUIDE.md)** — detailed feature reference, usage, and troubleshooting.
+
 ## Screenshots
 
 ![kernel-manager screenshot](img/Screenshot.png)
