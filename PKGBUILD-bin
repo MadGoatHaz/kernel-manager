@@ -67,12 +67,13 @@ install=kernel-manager.install
 # root, so a plain extraction into $pkgdir yields the FHS tree.
 source=("https://github.com/MadGoatHaz/kernel-manager/releases/download/v${pkgver}/kernel-manager-${pkgver}-x86_64.tar.zst")
 
-# PENDING_BACKFILL: the sha256 is pinned via the project's standing
-# double-fetch discipline (source PKGBUILD:27-30; Work/Docs/AUR_PACKAGING.md:9)
-# AFTER the v1.30.1 workflow_dispatch backfill build uploads the release
-# assets (plan §3 Step 7 item 3: fetch twice, cmp byte-identical, record).
-# Do not publish this PKGBUILD until the placeholder is replaced.
-sha256sums=("PENDING_BACKFILL_double_fetch_after_release_bin_v1.30.1_backfill")
+# Pinned via the project's standing double-fetch discipline (source
+# PKGBUILD:27-30; Work/Docs/AUR_PACKAGING.md:9) after the v1.30.1
+# workflow_dispatch backfill build (run 34516661858, 2026-09-10) uploaded
+# the release assets (plan §3 Step 7 item 3: fetch twice, cmp byte-identical,
+# record). Re-pin per release (plan §3 Step 7 item 3) after each backfill
+# build publishes a new asset.
+sha256sums=("39ebaad131e281f631fa84d82dd23b9ea3c26a973b8825d56974c0cd9c6fa840")
 
 package() {
   # The tarball's root is `usr/`, so a plain extraction into $pkgdir
