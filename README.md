@@ -5,6 +5,7 @@ Build and install custom Linux kernels on Arch — from a clean Qt6 desktop app.
 [![Build](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/build.yml/badge.svg)](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/build.yml)
 [![Checks](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/checks.yml/badge.svg)](https://github.com/MadGoatHaz/kernel-manager/actions/workflows/checks.yml)
 [![AUR version](https://img.shields.io/aur/v/kernel-manager.svg)](https://aur.archlinux.org/packages/kernel-manager)
+[![AUR version](https://img.shields.io/badge/AUR-kernel--manager--bin--1.30.1--1-blue.svg)](https://aur.archlinux.org/packages/kernel-manager-bin)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue)](LICENSE)
 
 Pick a kernel, choose your build options, hit install. kernel-manager builds it (`makepkg`) and installs it (`pacman -U`); your distro's own hooks handle the rest — DKMS drivers, initramfs, bootloader entry. 21 kernel variants supported across official Arch, CachyOS, and community repos.
@@ -105,6 +106,19 @@ paru -S kernel-manager
 ```
 
 A rolling `kernel-manager-git` variant (tracking the `main` branch) is not currently on the AUR and may be offered in a future release.
+
+### Packages
+
+Two AUR entries install the same application — they conflict with each other, so only one can be present. Pick the one that matches how you want it built:
+
+| Entry | Build model | Install |
+|-------|-------------|---------|
+| [`kernel-manager-bin`](https://aur.archlinux.org/packages/kernel-manager-bin) | Precompiled x86_64 binary — zero build dependencies (no cmake, no cargo, no CPM fetches) | `yay -S kernel-manager-bin` |
+| [`kernel-manager`](https://aur.archlinux.org/packages/kernel-manager) | Source build in your AUR chroot (full build toolchain) | `yay -S kernel-manager` |
+
+- **Desktop users** → `kernel-manager-bin`: one command, nothing compiled.
+- **scx-manager (sched-ext) support or a custom/patched build** → `kernel-manager` (source): the prebuilt binary ships with scx-manager compiled out, so sched-ext management requires the source package (see [Optional: sched-ext support](#optional-sched-ext-scx-manager-support) below).
+- **Switching** is one command in either direction: `pacman -S kernel-manager` (or `pacman -S kernel-manager-bin`) removes the other and installs the chosen package in a single transaction — no state migration needed.
 
 ### From source
 
