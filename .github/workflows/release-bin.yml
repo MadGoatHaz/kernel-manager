@@ -237,36 +237,50 @@ jobs:
           # always pass --repo explicitly (PKGBUILD:33-35).
           REPO="MadGoatHaz/kernel-manager"
           TARBALL="kernel-manager-${VERSION}-x86_64.tar.zst"
+          AUDIT="$(cat build-audit.md)"
 
-          if gh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+          # Existence check: one `gh release view` call capturing the body,
+          # with the diagnostic kept (2>/tmp/relerr) and never swallowed — the
+          # pre-fix check used >/dev/null 2>&1, so the lookup failure for an
+          # EXISTING release left no trace and the missing-release branch ran
+          # anyway. A failed lookup (auth/permission/transient) must not
+          # silently masquerade as "release missing": the error is surfaced
+          # below, and if a release actually exists the missing-release branch
+          # fails loudly (gh release create will not double-create the taken
+          # tag), so a re-run lands on the exists branch.
+          if BODY="$(gh release view "${TAG}" --repo "${REPO}" --json body --jq .body 2>/tmp/relerr)"; then
             RELEASE_EXISTS=true
-            EXISTING_BODY="$(gh release view "${TAG}" --repo "${REPO}" --json body -q .body)"
           else
             RELEASE_EXISTS=false
-            EXISTING_BODY=""
+            BODY=""
+            echo "::warning::gh release view ${TAG} failed (diagnostic below); treating as missing-release"
+            cat /tmp/relerr
           fi
 
-          # Release notes = the existing body (if any) + the audit section.
-          {
-            if [ -n "${EXISTING_BODY}" ]; then
-              printf '%s\n' "${EXISTING_BODY}"
-            fi
-            cat build-audit.md
-          } > release-notes.md
+          # Release notes = the existing body (if any) + the audit section
+          # (build-audit.md opens with a blank line = the separator).
+          NOTES="${AUDIT}"
+          if [ -n "${BODY}" ]; then
+            NOTES="$(printf "%s\n%s" "${BODY}" "${AUDIT}")"
+          fi
 
           if [ "${RELEASE_EXISTS}" = true ]; then
-            # Release exists (normal tag push): append the audit to the
-            # body, then attach both artifacts.
-            gh release edit "${TAG}" --repo "${REPO}" --notes-file release-notes.md
-            gh release upload "${TAG}" "${TARBALL}" SHA256SUMS --repo "${REPO}"
-            echo "Appended audit to release ${TAG}; uploaded ${TARBALL} + SHA256SUMS"
+            # Release exists (normal tag push / idempotent re-run): attach
+            # both artifacts first (--clobber re-uploads same-named assets
+            # only, so a re-run after a failed publish is safe and other
+            # assets are untouched), then set the notes (existing body
+            # preserved + audit appended).
+            gh release upload "${TAG}" "${TARBALL}" SHA256SUMS --repo "${REPO}" --clobber
+            gh release edit "${TAG}" --repo "${REPO}" --notes "${NOTES}"
+            echo "Published ${TARBALL} + SHA256SUMS on release ${TAG} (clobber); notes = existing body + audit"
           else
             # No release yet (workflow_dispatch backfill): create it with
             # the audit notes and attach both artifacts in one call.
-            gh release upload "${TAG}" "${TARBALL}" SHA256SUMS \
-              --repo "${REPO}" --create \
-              --title "kernel-manager v${VERSION}" \
-              --notes-file release-notes.md
+            # --verify-tag aborts loudly if the tag is missing (no
+            # auto-created tag from the default branch).
+            gh release create "${TAG}" "${TARBALL}" SHA256SUMS \
+              --repo "${REPO}" --verify-tag \
+              --notes "${NOTES}"
             echo "Created release ${TAG} with ${TARBALL} + SHA256SUMS"
           fi
         shell: bash
