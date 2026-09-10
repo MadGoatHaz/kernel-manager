@@ -111,7 +111,36 @@ jobs:
           # qt6-base is pulled in transitively via qt6-tools + polkit-qt6
           # (the source package does not list it directly either).
           pacman -Syu --noconfirm \
-            cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polkit-qt6 zstd gh
+            cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polkit-qt6 zstd
+        shell: bash
+
+      - name: Install gh CLI (pinned static binary — AUR-only on Arch)
+        run: |
+          set -eu
+          # gh is AUR-only on Arch: the official repos that the
+          # archlinux:base-devel container carries no `gh` package, so it
+          # cannot be pacman-installed (removed from the "Install build
+          # deps" step above). Install the pinned static binary from the
+          # official cli/cli GitHub releases instead. In GitHub Actions, gh
+          # authenticates automatically via GITHUB_TOKEN (this workflow has
+          # permissions: contents: write) — no auth step is added.
+          GH_VERSION=2.100.0
+          install -d /usr/local/bin
+          curl -sSL -o "/tmp/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+            "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz"
+          # Extract only bin/gh into /usr/local/bin (strip the version dir +
+          # the bin/ segment), then clean up the tarball.
+          tar -xzf "/tmp/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+            -C /usr/local/bin --strip-components=2 "gh_${GH_VERSION}_linux_amd64/bin/gh"
+          rm -f "/tmp/gh_${GH_VERSION}_linux_amd64.tar.gz"
+          # Verify the pinned version landed and is on PATH (fail loudly so
+          # a bad release URL/version cannot silently pass).
+          GH_OUT="$(gh --version)"
+          echo "${GH_OUT}"
+          echo "${GH_OUT}" | grep -q "^gh version ${GH_VERSION} " || {
+            echo "::error::gh version mismatch (expected ${GH_VERSION})"
+            exit 1
+          }
         shell: bash
 
       - name: Build (Release, fat LTO — mirrors PKGBUILD:111-123)
