@@ -1,0 +1,243 @@
+name: Release (prebuilt bin)
+
+# ============================================================================
+# kernel-manager-bin: precompiled AUR -bin artifact pipeline
+# ----------------------------------------------------------------------------
+# PURPOSE
+#   Build kernel-manager once per annotated release tag (and on demand via
+#   workflow_dispatch — how the v1.30.1 backfill is cut without a new app
+#   release) in the same archlinux:base-devel container the project CI
+#   already uses (.github/workflows/build.yml:21), stage the install tree
+#   with DESTDIR, and publish:
+#
+#       kernel-manager-<ver>-x86_64.tar.zst   (tar root = `usr/`)
+#       SHA256SUMS                            (checksum of the tarball)
+#
+#   to the GitHub release for that tag (created if missing), alongside the
+#   existing source-release asset kernel-manager-<ver>.tar.gz.
+#
+#   These are the checksum-pinned `source=` artifacts of the AUR
+#   kernel-manager-bin package (plans/BIN_PACKAGE_PLAN.md, Steps 1-4): the
+#   -bin PKGBUILD downloads + extracts them, so AUR users install without
+#   compiling (no cmake/cargo/CPM network fetches in the user's chroot).
+#   The tarball root is `usr/` so a plain extraction into $pkgdir yields
+#   the full FHS tree.
+#
+# TOOLCHAIN PIN — byte-parity with the documented AUR source build
+#   Compiler  = GCC (system default). CC/CXX are NOT overridden and
+#               clang/llvm/libc++ are NOT installed: build.yml's
+#               clang/mold/ninja Debug-CI path (build.yml:27,30-38) is
+#               deliberately not reused. The source PKGBUILD builds with
+#               the default compiler "GCC, NOT clang" (PKGBUILD:58-60).
+#   Linker    = GNU ld (system default). cmake/Linker.cmake leaves
+#               ENABLE_USER_LINKER=OFF, so no -fuse-ld is passed and mold
+#               is not installed.
+#   Generator = Unix Makefiles — CMake's default here: `make` is installed
+#               and `ninja` is not (the verify step fails loudly if this
+#               ever drifts). No -G is passed, keeping the invocation
+#               byte-identical to PKGBUILD:119-122.
+#   Flags     = Release + -ffat-lto-objects, mirroring PKGBUILD:111-123
+#               line-for-line, so the prebuilt binary matches what the
+#               documented AUR source build produces.
+#
+# NEVER DELETE
+#   The published artifacts are the AUR package's `source=` (checksum-
+#   pinned). Deleting a release's tar.zst + SHA256SUMS pair makes
+#   kernel-manager-bin uninstallable for every user with no recovery path.
+#   Keep every release's pair forever (plans/BIN_PACKAGE_PLAN.md, risk R4).
+# ============================================================================
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: >-
+          Release tag to build + publish (e.g. v1.30.1). The dispatch path
+          is how the v1.30.1 backfill is cut without a new app release.
+        required: true
+        default: 'v1.30.1'
+
+permissions:
+  contents: write
+
+jobs:
+  release-bin:
+    name: Build + publish prebuilt bin
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve tag + version
+        id: ver
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          set -eu
+          # Tag source: the pushed tag (github.ref_name) or the
+          # workflow_dispatch `tag` input (the v1.30.1 backfill path).
+          TAG="${TAG:-}"
+          # <ver> = the tag without the leading v (v1.30.1 -> 1.30.1).
+          VERSION="${TAG#v}"
+          # Fallback (tag unavailable, or not a version): the CMakeLists
+          # project(... VERSION ...) — the source of truth for this tree's
+          # app version.
+          case "${VERSION}" in
+            [0-9]*) ;;
+            *) VERSION="$(grep -A2 '^project(' CMakeLists.txt | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)" ;;
+          esac
+          if [ -z "${VERSION}" ]; then
+            echo "::error::No version resolvable (tag='${TAG}', CMakeLists fallback empty)"
+            exit 1
+          fi
+          echo "tag=${TAG:-<none>} version=${VERSION}"
+          echo "TAG=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Install build deps (source PKGBUILD makedepends + zstd + gh)
+        run: |
+          set -eu
+          # Mirrors the source package's makedepends (PKGBUILD:97) exactly,
+          # plus zstd (the tarball archiver) and gh (the publish tool — the
+          # plan's `gh release upload` step; not in base-devel). Neither
+          # affects the build toolchain. This is NOT build.yml:27's list:
+          # clang/mold/llvm/libc++/ninja are deliberately absent so the
+          # toolchain stays GCC + GNU ld + Unix Makefiles (see header).
+          # qt6-base is pulled in transitively via qt6-tools + polkit-qt6
+          # (the source package does not list it directly either).
+          pacman -Syu --noconfirm \
+            cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polkit-qt6 zstd gh
+        shell: bash
+
+      - name: Build (Release, fat LTO — mirrors PKGBUILD:111-123)
+        run: |
+          set -eu
+          # Fat LTO objects so the Release LTO build can be stripped,
+          # exactly as the source PKGBUILD does (PKGBUILD:115-116).
+          export CFLAGS="${CFLAGS:+${CFLAGS} }-ffat-lto-objects"
+          export CXXFLAGS="${CXXFLAGS:+${CXXFLAGS} }-ffat-lto-objects"
+          # Toolchain = system defaults: GCC + GNU ld + Unix Makefiles.
+          # No CC/CXX override, no -fuse-ld, no -G (ninja is not installed,
+          # so Unix Makefiles is CMake's default generator).
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build -j"$(nproc)"
+        shell: bash
+
+      - name: Verify toolchain (GCC + GNU ld + Unix Makefiles)
+        run: |
+          set -eu
+          # Guard against environment drift: the generator must be the
+          # documented AUR build's (Unix Makefiles) and the compiler GCC.
+          # Fails loudly if ninja ever appears in the container and CMake
+          # would pick it, or if the default compiler changes.
+          grep -q '^CMAKE_GENERATOR:INTERNAL=Unix Makefiles$' build/CMakeCache.txt
+          grep -E '^CMAKE_(C|CXX)_COMPILER:' build/CMakeCache.txt
+          echo "toolchain verified: Unix Makefiles + $(sed -n 's/^CMAKE_CXX_COMPILER:.*=//p' build/CMakeCache.txt)"
+        shell: bash
+
+      - name: Stage install tree + package tarball (mirrors PKGBUILD:125-144)
+        env:
+          VERSION: ${{ steps.ver.outputs.VERSION }}
+        run: |
+          set -eu
+          STAGE="$(mktemp -d /tmp/km-stage.XXXXXX)"
+          # DESTDIR correctly prepends the staging dir to every destination
+          # (relative AND absolute) — PKGBUILD:141. The helper/policy
+          # destinations are ABSOLUTE in CMakeLists, so a bare `--prefix`
+          # install alone would skip them; DESTDIR catches all of them.
+          DESTDIR="${STAGE}" cmake --install build --prefix /usr
+          # Ship the project license (PKGBUILD:144).
+          install -Dm644 LICENSE "${STAGE}/usr/share/licenses/kernel-manager/LICENSE"
+
+          # Tarball root = `usr/` so a plain extraction into an AUR $pkgdir
+          # yields the full FHS tree (the kernel-manager-bin package()).
+          # Name is distinct from the source-release asset
+          # kernel-manager-<ver>.tar.gz — both coexist on the same release.
+          tar -C "${STAGE}" -cf - usr | zstd -T0 > "kernel-manager-${VERSION}-x86_64.tar.zst"
+          sha256sum "kernel-manager-${VERSION}-x86_64.tar.zst" > SHA256SUMS
+
+          echo "staged tree:"
+          find "${STAGE}/usr" -maxdepth 2 | sort
+          ls -l "kernel-manager-${VERSION}-x86_64.tar.zst" SHA256SUMS
+          cat SHA256SUMS
+        shell: bash
+
+      - name: Collect build-environment audit
+        run: |
+          set -eu
+          # Per-release ABI record (plan Step 1 audit trail): the toolchain
+          # + runtime-library versions this binary was built/linked against,
+          # so every release's build environment is auditable. The ldd
+          # output shows the resolved libalpm/Qt6/glib/glibc files.
+          BIN="build/kernel-manager"
+          test -x "${BIN}"
+          {
+            echo
+            echo "## Build audit (release-bin workflow, auto-generated)"
+            echo
+            echo "Container: archlinux:base-devel — toolchain GCC + GNU ld + Unix Makefiles (no clang/mold/ninja)."
+            echo
+            echo '```'
+            echo "cmake:    $(cmake --version | head -n1)"
+            echo "gcc:      $(gcc --version | head -n1)"
+            echo "rustc:    $(rustc --version)"
+            echo "glib-2.0: $(pkg-config --modversion glib-2.0)"
+            echo "pacman:   $(pacman --version | head -n1)"
+            echo "glibc:    $(ldd --version | head -n1)"
+            echo "ldd ${BIN}:"
+            ldd "${BIN}" | grep -E 'libalpm|libQt6|libglib-2\.0|libc\.so'
+            echo '```'
+          } > build-audit.md
+          cat build-audit.md
+        shell: bash
+
+      - name: Publish to GitHub release (create if missing)
+        env:
+          TAG: ${{ steps.ver.outputs.TAG }}
+          VERSION: ${{ steps.ver.outputs.VERSION }}
+        run: |
+          set -eu
+          # Fork: a bare `gh` infers upstream CachyOS/kernel-manager —
+          # always pass --repo explicitly (PKGBUILD:33-35).
+          REPO="MadGoatHaz/kernel-manager"
+          TARBALL="kernel-manager-${VERSION}-x86_64.tar.zst"
+
+          if gh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+            RELEASE_EXISTS=true
+            EXISTING_BODY="$(gh release view "${TAG}" --repo "${REPO}" --json body -q .body)"
+          else
+            RELEASE_EXISTS=false
+            EXISTING_BODY=""
+          fi
+
+          # Release notes = the existing body (if any) + the audit section.
+          {
+            if [ -n "${EXISTING_BODY}" ]; then
+              printf '%s\n' "${EXISTING_BODY}"
+            fi
+            cat build-audit.md
+          } > release-notes.md
+
+          if [ "${RELEASE_EXISTS}" = true ]; then
+            # Release exists (normal tag push): append the audit to the
+            # body, then attach both artifacts.
+            gh release edit "${TAG}" --repo "${REPO}" --notes-file release-notes.md
+            gh release upload "${TAG}" "${TARBALL}" SHA256SUMS --repo "${REPO}"
+            echo "Appended audit to release ${TAG}; uploaded ${TARBALL} + SHA256SUMS"
+          else
+            # No release yet (workflow_dispatch backfill): create it with
+            # the audit notes and attach both artifacts in one call.
+            gh release upload "${TAG}" "${TARBALL}" SHA256SUMS \
+              --repo "${REPO}" --create \
+              --title "kernel-manager v${VERSION}" \
+              --notes-file release-notes.md
+            echo "Created release ${TAG} with ${TARBALL} + SHA256SUMS"
+          fi
+        shell: bash
