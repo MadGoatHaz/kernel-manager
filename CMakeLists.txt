@@ -7,7 +7,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 ## name and version
 ##
 project(kernel-manager
-        VERSION 1.30.1
+        VERSION 1.30.2
         LANGUAGES CXX)
 
 
