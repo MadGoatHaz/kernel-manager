@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.30.2 (2026-09-18)
+
+### Fixed
+- A build directory with a trailing separator (e.g. `/home/user/km/`) no longer produced an empty git-clone destination: trailing `/` and `\` are stripped when the path is read from, and written to, the settings, and a root/separator-only path is refused with a clear diagnostic before any git invocation.
+
+### Changed
+- AUR `kernel-manager` re-pinned to v1.30.2 (version-bump-commit archive, double-fetch verified).
+- AUR `kernel-manager-bin` updated to v1.30.2-1 (prebuilt tarball, double-fetch verified; depends floors re-captured from the build audit).
+
 ## v1.30.1 (2026-09-06)
 
 ### Added
