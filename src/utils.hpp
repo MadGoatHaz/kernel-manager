@@ -55,6 +55,13 @@ bool write_to_file(std::string_view filepath, std::string_view data) noexcept;
 std::string exec(std::string_view command) noexcept;
 [[nodiscard]] std::string fix_path(std::string&& path) noexcept;
 
+// Removes trailing '/' and '\' characters from `dir`, leaving the
+// filesystem root ("/") intact (a path made of separators only collapses
+// to the root). Keeps fs::path::filename() non-empty for build
+// directories: a trailing slash (e.g. "/home/user/km/") would otherwise
+// make a git-clone destination empty.
+[[nodiscard]] std::string strip_trailing_separators(std::string dir) noexcept;
+
 // Runs a command in a terminal; when escalate is true, the command is wrapped in pkexec and
 // executed through the unified polkit privilege layer (rootshell.sh, auth_admin action)
 int runCmdTerminal(QString cmd, bool escalate) noexcept;
