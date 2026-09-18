@@ -34,10 +34,15 @@
 //     (…-custom stays …-custom)
 //   - run_and_remove_testscript does not exec when the script write failed
 //   - the makepkg.conf PKGEXT testscript is pinned away from the process CWD
+//   - a trailing-separator buildDir (e.g. "/home/user/km/") yields a
+//     non-empty git-clone destination (stripped on read AND on store), and
+//     prepare_git_repo refuses a root/separator-only destination with a
+//     diagnostic instead of running `git clone <url> ""`
 
 #include "conf-window.cpp"
 
 #include <QApplication>
+#include <QSettings>  // for the D4 settings-file seam (k15 pattern)
 
 #include <cstdio>   // for printf
 #include <cstdlib>  // for getpid
@@ -109,10 +114,39 @@ std::size_t count_occurrences(const std::string& haystack, const std::string& ne
     return count;
 }
 
+// The settings file this harness talks to (the D4/k15 seam): explicit
+// org/app (the utils:: identity) resolved against the pinned
+// XDG_CONFIG_HOME sandbox; the name comes from Qt itself, never hardcoded.
+std::string settings_file() {
+    return QSettings{"ArchLinux", "KernelManager"}.fileName().toStdString();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
     qputenv("QT_QPA_PLATFORM", "offscreen");
+
+    // D4 harness seam (the k15 pattern): pin XDG_CONFIG_HOME to a sandbox
+    // before any utils::/QSettings use, so the trailing-separator checks
+    // (set_build_dir below) can never reach the user's real config
+    // (ArchLinux/KernelManager.*). Reuse an exported sandbox (the runner's
+    // trap owns its cleanup); otherwise create a private one, removed on
+    // exit — safe standalone too.
+    const char* inherited = std::getenv("XDG_CONFIG_HOME");
+    std::string xdg_sandbox{};
+    bool own_xdg_sandbox = false;
+    if (inherited != nullptr && inherited[0] != '\0') {
+        xdg_sandbox = inherited;
+    } else {
+        xdg_sandbox = (fs::temp_directory_path() / ("km-chunk1-xdg-" + std::to_string(::getpid()))).string();
+        fs::create_directories(xdg_sandbox);
+        own_xdg_sandbox = true;
+    }
+    if (::setenv("XDG_CONFIG_HOME", xdg_sandbox.c_str(), 1) != 0) {
+        fmt::print(stderr, "chunk1: setenv XDG_CONFIG_HOME={} failed\n", xdg_sandbox);
+        return 1;
+    }
+
     QApplication app{argc, argv};
 
     const auto root = fs::path{std::string{"/tmp/km-chunk1-test-"} + std::to_string(::getpid())};
@@ -414,7 +448,77 @@ int main(int argc, char** argv) {
     }
 
     // ------------------------------------------------------------------
+    // 19. build-dir trailing-separator handling (the `git clone <url> ""`
+    //     bug): a buildDir ending in a separator must yield a non-empty
+    //     fs::path::filename(). The strip is unit-tested directly, then
+    //     round-tripped through set_build_dir() (stored clean) and
+    //     build_repo_path() (read clean — including a pre-existing INI
+    //     value), and prepare_git_repo() is shown to refuse the
+    //     root/separator-only destination with a diagnostic instead of
+    //     running `git clone <url> ""`.
+    // ------------------------------------------------------------------
+    check(utils::strip_trailing_separators("").empty(), "strip: empty stays empty");
+    check(utils::strip_trailing_separators("/") == "/", "strip: the root keeps its single separator");
+    check(utils::strip_trailing_separators("///") == "/", "strip: separators only collapse to the root");
+    check(utils::strip_trailing_separators("/a/b/") == "/a/b", "strip: one trailing '/' removed");
+    check(utils::strip_trailing_separators("/a/b//") == "/a/b", "strip: repeated trailing '/' removed");
+    check(utils::strip_trailing_separators("a/b/") == "a/b", "strip: relative-path trailing '/' removed");
+    check(utils::strip_trailing_separators("/a/b\\") == "/a/b", "strip: trailing '\\' removed");
+    check(utils::strip_trailing_separators("~/km/") == "~/km", "strip: `~`-form trailing '/' removed");
+    check(utils::strip_trailing_separators("/a/b") == "/a/b", "strip: no trailing separator is a no-op");
+
+    // set_build_dir stores the value stripped; build_repo_path reads it
+    // back with a non-empty filename() (the git-clone destination).
+    utils::set_build_dir("/tmp/kmtest-slash/");
+    check(utils::build_repo_path() == fs::path{"/tmp/kmtest-slash"}, "set_build_dir(\"/tmp/kmtest-slash/\") → build_repo_path() is stripped");
+    check(!utils::build_repo_path().filename().empty(), "trailing-slash buildDir yields a non-empty filename()");
+    check(utils::read_whole_file(settings_file()).contains("buildDir=/tmp/kmtest-slash"), "the INI stores the stripped value (no trailing slash)");
+    check(!utils::read_whole_file(settings_file()).contains("buildDir=/tmp/kmtest-slash/"), "the INI does not store the trailing slash");
+
+    // repeated trailing separators
+    utils::set_build_dir("/tmp/kmtest-slash//");
+    check(utils::build_repo_path() == fs::path{"/tmp/kmtest-slash"}, "set_build_dir(\"/tmp/kmtest-slash//\") → build_repo_path() is stripped");
+
+    // `~` expansion + strip
+    utils::set_build_dir("~/km-slash/");
+    check(utils::build_repo_path() == utils::fix_path(std::string{"~/km-slash"}), "set_build_dir(\"~/km-slash/\") → expanded + stripped");
+
+    // A PRE-EXISTING INI value with a trailing slash (saved before this
+    // fix) is cleaned on read by build_repo_path() alone (the static
+    // QSettings re-reads the file the independent instance just wrote).
+    {
+        QSettings other{"ArchLinux", "KernelManager"};
+        other.setValue("buildDir", "/tmp/kmtest-legacy/");
+    }
+    check(utils::build_repo_path() == fs::path{"/tmp/kmtest-legacy"}, "a pre-existing INI trailing slash is stripped on read");
+    check(!utils::build_repo_path().filename().empty(), "the legacy value yields a non-empty filename()");
+
+    // The filesystem root: the strip keeps its single separator, so
+    // build_repo_path() returns "/" with an EMPTY filename();
+    // prepare_git_repo() must refuse that destination with a diagnostic —
+    // no `git clone <url> ""`, no crash, the CWD is restored.
+    utils::set_build_dir("/");
+    check(utils::build_repo_path() == fs::path{"/"}, "set_build_dir(\"/\") → build_repo_path() is the root (empty filename)");
+    {
+        restore_marker();
+        const auto before = fs::current_path();
+        utils::prepare_git_repo(fs::path{"/"}, fs::path{"/"}, std::string{"file://"} + origin.string());
+        const auto after = fs::current_path();
+        check(same_path(before, after), "CWD restored when prepare_git_repo refuses an empty clone destination");
+    }
+
+    // Hygiene: clear the sandbox value (the sandbox itself is removed on
+    // exit; nothing after this section reads build_repo_path()).
+    {
+        QSettings other{"ArchLinux", "KernelManager"};
+        other.setValue("buildDir", QString());
+    }
+
+    // ------------------------------------------------------------------
     fs::remove_all(root);
+    if (own_xdg_sandbox) {
+        fs::remove_all(xdg_sandbox);
+    }
     if (g_failures == 0) {
         std::printf("ALL TESTS PASSED\n");
         return 0;

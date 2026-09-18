@@ -184,6 +184,16 @@ std::string fix_path(std::string&& path) noexcept {
     return std::move(path);
 }
 
+std::string strip_trailing_separators(std::string dir) noexcept {
+    // The root ("/") keeps its single separator; a path made of separators
+    // only collapses to it. Everything else is popped one character at a
+    // time until a non-separator remains.
+    while (dir.size() > 1 && (dir.back() == '/' || dir.back() == '\\')) {
+        dir.pop_back();
+    }
+    return dir;
+}
+
 namespace {
     // Normalize a clone URL for comparison (drop a trailing '/' and '.git').
     auto normalize_clone_url(std::string_view url) noexcept -> std::string {
@@ -275,6 +285,16 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
         }
     }
 
+    // A repo path ending in a separator (or the filesystem root) has an
+    // empty filename(); the clone would be invoked as `git clone <url> ""`
+    // and die with "could not create work tree dir ''". Refuse with a
+    // clear diagnostic instead (the CwdGuard above restores the CWD on
+    // this return path like on every other one).
+    if (repo_path.filename().empty()) {
+        fmt::print(stderr, "prepare_git_repo: cannot derive a repo directory name from '{}'; the build directory must not be a filesystem root or end in a separator\n", repo_path.string());
+        return;
+    }
+
     if (!fs::exists(repo_path, ec)
         && run_process("git", {"clone", std::string{clone_url}, repo_path.filename().string()}) != 0) {
         fmt::print(stderr, "prepare_git_repo: 'git clone {}' failed\n", clone_url);
@@ -312,6 +332,11 @@ fs::path build_repo_path() noexcept {
     // toString().toStdString(): this Qt build's QVariant lacks toStdString()
     // (the QString side has it) — identical semantics.
     std::string dir = app_settings().value("buildDir").toString().toStdString();
+    // Strip trailing separators so fs::path::filename() is never empty: a
+    // trailing slash (e.g. "/home/user/km/") would make the git-clone
+    // destination empty and fail with "could not create work tree dir ''".
+    // Covers pre-existing INI values too; set_build_dir() stores stripped.
+    dir = utils::strip_trailing_separators(std::move(dir));
     if (dir.empty()) {
         return utils::fix_path("~/.cache/kernel-manager/pkgbuilds");
     }
@@ -333,6 +358,10 @@ void set_build_dir(std::string dir) noexcept {
     while (!dir.empty() && (dir.back() == ' ' || dir.back() == '\t' || dir.back() == '\n' || dir.back() == '\r')) {
         dir.pop_back();
     }
+    // Strip trailing separators so a freshly stored value is clean too
+    // (defense in depth; build_repo_path() strips as well, which covers
+    // pre-existing INI values).
+    dir = utils::strip_trailing_separators(std::move(dir));
     if (dir.empty()) {
         return;  // keep the current value
     }
