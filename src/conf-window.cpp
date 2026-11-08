@@ -112,12 +112,14 @@ namespace fs = std::filesystem;
 
 namespace {
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 GENERATE_CONST_LOOKUP_OPTION_VALUES(hz_tick, "1000", "750", "600", "500", "300", "250", "100")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(tickless_mode, "full", "idle", "periodic")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(preempt_mode, "full", "lazy", "voluntary", "none")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(lto_mode, "none", "full", "thin", "thin-dist")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(hugepage_mode, "always", "madvise")
 GENERATE_CONST_LOOKUP_OPTION_VALUES(cpu_opt_mode, "manual", "native", "generic_v1", "generic_v2", "generic_v3", "generic_v4", "zen4")
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
 // NOLINTEND(cppcoreguidelines-macro-usage)
 
@@ -1183,7 +1185,7 @@ void ConfWindow::update_option_set() noexcept {
 auto ConfWindow::effective_build_source() const noexcept -> std::string {
     const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
     const auto* source_combo        = options_page_ui_obj->build_source_combo;
-    const std::int32_t index = source_combo->currentIndex();
+    const std::int32_t index        = source_combo->currentIndex();
     if (index < 0) {
         return std::string{};
     }
@@ -1602,7 +1604,7 @@ void ConfWindow::on_save() noexcept {
         tr("Save file as"),
         QString::fromStdString(utils::fix_path("~/")),
         tr("Config file (*.toml)"))
-                               .toStdString();
+                                                            .toStdString();
     if (save_file_path.empty()) {
         return;
     }
@@ -1619,7 +1621,7 @@ void ConfWindow::on_load() noexcept {
         tr("Load from"),
         QString::fromStdString(utils::fix_path("~/")),
         tr("Config file (*.toml)"))
-                               .toStdString();
+                                                            .toStdString();
     if (load_file_path.empty()) {
         return;
     }
