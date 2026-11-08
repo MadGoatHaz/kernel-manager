@@ -27,8 +27,9 @@ jobs:
 
       - name: install deps
         run: |
-          pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
-          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+          pacman -Sy --noconfirm
+          pacman -S --noconfirm cmake pkg-config ninja clang rust \
+          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache gcc-libs binutils
         shell: bash
 
       - name: Cache ccache
@@ -91,8 +92,9 @@ jobs:
 
       - name: install deps
         run: |
-          pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
-          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git scx-manager ccache
+          pacman -Sy --noconfirm
+          pacman -S --noconfirm cmake pkg-config ninja clang rust \
+          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git scx-manager ccache gcc-libs binutils
         shell: bash
 
       - name: Cache ccache
