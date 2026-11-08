@@ -431,7 +431,10 @@ void restore_clean_environment(std::vector<std::string>& previously_set_options,
     }
     previously_set_options.clear();
 
-    const auto set_values_list = utils::make_split_view(all_set_values, '\n');
+    // NOLINTNEXTLINE(misc-const-correctness) — the filter_view returned by
+    // make_split_view is not const-iterable (its begin() is non-const), so
+    // this local cannot be declared const without breaking the range-for.
+    auto set_values_list = utils::make_split_view(all_set_values, '\n');
     for (auto&& expr : set_values_list) {
         auto expr_split = utils::make_multiline(std::move(expr), '=');
         auto var_name   = expr_split.at(0);

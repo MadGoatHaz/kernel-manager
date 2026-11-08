@@ -235,8 +235,7 @@ inline constexpr std::array<CheckboxBinding, 11> checkbox_bindings{{
     {.widget = &Ui::ConfOptionsPage::builtin_zfs_check, .config_field = &ConfigOptions::builtin_zfs_check, .build_var = "builtin_zfs"},
     {.widget = &Ui::ConfOptionsPage::builtin_nvidia_open_check, .config_field = &ConfigOptions::builtin_nvidia_open_check, .build_var = "builtin_nvidia_open"},
     {.widget = &Ui::ConfOptionsPage::build_debug_check, .config_field = &ConfigOptions::build_debug_check, .build_var = "build_debug"},
-},
-};
+}};
 
 // Option rows of the Configure page mapped to their per-repo option key, so
 // the visible option set can follow the selected build source.
@@ -258,8 +257,7 @@ inline constexpr std::array<std::pair<std::string_view, QWidget * Ui::ConfOption
     {"hugepage", &Ui::ConfOptionsPage::hugepage_widget},
     {"cpu_opt", &Ui::ConfOptionsPage::processor_opt_widget},
     {"lto", &Ui::ConfOptionsPage::lto_widget},
-},
-};
+}};
 
 inline auto set_combobox_val(QComboBox* combobox, ssize_t index) noexcept {
     if (index < 0) {
