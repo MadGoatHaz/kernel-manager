@@ -16,6 +16,10 @@ cd "$(dirname "$0")/.."
 
 ROOT="$(pwd)"
 BUILD="$ROOT/build"
+source "$ROOT/tests/common.sh"
+
+FMT_INC="$(resolve_fmt_include)" || exit 1
+FMT_LIB="$(resolve_fmt_lib)" || exit 1
 
 OUT="/tmp/km-test-k8"
 
@@ -24,7 +28,7 @@ OUT="/tmp/km-test-k8"
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB \
     -I"$ROOT/src" \
-    -I"$BUILD/_deps/fmt-src/include" \
+    -I"$FMT_INC" \
     -isystem /usr/include/qt6/QtWidgets \
     -isystem /usr/include/qt6/QtGui \
     -isystem /usr/include/qt6/QtCore \
@@ -51,7 +55,7 @@ OUT="/tmp/km-test-k8"
     src/boot_instructions.cpp \
     src/aur_kernel.cpp \
     src/utils.cpp \
-    "$BUILD/_deps/fmt-build/libfmt.a" \
+    "$FMT_LIB" \
     -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc \
     /usr/lib/libglib-2.0.so \
     /usr/lib/libQt6Widgets.so \

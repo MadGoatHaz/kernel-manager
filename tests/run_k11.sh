@@ -15,22 +15,13 @@ cd "$(dirname "$0")/.."
 
 ROOT="$(pwd)"
 BUILD="$ROOT/build"
+source "$ROOT/tests/common.sh"
 
 # The harness needs only the fmt artifacts (header + static lib) from the
-# project's CPM build dir. If this worktree has no build/ of its own (or the
-# fmt pieces are absent), copy them from the main worktree's build — the
-# CMake configure is their only producer and they are version-pinned by CPM.
-if [[ ! -d "$BUILD/_deps/fmt-src/include" || ! -f "$BUILD/_deps/fmt-build/libfmt.a" ]]; then
-    MAIN_ROOT="$(git -C "$ROOT" worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
-    if [[ -n "$MAIN_ROOT" && -d "$MAIN_ROOT/build/_deps/fmt-src/include" && -f "$MAIN_ROOT/build/_deps/fmt-build/libfmt.a" ]]; then
-        mkdir -p "$BUILD/_deps/fmt-build" "$BUILD/_deps/fmt-src"
-        cp -r "$MAIN_ROOT/build/_deps/fmt-src/include" "$BUILD/_deps/fmt-src/"
-        cp "$MAIN_ROOT/build/_deps/fmt-build/libfmt.a" "$BUILD/_deps/fmt-build/"
-    else
-        echo "error: fmt artifacts not found in $BUILD nor in the main worktree's build (run the CMake build first)" >&2
-        exit 1
-    fi
-fi
+# project's CPM build dir. resolve_* handles the Debug-postfix lib name
+# (libfmtd.a), the CPM source cache, and main-worktree bootstrap.
+FMT_INC="$(resolve_fmt_include)" || exit 1
+FMT_LIB="$(resolve_fmt_lib)" || exit 1
 
 OUT="/tmp/km-test-k11"
 
@@ -39,7 +30,7 @@ OUT="/tmp/km-test-k11"
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB \
     -I"$ROOT/src" \
-    -I"$BUILD/_deps/fmt-src/include" \
+    -I"$FMT_INC" \
     -isystem /usr/include/qt6/QtWidgets \
     -isystem /usr/include/qt6/QtGui \
     -isystem /usr/include/qt6/QtCore \
@@ -63,7 +54,7 @@ OUT="/tmp/km-test-k11"
     src/known_kernels.cpp \
     src/alpm_utils.cpp \
     src/utils.cpp \
-    "$BUILD/_deps/fmt-build/libfmt.a" \
+    "$FMT_LIB" \
     -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc \
     /usr/lib/libglib-2.0.so \
     /usr/lib/libQt6Widgets.so \

@@ -29,28 +29,13 @@ cd "$(dirname "$0")/.."
 
 ROOT="$(pwd)"
 BUILD="$ROOT/build"
+source "$ROOT/tests/common.sh"
 
-# --- bootstrap the fmt artifacts (run_k12/k13 pattern) -------------------
-# The standalone recipe needs the fmt include dir + static lib from the
-# project's CMake build dir (the CMake configure is their only producer;
-# they are version-pinned). If this worktree has no build/ of its own,
-# copy them from the main worktree's build.
-for f in \
-    "$BUILD/_deps/fmt-src/include" \
-    "$BUILD/_deps/fmt-build/libfmt.a"
-do
-    if [[ ! -e "$f" ]]; then
-        MAIN_ROOT="$(git -C "$ROOT" worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
-        REL="${f#"$BUILD"/}"
-        if [[ -n "${MAIN_ROOT}" && -e "${MAIN_ROOT}/build/${REL}" ]]; then
-            mkdir -p "$(dirname "$f")"
-            cp -r "${MAIN_ROOT}/build/${REL}" "$f"
-        else
-            echo "error: CMake artifact $f not found in $BUILD nor in the main worktree's build (run the CMake build first)" >&2
-            exit 1
-        fi
-    fi
-done
+# --- fmt artifacts (run_k12/k13 pattern) ---------------------------------
+# resolve_* handles the Debug-postfix lib name (libfmtd.a), the CPM source
+# cache, and main-worktree bootstrap.
+FMT_INC="$(resolve_fmt_include)" || exit 1
+FMT_LIB="$(resolve_fmt_lib)" || exit 1
 
 OUT="/tmp/km-test-k23"
 LOG="$OUT-build.log"
@@ -61,7 +46,7 @@ LOG="$OUT-build.log"
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB \
     -I"$ROOT/src" \
-    -I"$BUILD/_deps/fmt-src/include" \
+    -I"$FMT_INC" \
     -isystem /usr/include/qt6/QtWidgets \
     -isystem /usr/include/qt6/QtGui \
     -isystem /usr/include/qt6/QtCore \
@@ -82,7 +67,7 @@ LOG="$OUT-build.log"
     -D_FILE_OFFSET_BITS=64 -pthread \
     tests/test_k23_pkgbuild_custom_name.cpp \
     src/utils.cpp \
-    "$BUILD/_deps/fmt-build/libfmt.a" \
+    "$FMT_LIB" \
     -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc \
     /usr/lib/libglib-2.0.so \
     /usr/lib/libQt6Widgets.so \
