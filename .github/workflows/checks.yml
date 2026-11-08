@@ -27,11 +27,8 @@ jobs:
 
       - name: install deps
         run: |
-          # Download the package DB (-Sy, NOT -Syu) then install what the
-          # build needs; --needed keeps base-devel packages at image versions.
-          pacman -Sy --noconfirm
-          pacman -S --noconfirm --needed cmake ninja pkgconf clang rust mold \
-            llvm libc++ qt6-base qt6-tools polkit-qt6 git ccache
+          pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
+          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
         shell: bash
 
       - name: Cache ccache
@@ -94,12 +91,8 @@ jobs:
 
       - name: install deps
         run: |
-          # cachyOS base ships the standard toolchain. Download the package
-          # DB (-Sy, no -u) then add what's missing; scx-manager is the
-          # cachyOS-specific addition for this job.
-          pacman -Sy --noconfirm
-          pacman -S --noconfirm --needed cmake ninja pkgconf clang rust mold \
-            llvm libc++ qt6-base qt6-tools polkit-qt6 git ccache scx-manager
+          pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
+          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git scx-manager ccache
         shell: bash
 
       - name: Cache ccache

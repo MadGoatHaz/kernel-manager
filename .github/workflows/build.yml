@@ -28,13 +28,7 @@ jobs:
 
       - name: install deps
         run: |
-          # Download the package DB (-Sy, NOT -Syu: a full system upgrade in
-          # this image has been observed to drop glibc/readline/binutils
-          # mid-run). Then install only what the build needs; --needed keeps
-          # already-present base-devel packages at their image versions.
-          pacman -Sy --noconfirm
-          pacman -S --noconfirm --needed cmake ninja pkgconf clang rust mold \
-            llvm libc++ qt6-base qt6-tools polkit-qt6 git ccache
+          pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
         shell: bash
 
       - name: Cache ccache
@@ -101,13 +95,7 @@ jobs:
 
       - name: install deps
         run: |
-          # Download the package DB (-Sy, NOT -Syu: a full system upgrade in
-          # this image has been observed to drop glibc/readline/binutils
-          # mid-run). Then install only what the build needs; --needed keeps
-          # already-present base-devel packages at their image versions.
-          pacman -Sy --noconfirm
-          pacman -S --noconfirm --needed cmake ninja pkgconf clang rust mold \
-            llvm libc++ qt6-base qt6-tools polkit-qt6 git ccache
+          pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
         shell: bash
 
       - name: Cache ccache
