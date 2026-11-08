@@ -27,9 +27,11 @@ jobs:
 
       - name: install deps
         run: |
-          pacman -Sy --noconfirm
-          pacman -S --noconfirm cmake pkg-config ninja clang rust \
-          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache gcc-libs binutils
+          # base-devel already ships gcc, binutils (as), make, cmake, ninja,
+          # pkgconf, git, python. Only add what it lacks; no -Syu/-Sy so we
+          # never disturb the working system packages.
+          pacman -S --noconfirm --needed clang rust mold llvm libc++ \
+            qt6-base qt6-tools polkit-qt6 ccache
         shell: bash
 
       - name: Cache ccache
@@ -92,9 +94,12 @@ jobs:
 
       - name: install deps
         run: |
-          pacman -Sy --noconfirm
-          pacman -S --noconfirm cmake pkg-config ninja clang rust \
-          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git scx-manager ccache gcc-libs binutils
+          # base-devel already ships gcc, binutils (as), make, cmake, ninja,
+          # pkgconf, git, python. Only add what it lacks; no -Syu/-Sy so we
+          # never disturb the working system packages. scx-manager is the
+          # cachyOS-specific addition for this job.
+          pacman -S --noconfirm --needed clang rust mold llvm libc++ \
+            qt6-base qt6-tools polkit-qt6 ccache scx-manager
         shell: bash
 
       - name: Cache ccache

@@ -28,13 +28,13 @@ jobs:
 
       - name: install deps
         run: |
-          # Sync the package DB but do NOT do a full -Syu: a whole-system
-          # upgrade inside the ephemeral container can replace glibc /
-          # readline / gcc-libs mid-run and break every subsequent tool.
-          # Just install what the build needs on top of the image baseline.
-          pacman -Sy --noconfirm
-          pacman -S --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ \
-            qt6-base qt6-tools polkit-qt6 python git ccache gcc-libs binutils
+          # base-devel already ships gcc, binutils (as), make, cmake, ninja,
+          # pkgconf, git, python. Only add what it lacks. Use -S --needed
+          # (no -Syu/-Sy) so we never touch the working system packages —
+          # a full DB sync + upgrade in this image has been observed to
+          # drop glibc/readline/gcc-libs and break every tool after it.
+          pacman -S --noconfirm --needed clang rust mold llvm libc++ \
+            qt6-base qt6-tools polkit-qt6 ccache
         shell: bash
 
       - name: Cache ccache
@@ -101,13 +101,13 @@ jobs:
 
       - name: install deps
         run: |
-          # Sync the package DB but do NOT do a full -Syu: a whole-system
-          # upgrade inside the ephemeral container can replace glibc /
-          # readline / gcc-libs mid-run and break every subsequent tool.
-          # Just install what the build needs on top of the image baseline.
-          pacman -Sy --noconfirm
-          pacman -S --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ \
-            qt6-base qt6-tools polkit-qt6 python git ccache gcc-libs binutils
+          # base-devel already ships gcc, binutils (as), make, cmake, ninja,
+          # pkgconf, git, python. Only add what it lacks. Use -S --needed
+          # (no -Syu/-Sy) so we never touch the working system packages —
+          # a full DB sync + upgrade in this image has been observed to
+          # drop glibc/readline/gcc-libs and break every tool after it.
+          pacman -S --noconfirm --needed clang rust mold llvm libc++ \
+            qt6-base qt6-tools polkit-qt6 ccache
         shell: bash
 
       - name: Cache ccache
