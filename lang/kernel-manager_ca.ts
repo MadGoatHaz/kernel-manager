@@ -85,6 +85,11 @@
         <translation>Construeix el mòdul obert d&apos;NVIDIA</translation>
     </message>
     <message>
+        <location filename="../src/conf-options-page.ui" line="575"/>
+        <source>Include vmlinux with debug symbols</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../src/conf-options-page.ui" line="621"/>
         <source>Load</source>
         <translation>Carrega</translation>
@@ -136,9 +141,8 @@
         <translation>Construeix el mòdul ZFS</translation>
     </message>
     <message>
-        <location filename="../src/conf-options-page.ui" line="575"/>
         <source>Include vmlinux with debug informations/symbols</source>
-        <translation>Inclou vmlinux amb informació/símbols de depuració</translation>
+        <translation type="vanished">Inclou vmlinux amb informació/símbols de depuració</translation>
     </message>
     <message>
         <location filename="../src/conf-options-page.ui" line="430"/>
@@ -172,12 +176,30 @@
 <context>
     <name>ConfPatchesPage</name>
     <message>
-        <location filename="../src/conf-patches-page.ui" line="81"/>
+        <location filename="../src/conf-patches-page.ui" line="44"/>
+        <location filename="../src/conf-patches-page.ui" line="47"/>
+        <source>Remove selected patch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-patches-page.ui" line="57"/>
+        <location filename="../src/conf-patches-page.ui" line="60"/>
+        <source>Move patch up</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-patches-page.ui" line="70"/>
+        <location filename="../src/conf-patches-page.ui" line="73"/>
+        <source>Move patch down</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-patches-page.ui" line="99"/>
         <source>Add remote patch</source>
         <translation>Afegeix un pedaç remot</translation>
     </message>
     <message>
-        <location filename="../src/conf-patches-page.ui" line="88"/>
+        <location filename="../src/conf-patches-page.ui" line="106"/>
         <source>Add local patch</source>
         <translation>Afegeix un pedaç local</translation>
     </message>
@@ -194,12 +216,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.ui" line="36"/>
+        <location filename="../src/conf-window.ui" line="28"/>
         <source>Options</source>
         <translation>Opcions</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.ui" line="41"/>
+        <location filename="../src/conf-window.ui" line="33"/>
         <source>Patches</source>
         <translation>Pedaços</translation>
     </message>
@@ -212,66 +234,129 @@
         <translation type="vanished">RC - Candidat de publicació</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="604"/>
-        <location filename="../src/conf-window.cpp" line="1189"/>
-        <location filename="../src/conf-window.cpp" line="1207"/>
-        <location filename="../src/conf-window.cpp" line="1229"/>
+        <location filename="../src/conf-window.cpp" line="832"/>
+        <location filename="../src/conf-window.cpp" line="892"/>
+        <location filename="../src/conf-window.cpp" line="910"/>
+        <location filename="../src/conf-window.cpp" line="923"/>
+        <location filename="../src/conf-window.cpp" line="927"/>
+        <location filename="../src/conf-window.cpp" line="938"/>
+        <location filename="../src/conf-window.cpp" line="953"/>
+        <location filename="../src/conf-window.cpp" line="991"/>
+        <location filename="../src/conf-window.cpp" line="996"/>
+        <location filename="../src/conf-window.cpp" line="1000"/>
+        <location filename="../src/conf-window.cpp" line="1601"/>
+        <location filename="../src/conf-window.cpp" line="1619"/>
+        <location filename="../src/conf-window.cpp" line="1641"/>
         <source>Kernel Manager</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="886"/>
+        <location filename="../src/conf-window.cpp" line="894"/>
+        <location filename="../src/conf-window.cpp" line="940"/>
+        <source>Proceed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="895"/>
+        <location filename="../src/conf-window.cpp" line="941"/>
+        <source>Cancel</source>
+        <translation type="unfinished">Cancel·la</translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="924"/>
+        <source>Failed to install the kernel headers (rc=%1).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="925"/>
+        <location filename="../src/conf-window.cpp" line="998"/>
+        <source>Check the terminal output for details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="927"/>
+        <location filename="../src/conf-window.cpp" line="1000"/>
+        <source>Continue with the install anyway?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="955"/>
+        <source>Migrate to %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="956"/>
+        <source>Proceed without</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="957"/>
+        <source>Abort install</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="991"/>
+        <source>The DKMS driver migration succeeded. The install will continue.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="997"/>
+        <source>The driver migration failed (rc=%1).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/conf-window.cpp" line="1298"/>
         <source>Custom URL…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1020"/>
+        <location filename="../src/conf-window.cpp" line="1432"/>
         <source>Select one or more patch files</source>
         <translation>Seleccioneu un o més fitxers de pedaç</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1022"/>
+        <location filename="../src/conf-window.cpp" line="1434"/>
         <source>Patch file (*.patch)</source>
         <translation>Fitxer de pedaç (*.patch)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1042"/>
+        <location filename="../src/conf-window.cpp" line="1454"/>
         <source>Enter URL patch</source>
         <translation>Introduïu l&apos;URL del pedaç</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1043"/>
+        <location filename="../src/conf-window.cpp" line="1455"/>
         <source>Patch URL:</source>
         <translation>URL del pedaç:</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1180"/>
+        <location filename="../src/conf-window.cpp" line="1592"/>
         <source>Save file as</source>
         <translation>Desa el fitxer com a</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1182"/>
-        <location filename="../src/conf-window.cpp" line="1199"/>
+        <location filename="../src/conf-window.cpp" line="1594"/>
+        <location filename="../src/conf-window.cpp" line="1611"/>
         <source>Config file (*.toml)</source>
         <translation>Fitxer de config. (*.toml)</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1189"/>
+        <location filename="../src/conf-window.cpp" line="1601"/>
         <source>Failed to save config options to file: %1</source>
         <translation>Ha fallat desar les opcions de configuració al fitxer %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1197"/>
+        <location filename="../src/conf-window.cpp" line="1609"/>
         <source>Load from</source>
         <translation>Carrega des de</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1207"/>
+        <location filename="../src/conf-window.cpp" line="1619"/>
         <source>Failed to load config options from file: %1</source>
         <translation>Ha fallat carregar les opcions de configuració des del fitxer %1</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="1229"/>
+        <location filename="../src/conf-window.cpp" line="1641"/>
         <source>Config file(%1) is outdated</source>
         <translation>El fitxer de configuració (%1) està obsolet.</translation>
     </message>
@@ -280,7 +365,7 @@
         <translation type="vanished">RT - Nucli en temps real</translation>
     </message>
     <message>
-        <location filename="../src/conf-window.cpp" line="604"/>
+        <location filename="../src/conf-window.cpp" line="832"/>
         <source>Do you want to install build packages?</source>
         <translation>Voleu instal·lar els paquets de compilació?</translation>
     </message>
@@ -320,87 +405,120 @@
 &lt;/html&gt;</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="17"/>
-        <location filename="../src/km-window.cpp" line="353"/>
-        <location filename="../src/km-window.cpp" line="366"/>
-        <location filename="../src/km-window.cpp" line="423"/>
-        <location filename="../src/km-window.cpp" line="452"/>
-        <location filename="../src/km-window.cpp" line="712"/>
-        <location filename="../src/km-window.cpp" line="722"/>
-        <location filename="../src/km-window.cpp" line="799"/>
-        <location filename="../src/km-window.cpp" line="813"/>
-        <location filename="../src/km-window.cpp" line="876"/>
-        <location filename="../src/km-window.cpp" line="924"/>
-        <location filename="../src/km-window.cpp" line="931"/>
+        <location filename="../src/km-window.ui" line="23"/>
+        <location filename="../src/km-window.cpp" line="629"/>
+        <location filename="../src/km-window.cpp" line="677"/>
+        <location filename="../src/km-window.cpp" line="705"/>
+        <location filename="../src/km-window.cpp" line="1250"/>
+        <location filename="../src/km-window.cpp" line="1374"/>
+        <location filename="../src/km-window.cpp" line="1416"/>
+        <location filename="../src/km-window.cpp" line="1423"/>
+        <location filename="../src/km-window.cpp" line="1439"/>
+        <location filename="../src/km-window.cpp" line="1480"/>
+        <location filename="../src/km-window.cpp" line="1485"/>
+        <location filename="../src/km-window.cpp" line="1489"/>
+        <location filename="../src/km-window.cpp" line="1580"/>
+        <location filename="../src/km-window.cpp" line="1785"/>
+        <location filename="../src/km-window.cpp" line="1792"/>
         <source>Kernel Manager</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="63"/>
+        <location filename="../src/km-window.ui" line="40"/>
+        <source>&lt;html&gt;
+&lt;body&gt;
+&lt;p&gt;Select kernels to install or remove, then click Execute.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="57"/>
+        <source>A pacman instance is already running — this app won&apos;t work until it exits.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="77"/>
         <source>Choose</source>
         <translation>Trieu</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="68"/>
+        <location filename="../src/km-window.ui" line="82"/>
         <source>PkgName</source>
         <translation>Nom del paquet</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="73"/>
+        <location filename="../src/km-window.ui" line="87"/>
         <source>Version</source>
         <translation>Versió</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="78"/>
+        <location filename="../src/km-window.ui" line="92"/>
         <source>Category</source>
         <translation>Categoria</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="83"/>
+        <location filename="../src/km-window.ui" line="97"/>
         <source>Installed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="88"/>
+        <location filename="../src/km-window.ui" line="102"/>
         <source>Immutable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="99"/>
+        <location filename="../src/km-window.ui" line="113"/>
         <source>Build dir:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="116"/>
+        <location filename="../src/km-window.ui" line="130"/>
         <source>Browse…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="136"/>
+        <location filename="../src/km-window.ui" line="150"/>
         <source>sched-ext scheduler config</source>
         <translation>Configuració del planificador sched-ext</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="143"/>
+        <location filename="../src/km-window.ui" line="157"/>
         <source>Configure</source>
         <translation>Configura</translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="150"/>
+        <location filename="../src/km-window.ui" line="164"/>
+        <source>Refresh</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="167"/>
+        <source>Re-scan the kernel list and clear stale built/folder entries.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="174"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Cancel</source>
-        <translation type="vanished">Cancel·la</translation>
+        <location filename="../src/km-window.ui" line="184"/>
+        <source>Install the checked kernel(s) or uninstall the unchecked installed ones. After each execution the list refreshes automatically — removed kernels disappear from the view.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="157"/>
+        <location filename="../src/km-window.cpp" line="1426"/>
+        <source>Cancel</source>
+        <translation>Cancel·la</translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.ui" line="181"/>
         <source>Execute</source>
         <translation>Executa</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="452"/>
+        <location filename="../src/km-window.cpp" line="705"/>
         <source>No kernels found!
 Please run `pacman -Sy` to update DB!
 This is needed for the app to work properly</source>
@@ -409,15 +527,25 @@ Si us plau, executeu &apos;pacman -Sy&apos; per actualitzar la base de dades!
 Això és necessari perquè l&apos;aplicació funcioni correctament.</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="423"/>
+        <location filename="../src/km-window.cpp" line="677"/>
         <source>Failed to clone repository!
 Please check your internet connection and try again</source>
         <translation>Ha fallat clonar el repositori!
 Si us plau, comproveu la connexió a Internet i torneu-ho a provar.</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="523"/>
-        <location filename="../src/km-window.cpp" line="587"/>
+        <location filename="../src/km-window.cpp" line="554"/>
+        <source>Kernel Manager %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="555"/>
+        <source>v%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="788"/>
+        <location filename="../src/km-window.cpp" line="1088"/>
         <source>Please wait...
 We are preparing configuration window for you
 cloning PKGBUILDs..</source>
@@ -426,128 +554,218 @@ Es posa a punt la finestra de configuració.
 Clonació de PKGBUILDs..</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="353"/>
-        <location filename="../src/km-window.cpp" line="876"/>
+        <location filename="../src/km-window.cpp" line="977"/>
+        <source>Release</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="978"/>
+        <source>Compiler</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="979"/>
+        <source>Arch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="987"/>
+        <source>Build date</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="988"/>
+        <source>ISA level</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="989"/>
+        <source>ISA validation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="990"/>
+        <source>LTO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="993"/>
+        <source>Optimization</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="994"/>
+        <source>Tick rate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="995"/>
+        <source>sched_ext</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="996"/>
+        <source>Preemption</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="999"/>
+        <source>MGLRU</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1000"/>
+        <source>THP</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1001"/>
+        <source>TCP congestion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1002"/>
+        <source>Clocksource</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1425"/>
+        <source>Proceed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1441"/>
+        <source>Migrate to %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1442"/>
+        <source>Proceed without</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1443"/>
+        <source>Abort install</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1480"/>
+        <source>The DKMS driver migration succeeded. The install will continue.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1486"/>
+        <source>The driver migration failed (rc=%1).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1487"/>
+        <source>Check the terminal output for details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1489"/>
+        <source>Continue with the install anyway?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="1580"/>
         <source>Failed to initialize alpm handle (%1)</source>
         <translation>Ha fallat iniciar l&apos;identificador d&apos;alpm (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="366"/>
         <source>Failed to release alpm handle (%1)</source>
-        <translation>Ha fallat alliberar l&apos;identificador d&apos;alpm (%1)</translation>
+        <translation type="vanished">Ha fallat alliberar l&apos;identificador d&apos;alpm (%1)</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="646"/>
+        <location filename="../src/km-window.cpp" line="1148"/>
         <source>Install from directory…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="662"/>
+        <location filename="../src/km-window.cpp" line="1164"/>
         <source>Install pre-compiled %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="682"/>
+        <location filename="../src/km-window.cpp" line="1184"/>
         <source>Add repo &apos;%1&apos;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="686"/>
+        <location filename="../src/km-window.cpp" line="1188"/>
         <source>Build custom %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="688"/>
+        <location filename="../src/km-window.cpp" line="1190"/>
         <source>Show boot instructions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="697"/>
+        <location filename="../src/km-window.cpp" line="1199"/>
         <source>Install the pre-compiled package for &apos;%1&apos;?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="698"/>
+        <location filename="../src/km-window.cpp" line="1200"/>
         <source>This installs the package as root (pacman) and refreshes the initramfs.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="712"/>
-        <source>Failed to install &apos;%1&apos;:
-%2</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/km-window.cpp" line="716"/>
-        <source>Installed &apos;%1&apos;. Select it at the next boot:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/km-window.cpp" line="736"/>
+        <location filename="../src/km-window.cpp" line="1266"/>
         <source>Enable the &apos;%1&apos; pacman repository?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="737"/>
+        <location filename="../src/km-window.cpp" line="1267"/>
         <source>This appends the [%1] section to /etc/pacman.conf (a backup is written first) and runs `pacman -Sy` as an administrator.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="753"/>
+        <location filename="../src/km-window.cpp" line="1283"/>
         <source>Repository enabled</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="754"/>
+        <location filename="../src/km-window.cpp" line="1284"/>
         <source>Repository &apos;%1&apos; enabled — refreshing the kernel list…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="762"/>
+        <location filename="../src/km-window.cpp" line="1292"/>
         <source>Failed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="763"/>
+        <location filename="../src/km-window.cpp" line="1293"/>
         <source>Failed to enable repository &apos;%1&apos; (exit code %2). Check the terminal output.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="790"/>
+        <location filename="../src/km-window.cpp" line="1322"/>
         <source>Choose build directory…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="799"/>
-        <source>Failed to install from &apos;%1&apos;:
-%2</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/km-window.cpp" line="808"/>
-        <source>Installed &apos;%1 (%2)&apos;. Select it at the next boot:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/km-window.cpp" line="829"/>
+        <location filename="../src/km-window.cpp" line="1535"/>
         <source>Choose build directory</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="858"/>
+        <location filename="../src/km-window.cpp" line="1565"/>
         <source>Please wait...
 Initializing kernels..</source>
         <translation>Espereu, si us plau...
 S&apos;inicien els nuclis...</translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="924"/>
-        <location filename="../src/km-window.cpp" line="931"/>
+        <location filename="../src/km-window.cpp" line="1785"/>
+        <location filename="../src/km-window.cpp" line="1792"/>
         <source>scx-manager is not installed.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.ui" line="24"/>
         <source>&lt;html&gt;
 &lt;body&gt;
 &lt;p&gt;Here you&apos;ll see information about currently installed and available Linux kernels.&lt;/p&gt;
@@ -555,7 +773,7 @@ S&apos;inicien els nuclis...</translation>
 &lt;p&gt;This app won&apos;t work if you are already running a pacman instance.&lt;/p&gt;
 &lt;/body&gt;
 &lt;/html&gt;</source>
-        <translation>&lt;html&gt;
+        <translation type="vanished">&lt;html&gt;
 &lt;body&gt;
 &lt;p&gt;Aquí veureu informació sobre els nuclis de Linux instal·lats i disponibles actualment.&lt;/p&gt;
 &lt;p&gt;Podeu instal·lar o desinstal·lar paquets de nucli usant les caselles de selecció de la columna de l&apos;esquerra.&lt;/p&gt;
@@ -567,13 +785,23 @@ S&apos;inicien els nuclis...</translation>
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../src/km-window.cpp" line="296"/>
+        <location filename="../src/km-window.cpp" line="272"/>
         <source>Boot instructions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/km-window.cpp" line="309"/>
+        <location filename="../src/km-window.cpp" line="285"/>
         <source>Close</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="327"/>
+        <source>Kernel installed successfully. You can reboot when ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/km-window.cpp" line="332"/>
+        <source>Kernel installation failed (rc=%1). Check the terminal output for details.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

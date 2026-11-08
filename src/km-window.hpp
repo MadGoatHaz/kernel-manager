@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #ifndef MAINWINDOW_HPP_
 #define MAINWINDOW_HPP_
@@ -44,6 +43,7 @@
 #include "driver_gate.hpp"
 #include "kernel.hpp"
 #include "kernel_info.hpp"
+#include "transaction_worker.hpp"
 #include "utils.hpp"
 
 #ifdef WITH_SCX_MANAGER
@@ -51,10 +51,8 @@
 #endif
 
 #include <array>
-#include <condition_variable>
 #include <cstdint>
 #include <memory>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -73,22 +71,6 @@
 #elifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
-
-class Work final : public QObject {
-    Q_OBJECT
-    Q_DISABLE_COPY_MOVE(Work)
-
- public:
-    using function_t = std::function<void()>;
-    explicit Work(function_t&& func)
-      : m_func(std::move(func)) { }
-    ~Work() override = default;
-
-    void doHeavyCalculations();
-
- private:
-    function_t m_func;
-};
 
 // Column indices of the kernel tree (a scoped enum: the Qt APIs take
 // int columns, so call sites pass static_cast<int>(TreeCol::…)).
@@ -128,10 +110,10 @@ class MainWindow final : public QMainWindow {
     void on_cancel() noexcept;
     // Refresh (plan v1.29.0 D2): the manual re-scan — the bottom-row button
     // between Configure and Close. A silent no-op while a transaction is
-    // in flight (m_running — the worker's post-transaction auto-refresh is
-    // authoritative) or the Configure clone flow owns the shared progress
-    // dialog (m_future_watcher); otherwise init_kernels() (the verbatim
-    // shared refresh), purge_stale_rows(), and the idempotent
+    // in flight (m_transaction_in_flight — the worker's post-transaction
+    // auto-refresh is authoritative) or the Configure clone flow owns the
+    // shared progress dialog (m_future_watcher); otherwise init_kernels()
+    // (the verbatim shared refresh), purge_stale_rows(), and the idempotent
     // build_kernel_info_header() re-extraction — all on the main thread.
     void on_refresh() noexcept;
     // The Refresh flow's stale-row purge step (plan v1.29.0 D4): removes
@@ -188,16 +170,29 @@ class MainWindow final : public QMainWindow {
 
     void init_kernels() noexcept;
 
-    std::atomic_bool m_running;
-    std::atomic_bool m_thread_running{true};
-    std::mutex m_mutex;
-    std::condition_variable m_cv;
+    // Transaction in-flight flag (main thread only): set when the user
+    // clicks Execute and the worker is asked to start a transaction;
+    // cleared when the worker's transactionFinished signal arrives.
+    // Prevents overlapping transactions and silent-refreshes during a
+    // transaction. Only accessed from the main thread, so a plain bool
+    // suffices (no atomics needed).
+    bool m_transaction_in_flight{false};
 
     QStringList m_change_list;
 
     QProgressDialog* m_conf_progress_dialog{nullptr};
     QProgressBar* m_conf_progress_bar{nullptr};
     QFutureWatcher<void> m_future_watcher;
+
+    // T-122: non-blocking install operations — a QProgressDialog shown while
+    // the TransactionWorker is running a pacman install/remove transaction.
+    // The dialog has an indeterminate progress bar (pacman runs in an
+    // external terminal; we can't get granular progress from it) and a
+    // close button that dismisses the dialog without aborting the terminal
+    // operation (pacman transactions are atomic and should not be killed
+    // mid-run). The worker thread remains in flight until the terminal
+    // closes; the app UI stays responsive throughout.
+    QProgressDialog* m_transaction_progress_dialog{nullptr};
 
     // The D7 persistent status-bar banner (chunk 3): a permanent,
     // hidden-by-default label next to the version label; shown on a
@@ -234,8 +229,21 @@ class MainWindow final : public QMainWindow {
     // byte-identical re-render).
     QFrame* m_kernel_info_header = nullptr;
 
-    QThread* m_worker_th = new QThread(this);
-    Work* m_worker{nullptr};
+    // Transaction worker: a dedicated QObject that runs pacman install/
+    // remove transactions in its own QThread (via moveToThread). The
+    // worker creates and releases its OWN alpm handle for each
+    // transaction, so it never shares the main thread's handle — this
+    // eliminates the use-after-free crash on window close during a
+    // transaction (C1/C9). Communication with the main thread is only
+    // via signals/slots (transactionStarted, transactionFinished, error).
+    //
+    // Lifecycle: created in the MainWindow constructor, moved to
+    // m_worker_thread, and deleted when the thread finishes (via the
+    // QThread::finished → QObject::deleteLater connection). On window
+    // close, requestStop() is queued to the worker and the thread is
+    // quit() + wait()ed before the main thread releases its own handle.
+    QThread* m_worker_thread{nullptr};
+    TransactionWorker* m_worker{nullptr};
 
     alpm_errno_t m_err{};
     alpm_handle_t* m_handle                   = utils::parse_alpm(utils::alpm_root, utils::alpm_libdir, &m_err);

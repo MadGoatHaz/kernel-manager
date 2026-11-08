@@ -119,9 +119,12 @@ VERDICT=0
 
 for p in nvidia nvidia-open nvidia-lts nvidia-open-lts; do
     if pacman -Q "$p" 2>/dev/null; then
+        # --needed: skip the reinstall if the package is already at the
+        # installed version (the .ko files are already in place for this
+        # kernel version); only re-pull when the package version differs.
         log "driver: re-installing binary package '$p' (re-pull the .ko for $KVER)"
-        if ! pacman -U --noconfirm "$p"; then
-            log "WARN: 'pacman -U --noconfirm $p' failed (no .ko for $KVER? — the verify stage will confirm the gap)"
+        if ! pacman -U --needed --noconfirm "$p"; then
+            log "WARN: 'pacman -U --needed --noconfirm $p' failed (no .ko for $KVER? — the verify stage will confirm the gap)"
             VERDICT=1
         fi
     fi

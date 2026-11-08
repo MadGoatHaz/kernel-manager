@@ -243,9 +243,26 @@ if [[ ! -f "$CONF" ]]; then
     exit 1
 fi
 
+# Keep at most this many backups (T-075: rotation prevents unbounded
+# growth of /etc/pacman.conf.bak-* on systems that add repos frequently).
+MAX_BACKUPS=5
+
 BACKUP="$CONF.bak-$(date +%Y%m%d%H%M%S)"
 cp -a "$CONF" "$BACKUP"
 echo "Backed up $CONF → $BACKUP"
+
+# Rotate old backups: keep only the $MAX_BACKUPS most recent.
+backups=()
+while IFS= read -r -d '' f; do
+    backups+=("$f")
+done < <(find "$(dirname "$CONF")" -maxdepth 1 -name "$(basename "$CONF").bak-*" -type f -print0 2>/dev/null | sort -z)
+count=${#backups[@]}
+if (( count > MAX_BACKUPS )); then
+    to_remove=$(( count - MAX_BACKUPS ))
+    for (( i = 0; i < to_remove; i++ )); do
+        rm -f "${backups[$i]}" 2>/dev/null || true
+    done
+fi
 
 printf '%s' "$SECTION" >> "$CONF"
 echo "Appended [$REPO] to $CONF"

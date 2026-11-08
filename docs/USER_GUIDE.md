@@ -23,6 +23,45 @@ paru -S kernel-manager
 
 Building from source is documented in the [README](../README.md#installing).
 
+### Uninstalling
+
+To remove kernel-manager and its configuration data:
+
+```sh
+# Remove the package and all its configuration files
+sudo pacman -Rsn kernel-manager
+# or, for the prebuilt binary package:
+sudo pacman -Rsn kernel-manager-bin
+```
+
+The `-s` flag removes dependencies that were installed with kernel-manager and are no longer needed by any other package. The `-n` flag removes configuration files (your kernel build options, build directory selection, etc.) stored in `~/.config/kernel-manager/`. If you want to keep your configuration for a future reinstall, omit the `-n`:
+
+```sh
+sudo pacman -Rs kernel-manager
+```
+
+### Upgrading / Switching packages
+
+kernel-manager is available as two AUR packages — `kernel-manager` (source build) and `kernel-manager-bin` (precompiled binary). They are mutually exclusive (they conflict with each other), so switching between them is a single pacman transaction:
+
+```sh
+# Switch from the source package to the prebuilt binary
+sudo pacman -S kernel-manager-bin
+
+# Switch from the prebuilt binary to the source package
+sudo pacman -S kernel-manager
+```
+
+pacman automatically removes the old package and installs the new one in one step — no manual cleanup is required. Your configuration (build options, build directory, etc.) is preserved because both packages share the same configuration files under `~/.config/kernel-manager/`.
+
+To update kernel-manager to the latest version, simply run:
+
+```sh
+yay -S kernel-manager          # for the source package
+# or
+yay -S kernel-manager-bin      # for the prebuilt binary
+```
+
 ## Main Window
 
 The window (titled `Kernel Manager vX.Y.Z`, version also in the status bar) is arranged top to bottom:

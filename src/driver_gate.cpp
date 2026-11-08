@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,11 +12,11 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "driver_gate.hpp"
+#include "popen_utils.hpp"
 
 #include <array>         // for array
 #include <cctype>        // for tolower
@@ -59,26 +59,16 @@ namespace {
         return {(std::istreambuf_iterator<char>{in}), std::istreambuf_iterator<char>{}};
     }
 
-    // The module's single popen helper (D2): runs one fixed command string
-    // and captures its stdout. The commands are fixed literals chosen at the
-    // call site (lspci, pacman -Siq, dkms status); the one parameterized call
+    // The module's single popen helper (D2): delegates to the shared
+    // popen_utils::capture (T-060: consolidates the three duplicated popen
+    // runners into one). The commands are fixed literals chosen at the call
+    // site (lspci, pacman -Siq, dkms status); the one parameterized call
     // (package_in_sync_db) passes a name restricted to the package-name
     // character class before it reaches the shell. On popen failure the
     // sentinel "-1" is returned and callers treat it as "no signal" (the
     // degradation contract), never as data.
     [[nodiscard]] std::string run_fixed_command(std::string_view command) {
-        // NOLINTNEXTLINE(bugprone-command-processor) — by design: a shell is required to pipe the fixed tool output (lspci / pacman -Siq / dkms status); the command strings are compile-time literals or package-name-safe strings, so no user input reaches the shell. This is the third standing suppression (the other two are utils.cpp's popen and bootloader.cpp's `command -v`); per CONTRIBUTING it is specific, names the check, and carries its rationale.
-        if (FILE* const pipe = popen(std::string{command}.c_str(), "r")) {
-            std::string output{};
-            char buffer[512];
-            std::size_t got = 0;
-            while ((got = std::fread(buffer, 1, sizeof buffer, pipe)) > 0) {
-                output.append(buffer, got);
-            }
-            pclose(pipe);
-            return output;
-        }
-        return "-1";
+        return popen_utils::capture(command);  // default cap (1 MiB) is far above any lspci/dkms output
     }
 
     // Package-name-safe character class: the letters, digits, and the

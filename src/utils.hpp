@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #ifndef UTILS_HPP
 #define UTILS_HPP
@@ -41,6 +40,7 @@
 #endif
 
 #include <QString>
+#include <QWidget>
 
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -52,7 +52,21 @@ namespace utils {
 
 [[nodiscard]] auto read_whole_file(std::string_view filepath) noexcept -> std::string;
 bool write_to_file(std::string_view filepath, std::string_view data) noexcept;
-std::string exec(std::string_view command) noexcept;
+
+// Bring a window to the front and fire a desktop notification (T-061:
+// shared by km-window and conf-window, which previously each had a
+// private copy). The notification is a backup for when the window
+// manager does not hand focus back after a long operation.
+void bring_window_forward(QWidget* window, const QString& title, const QString& text);
+
+// Runs a shell command and captures its stdout, stopping at `max_bytes`
+// (default 1 MiB — enough for every known call site's output). Returns "-1"
+// as a sentinel on popen failure (callers treat it as "no signal", never as
+// data — the degradation contract). The command strings at all call sites are
+// built from vetted, charset-guarded inputs; see the NOLINT in utils.cpp.
+// (T-060: the single shared popen helper; kernel_info and driver_gate use it
+// with their module-specific caps instead of maintaining duplicates.)
+[[nodiscard]] std::string exec(std::string_view command, std::size_t max_bytes = 1u << 20u) noexcept;
 [[nodiscard]] std::string fix_path(std::string&& path) noexcept;
 
 // Removes trailing '/' and '\' characters from `dir`, leaving the

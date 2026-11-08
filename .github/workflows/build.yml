@@ -15,17 +15,99 @@ env:
   CTEST_OUTPUT_ON_FAILURE: 1
 
 jobs:
-  build:
-    name: Build
+  # T-132: Sanitizer build — catches memory bugs (use-after-free, buffer
+  # overflows, leaks) and undefined behavior (integer overflow, null
+  # dereference) that the normal build might miss. Runs the pure-logic
+  # test suite with ASan + UBSan enabled.
+  sanitizer:
+    name: Sanitizer (ASan + UBSan)
     runs-on: ubuntu-latest
     container: archlinux:base-devel
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: install deps
         run: |
-          pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git
+          pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
         shell: bash
+
+      - name: Cache ccache
+        uses: actions/cache@1.4.0
+        with:
+          path: /home/runner/.cache/ccache
+          key: ccache-sanitizer-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            ccache-sanitizer-${{ github.ref }}-
+            ccache-sanitizer-
+
+      - name: Cache CPM dependencies
+        uses: actions/cache@1.4.0
+        with:
+          path: /home/runner/.cache/cpm
+          key: cpm-sanitizer-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            cpm-sanitizer-${{ github.ref }}-
+            cpm-sanitizer-
+
+      - name: Configure CMake (sanitizers)
+        run: |
+          export AR=llvm-ar
+          export CC=clang
+          export CXX=clang++
+          export NM=llvm-nm
+          export RANLIB=llvm-ranlib
+          export CPM_SOURCE_CACHE="$HOME/.cache/cpm"
+          export CMAKE_C_COMPILER_LAUNCHER=ccache
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+          cmake -S . -B build-san \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -GNinja
+        shell: bash
+
+      - name: Build (sanitizers)
+        run: |
+          cmake --build build-san -j "$(nproc)"
+        shell: bash
+
+      - name: Run tests (sanitizers)
+        run: |
+          ctest --test-dir build-san --output-on-failure --parallel "$(nproc)"
+        shell: bash
+
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: install deps
+        run: |
+          pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+        shell: bash
+
+      - name: Cache ccache
+        uses: actions/cache@1.4.0
+        with:
+          path: /home/runner/.cache/ccache
+          key: ccache-${{ github.job }}-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            ccache-${{ github.job }}-${{ github.ref }}-
+            ccache-${{ github.job }}-
+
+      - name: Cache CPM dependencies
+        uses: actions/cache@1.4.0
+        with:
+          path: /home/runner/.cache/cpm
+          key: cpm-${{ github.job }}-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            cpm-${{ github.job }}-${{ github.ref }}-
+            cpm-${{ github.job }}-
 
       - name: Configure CMake
         run: |
@@ -34,11 +116,33 @@ jobs:
           export CXX=clang++
           export NM=llvm-nm
           export RANLIB=llvm-ranlib
+          export CPM_SOURCE_CACHE="$HOME/.cache/cpm"
 
-          ./configure.sh -t=Debug -p=${{github.workspace}}/build --use_clang
+          # T-125: use ccache to speed up repeated CI builds.
+          export CMAKE_C_COMPILER_LAUNCHER=ccache
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+          # Configure into build/ (not build/Debug) so the test harnesses
+          # find the CMake artifacts (fmt, cxxbridge, moc, uic) where they
+          # expect them (${SOURCE_ROOT}/build). compile_commands.json is
+          # generated for the clang-tidy job in checks.yml.
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -GNinja
         shell: bash
 
       - name: Build
         run: |
-          ./build.sh
+          cmake --build build -j "$(nproc)"
+        shell: bash
+
+      - name: Run tests (CTest)
+        run: |
+          ctest --test-dir build --output-on-failure --parallel "$(nproc)"
+        shell: bash
+
+      - name: ccache stats
+        run: |
+          ccache -s || true
         shell: bash

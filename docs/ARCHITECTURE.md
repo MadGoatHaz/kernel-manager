@@ -22,6 +22,7 @@ kernel-manager/
 ├── src/                        # All C++ sources + shell helpers + codegen
 │   ├── main.cpp                # Entry: single-instance lock, translations, MainWindow
 │   ├── km-window.{hpp,cpp,ui}  # Main window: kernel tree, telemetry header, install/refresh flows
+│   ├── transaction_worker.{hpp,cpp}  # Dedicated QObject worker in its own QThread for pacman transactions
 │   ├── conf-window.{hpp,cpp,ui}# Configure window: options/patches tabs, build runner
 │   ├── conf-options-page.{hpp,ui}  # Options tab (source, name, 17 toggles/combos)
 │   ├── conf-patches-page.{hpp,ui}  # Patches tab (list widget, .patch source editing)
@@ -52,15 +53,13 @@ kernel-manager/
 ├── icons/                      # hicolor icon set (org.archlinux.KernelManager.*)
 ├── img/                        # README screenshots
 ├── lang/                       # Qt translation sources (.ts)
-├── plans/                      # Dev plans: PLAN.md + archive/ (per-release)
 ├── scripts/                    # format_file.sh (clang-format), auto-changelog.sh
 ├── tests/                      # 17 run_*.sh harnesses + their test_*.cpp drivers
 ├── build.sh / configure.sh     # Thin CMake wrappers (configure.sh writes build.sh)
 ├── Makefile                    # `pretty_format` + `Changelog.md` only (not the build)
-├── PKGBUILD / PKGBUILD-git     # AUR package definitions (git- = -git variant, unpublished)
+├── PKGBUILD / PKGBUILD-git     # AUR package definitions (git- = -git rolling variant)
 ├── km_locale.qrc               # Translation-resource file
-├── DEV_LOG.md                  # Active-worker lease board (gitignored, working doc)
-├── Work/                       # Gitignored working docs (DEV_LOG, HANDOVER, ENHANCEMENTS, AUR guide)
+├── work/                       # Gitignored workspace: plans/, docs/, DEV_LOG.md, MASTER_LOG.md, wsc/, scratch/
 └── docs/                       # This file
 ```
 
@@ -71,7 +70,7 @@ The `MainWindow` (`QMainWindow`, `km-window.hpp:117`) is the app's shell. Layout
 - **Key methods:** `build_kernel_info_header()` (`km-window.cpp:885`) renders the telemetry grid; `init_kernels()` (`km-window.cpp:1596`) re-parses alpm + rebuilds the tree; `on_execute()` (`km-window.cpp:1741`) starts the install/remove worker; `on_refresh()` (`km-window.cpp:1662`) → `purge_stale_rows()` (`km-window.cpp:1708`); `on_configure()` (`km-window.cpp:1116`) clones the build repo and opens `ConfWindow`; `on_kernel_context_menu()` (`km-window.cpp:1157`) drives the per-row actions.
 - **Telemetry header:** one `kernel_info::extract_kernel_info()` per call into a **single 4×4 `QGridLayout`** (30 labels = 15 keys + 15 values; row 0 = Release spanning cols 0–1 in a +2 pt bold hero font, Compiler at (0,2), Arch at (0,3); rows 1–3 = the 12 remaining params). Idempotent — a repeat tears down and re-renders byte-identically.
 - **Signals/slots (ctor, `km-window.cpp:727-805`):** button clicks → `on_execute`/`on_configure`/`on_refresh`/`on_cancel`/`on_browse_build_dir`/`on_schedext_config`; tree `itemChanged`/`customContextMenuRequested`/`double-click` → `item_changed`/`on_kernel_context_menu`/`check_uncheck_item`; a 2 s `QTimer` → `update_pacman_lock_banner` (`km-window.cpp:632`); `QFutureWatcher::finished` → show `ConfWindow` after the background clone.
-- **Worker:** a `QThread` + `Work` functor (`km-window.cpp:639`) runs `install_packages`/`remove_packages` (`km-window.cpp:80-103`) → `Kernel::commit_transaction()` (pacman via `runCmdTerminal`), then re-parses alpm and, if state changed, queues `init_kernels` back on the main thread (`km-window.cpp:664-696`). `m_running`/`m_mutex`/`m_cv` serialize the transaction.
+- **Worker:** a `TransactionWorker` (`transaction_worker.hpp:78`) — a dedicated `QObject` moved into its own `QThread` via `moveToThread`. All long-running work (alpm handle creation, kernel list fetch, pacman execution) happens in the worker thread. The worker creates and releases its **own** alpm handle for each transaction, eliminating cross-thread handle sharing (the root cause of use-after-free crashes on window close). Communication with the main thread is **only** via signals/slots: `transactionStarted()` / `transactionFinished(success, kernelsChanged)` / `error(message)`. The worker never touches Qt widgets or the main thread's alpm handle. Clean shutdown: `requestStop()` sets an atomic flag; the main thread calls `QThread::quit()` + `wait()` in `closeEvent` before releasing its own resources. A transaction already in flight (pacman running) is allowed to complete — pacman transactions are atomic and should not be killed mid-run.
 
 ### Kernel Model (`kernel.{hpp,cpp}`, `known_kernels.{hpp,cpp}`)
 `Kernel` (`kernel.hpp:30`) wraps one alpm package + its `-headers` + optional module packages (zfs/nvidia/nvidia-open) and its repo. A row is either **LIVE** (`m_pkg != nullptr`: a repo/AUR package, installable/removable) or a **curated INFO-row** (`m_pkg == nullptr`: display-only, `version()` = "—", install/remove guard out). `Kernel::get_kernels()` (`kernel.cpp:275`) builds the list in **four passes**:
@@ -127,11 +126,13 @@ A Qt-free pre-flight that decides **NVIDIA DKMS-vs-prebuilt packaging** before a
 │   ├─ build GateTarget from installable rows                                    │
 │   ├─ run_driver_gate()  ← driver_gate::evaluate_gate()   [trigger A]          │
 │   │     PROCEED / WARN_MIGRATE / ENSURE_HEADERS / WARN_ONLY                    │
-│   ├─ start worker (QThread)                                                   │
-│   └─ worker: install_packages + remove_packages → Kernel::commit_transaction()│
+│   ├─ start TransactionWorker (QThread via moveToThread)                       │
+│   └─ worker thread: creates own alpm handle → fetches kernel list →           │
+│          install_packages + remove_packages → Kernel::commit_transaction()   │
 │          → pacman -S / pacman -Rsn  via runCmdTerminal(pkexec)                │
 │          → ALPM hooks (70-dkms, 90-kernel) do DKMS+initramfs+boot entry        │
-│          → re-parse alpm → QMetaObject::invokeMethod(init_kernels) [auto-refresh]│
+│          → releases own alpm handle → emits transactionFinished()             │
+│   main thread: on transactionFinished → re-parse alpm → init_kernels [auto-refresh] │
 │ CONTEXT-MENU "Install pre-compiled": install_kernel()  install_kernel.hpp:136  │
 │   plan_steps → pacman -S/paru -S (driver gate [trigger B]) → 2-state verdict  │
 └────────────────────────────────────────────────────────────────────────────────┘

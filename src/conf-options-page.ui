@@ -572,7 +572,7 @@
            <item>
             <widget class="QLabel" name="build_debug_label">
              <property name="text">
-              <string>Include vmlinux with debug informations/symbols</string>
+               <string>Include vmlinux with debug symbols</string>
              </property>
             </widget>
            </item>

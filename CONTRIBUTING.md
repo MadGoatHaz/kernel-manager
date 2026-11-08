@@ -47,7 +47,7 @@ expected to keep it. Read this before opening a PR — the standards below are
 
 ### Testing
 
-- **15 standalone harnesses** (`tests/run_k*.sh` + `tests/run_chunk*.sh`) — **ALL must
+- **17 standalone harnesses** (`tests/run_k*.sh` + `tests/run_chunk*.sh`) — **ALL must
   pass** with 0 real-FAIL lines:
   `for t in tests/run_*.sh; do bash "$t"; done`
 - **Offscreen smoke:** `QT_QPA_PLATFORM=offscreen timeout 4 ./build/kernel-manager` —
@@ -87,18 +87,42 @@ expected to keep it. Read this before opening a PR — the standards below are
 
 - `src/` — the C++23 / Qt6 application (main window, configure dialog, install engine,
   bootloader + distro detection, terminal helpers)
-- `tests/` — 15 standalone harnesses (g++ C++23, no CTest)
+- `tests/` — 17 standalone harnesses (g++ C++23, no CTest)
 - `config-option-lib/` — Rust crate (config-option parsing via Corrosion / cxx)
 - `lang/` — Qt translation catalogs (16 `.ts`; resync manually with
   `lupdate6 src/*.cpp src/*.hpp src/*.ui -ts lang/kernel-manager_*.ts` — there is no
   CMake target)
-- `Work/Docs/` — project documentation (gitignored, local-only)
-- `plans/` — dev-cycle plans (gitignored, local-only)
+- `work/docs/` — project documentation (gitignored, local-only)
+- `work/plans/` — dev-cycle plans (gitignored, local-only)
+
+## Documentation
+
+When changing user-visible behavior, update the documentation:
+
+- `docs/USER_GUIDE.md` — end-user-facing behavior (new features, changed UI, new
+  keyboard shortcuts, changed install/uninstall behavior).
+- `README.md` — installation instructions, badges, quick-start, and the
+  "Who is this for?" positioning.
+- `Changelog.md` — every user-visible change gets an entry in the next release
+  (use the `### Added` / `### Changed` / `### Fixed` / `### Removed` subsections).
+- `lang/*.ts` — run `lupdate6 src/*.cpp src/*.hpp src/*.ui -ts lang/kernel-manager_*.ts`
+  after adding new `tr()` strings so translators see the new context.
+
+Keep documentation factual and concise. Avoid duplicating information that already
+lives in the code's own comments or the archi...ture guide (`docs/ARCHITECTURE.md`).
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/)
+(version 2.1). By participating, you agree to uphold this code. Examples of
+contributing to a positive environment include: using welcoming and inclusive
+language, being respectful of differing viewpoints and experiences, and
+gracefully accepting constructive criticism.
 
 ## Feedback & Questions
 
 Report bugs and suggest features via the [issue
 tracker](https://github.com/MadGoatHaz/kernel-manager/issues), or open a pull request
 against `main`. See [Changelog.md](Changelog.md) for the release history. (The
-per-cycle dev state and handover notes live in the local-only `Work/Docs/` and
-`plans/` directories, which are gitignored and not published.)
+per-cycle dev state and handover notes live in the local-only `work/docs/` and
+`work/plans/` directories, which are gitignored and not published.)

@@ -30,6 +30,24 @@ LOG_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/kernel-manager"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/build-$(date +%Y%m%d-%H%M%S)-$$.log"
 
+# Keep at most this many build logs (T-074: rotation prevents unbounded
+# growth of ~/.cache/kernel-manager/ on systems that build frequently).
+MAX_BUILD_LOGS=10
+
+rotate_build_logs() {
+    local logs=()
+    while IFS= read -r -d '' f; do
+        logs+=("$f")
+    done < <(find "$LOG_DIR" -maxdepth 1 -name 'build-*.log' -type f -print0 2>/dev/null | sort -z)
+    local count=${#logs[@]}
+    if (( count > MAX_BUILD_LOGS )); then
+        local to_remove=$(( count - MAX_BUILD_LOGS ))
+        for (( i = 0; i < to_remove; i++ )); do
+            rm -f "${logs[$i]}" 2>/dev/null || true
+        done
+    fi
+}
+
 # Run makepkg with streaming output + GPG retry.
 run_makepkg_with_gpg_fix() {
     local attempt=0
@@ -75,8 +93,11 @@ run_makepkg_with_gpg_fix() {
             echo "=== Importing GPG keys: $key_ids ===" | tee -a "$LOG_FILE"
             for key_id in $key_ids; do
                 gpg --recv-keys "$key_id" 2>&1 | tee -a "$LOG_FILE" || true
-                # Mark as ultimately trusted
-                echo "$key_id:5" | gpg --import-ownertrust 2>/dev/null || true
+                # Mark as fully trusted (level 4). Level 5 (ultimate) would
+                # auto-trust every package signed by this key without further
+                # verification; level 4 is the standard trust level for
+                # manually imported keys (T-028).
+                echo "$key_id:4:" | gpg --import-ownertrust 2>/dev/null || true
             done
             echo "=== Retrying makepkg… ===" | tee -a "$LOG_FILE"
             # Mark the retry in the log (the failure output above it stays)
@@ -87,10 +108,13 @@ run_makepkg_with_gpg_fix() {
 
         # "No public key" but no ID extractable: no blind import — print a
         # manual-import hint, then retry once (the key may have been
-        # imported in the meantime).
+        # imported in the meantime). Show the GPG-related log lines so the
+        # user can identify the key manually (T-073 fallback).
         if [[ $no_public_key -eq 1 ]]; then
             echo ""
             echo "Cannot extract the missing GPG key ID — import it manually (gpg --recv-keys <id>), then re-run the build." | tee -a "$LOG_FILE"
+            echo "GPG-related log lines:" | tee -a "$LOG_FILE"
+            grep -iE '(gpg|keyring|public key|signature)' "$LOG_FILE" 2>/dev/null | tail -20 | tee -a "$LOG_FILE" || true
             echo "Retrying makepkg… (the key may need to be imported first)" | tee -a "$LOG_FILE"
             echo "" >> "$LOG_FILE"
             echo "=== RETRY ATTEMPT $attempt (manual key import hint) ===" >> "$LOG_FILE"
@@ -108,6 +132,9 @@ run_makepkg_with_gpg_fix() {
     echo "=== makepkg failed after $max_attempts attempts. Log: $LOG_FILE ===" | tee -a "$LOG_FILE"
     return 1
 }
+
+# Rotate old build logs before starting a new one.
+rotate_build_logs
 
 echo "=== Build started: $(date) ===" | tee "$LOG_FILE"
 echo "=== Log file: $LOG_FILE ==="

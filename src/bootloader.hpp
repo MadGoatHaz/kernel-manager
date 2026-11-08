@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #ifndef BOOTLOADER_HPP
 #define BOOTLOADER_HPP
@@ -32,18 +31,19 @@
 enum class Bootloader : std::uint8_t { UKI,
     SYSTEMD_BOOT,
     GRUB,
-    UNKNOWN };
+    UNKNOWN,
+};
 
 // Human-readable name of a detected bootloader (UI-facing text).
-[[gnu::pure]] std::string bootloader_name(Bootloader bl);
+[[gnu::pure]] std::string_view bootloader_name(Bootloader bl);
 
 // Injection point for the detection heuristics. Every predicate answers
 // one question the heuristics ask; an unbound (empty) predicate
 // contributes no signal, so a partially populated probe is safe.
 struct BootloaderProbe {
-    std::function<bool(std::string_view path)> path_exists;    // file or directory exists
-    std::function<bool(std::string_view cmd)> command_exists;  // command on PATH (`command -v`)
-    std::function<bool(std::string_view dir)> dir_has_uki;     // a regular *.efi file in dir
+    std::function<bool(std::string_view path)> path_exists{};    // file or directory exists
+    std::function<bool(std::string_view cmd)> command_exists{};  // command on PATH (`command -v`)
+    std::function<bool(std::string_view dir)> dir_has_uki{};     // a regular *.efi file in dir
 };
 
 // Pure detection (first match wins): UKI > systemd-boot > GRUB > UNKNOWN.

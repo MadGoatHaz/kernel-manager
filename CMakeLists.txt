@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
+# Bumped to 3.22 to match the minimum required by the Corrosion subproject (v0.6.1).
+cmake_minimum_required(VERSION 3.22 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -7,8 +8,17 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 ## name and version
 ##
 project(kernel-manager
-        VERSION 1.30.2
+        VERSION 1.31.0
         LANGUAGES CXX)
+
+##
+## TESTING
+## Enable CTest so the shell-harness test suite can be discovered and run
+## via `ctest` from the build directory. The harnesses are registered at
+## the bottom of this file, after the main target (they need the CMake
+## build artifacts: fmt, frozen, cxxbridge, moc, uic).
+##
+enable_testing()
 
 
 ##
@@ -85,12 +95,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
-   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto=thin -fwhole-program-vtables")
-   set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -flto=thin -fwhole-program-vtables")
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto -fwhole-program -fuse-linker-plugin")
-endif()
+# LTO is configured centrally via StandardProjectSettings.cmake (ENABLE_IPO option).
+# See: cmake/StandardProjectSettings.cmake — uses CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE.
 
 list(APPEND CMAKE_REQUIRED_LINK_OPTIONS "-lalpm")
 check_symbol_exists(alpm_pkg_get_installed_db "alpm.h" HAVE_ALPM_INSTALLED_DB)
@@ -139,6 +145,7 @@ qt_add_executable(${PROJECT_NAME}
     src/kernel_info.hpp src/kernel_info.cpp
     src/boot_instructions.hpp src/boot_instructions.cpp
     src/install_kernel.hpp src/install_kernel.cpp
+    src/transaction_worker.hpp src/transaction_worker.cpp
     src/km-window.hpp src/km-window.cpp
     "${CMAKE_BINARY_DIR}/compile_options.hpp"
     src/config-options.hpp src/config-options.cpp
@@ -154,8 +161,9 @@ qt_add_executable(${PROJECT_NAME}
 ##
 # Single install prefix for the pkexec helpers (terminal-helper, rootshell.sh, repo_add.sh, build_helper.sh).
 # Exposed to C++ as KM_HELPER_DIR so no hard-coded path literals remain in src/.
-# Keep in sync with the exec.path annotation in org.archlinux.kernel-manager.pkexec.policy.
-set(KM_HELPER_DIR "/usr/lib/kernel-manager")
+# Derived from CMAKE_INSTALL_PREFIX + CMAKE_INSTALL_LIBDIR so the install is relocatable.
+# Keep in sync with the exec.path annotation in org.archlinux.kernel-manager.pkexec.policy (generated at install time).
+set(KM_HELPER_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/kernel-manager")
 target_compile_definitions(${PROJECT_NAME} PRIVATE KM_HELPER_DIR="${KM_HELPER_DIR}")
 
 # Sync repo (pacman.conf section) excluded from kernel discovery.
@@ -237,8 +245,14 @@ install(
     DESTINATION ${KM_HELPER_DIR}
 )
 
+# Generate the polkit policy with the actual KM_HELPER_DIR substituted at configure time.
+configure_file(
+    "${CMAKE_SOURCE_DIR}/packaging/org.archlinux.kernel-manager.pkexec.policy.in"
+    "${CMAKE_BINARY_DIR}/org.archlinux.kernel-manager.pkexec.policy"
+    @ONLY
+)
 install(
-    FILES packaging/org.archlinux.kernel-manager.pkexec.policy
+    FILES "${CMAKE_BINARY_DIR}/org.archlinux.kernel-manager.pkexec.policy"
    DESTINATION "${POLKITQT-1_POLICY_FILES_INSTALL_DIR}"
 )
 
@@ -284,5 +298,110 @@ install(
 )
 install(
     FILES ${CMAKE_SOURCE_DIR}/icons/310x310/org.archlinux.KernelManager.png
-   DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/310x310/apps
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/310x310/apps
 )
+
+##
+## CTest registration
+##
+## Each shell harness compiles its own test binary against the real project
+## sources (the "standalone g++ on the real sources" pattern), so the CTest
+## entry just runs the script. The scripts cd to the source root themselves
+## and look for build artifacts under ${CMAKE_SOURCE_DIR}/build — configure
+## with `cmake -S . -B build` (not build/Debug) so the artifacts land where
+## the harnesses expect them.
+##
+## The tests are split into two groups by their CMake-artifact needs:
+##   - Pure-C++ harnesses (k2, k5, k6, k16, k17, k18, k19, k20, k22, k23):
+##     no CMake build required; can run standalone.
+##   - Build-dependent harnesses (chunk1, chunk2_ui, k7, k8, k11, k12, k13,
+##     k14, k15, k21): need fmt / cxxbridge / moc / uic from the CMake tree.
+## All are registered unconditionally; the build-dependent ones simply fail
+## fast with a clear diagnostic if the CMake tree is missing or stale.
+##
+
+# --- Pure-C++ / bash-only harnesses (no CMake build required) ---
+add_test(NAME test_chunk2_known_kernels
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_chunk2.sh")
+add_test(NAME test_k5_bootloader
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k5.sh")
+add_test(NAME test_k6_boot_instructions
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k6.sh")
+add_test(NAME test_k16_build_helper_gpg
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k16.sh")
+add_test(NAME test_k17_terminal_helper
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k17.sh")
+add_test(NAME test_k18_distro
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k18.sh")
+add_test(NAME test_k19_driver_gate
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k19.sh")
+add_test(NAME test_k20_kernel_info
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k20.sh")
+add_test(NAME test_k22_aur_kernel
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k22.sh")
+add_test(NAME test_k23_pkgbuild_custom_name
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k23.sh")
+
+# --- Build-dependent harnesses (need CMake artifacts under build/) ---
+add_test(NAME test_chunk1_paths
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_chunk1.sh")
+add_test(NAME test_chunk2_ui
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_chunk2_ui.sh")
+add_test(NAME test_k7_package_availability
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k7.sh")
+add_test(NAME test_k8_install_kernel
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k8.sh")
+add_test(NAME test_k11_tree_rows
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k11.sh")
+add_test(NAME test_k12_tree_render
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k12.sh")
+add_test(NAME test_k13_repo_add
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k13.sh")
+add_test(NAME test_k14_dir_install
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k14.sh")
+add_test(NAME test_k15_build_dir
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k15.sh")
+add_test(NAME test_k21_config_options
+         COMMAND bash "${CMAKE_SOURCE_DIR}/tests/run_k21.sh")
+
+# All build-dependent tests require the main executable target to be built
+# (it produces the moc / uic / cxxbridge / fmt artifacts the harnesses link
+# against). The dependency is declared on the target, not the test: ctest
+# runs after `cmake --build` completes, so the artifacts exist by then.
+# We still set WORKING_DIRECTORY to the source root for clarity and set a
+# generous timeout on the heavier harnesses.
+set(BUILD_DEPENDENT_TESTS
+    test_chunk1_paths
+    test_chunk2_ui
+    test_k7_package_availability
+    test_k8_install_kernel
+    test_k11_tree_rows
+    test_k12_tree_render
+    test_k13_repo_add
+    test_k14_dir_install
+    test_k15_build_dir
+    test_k21_config_options)
+
+foreach(_t ${BUILD_DEPENDENT_TESTS})
+    set_tests_properties(${_t} PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        TIMEOUT 600)
+endforeach()
+
+set(PURE_CPP_TESTS
+    test_chunk2_known_kernels
+    test_k5_bootloader
+    test_k6_boot_instructions
+    test_k16_build_helper_gpg
+    test_k17_terminal_helper
+    test_k18_distro
+    test_k19_driver_gate
+    test_k20_kernel_info
+    test_k22_aur_kernel
+    test_k23_pkgbuild_custom_name)
+
+foreach(_t ${PURE_CPP_TESTS})
+    set_tests_properties(${_t} PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        TIMEOUT 300)
+endforeach()

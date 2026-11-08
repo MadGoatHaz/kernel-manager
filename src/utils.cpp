@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,11 +12,11 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "utils.hpp"
+#include "popen_utils.hpp"
 
 #include <cerrno>   // for errno
 #include <cstdio>   // for fopen, fclose, fread, fseek, ftell, SEEK_END, SEEK_SET
@@ -57,6 +57,16 @@
 namespace fs = std::filesystem;
 
 namespace utils {
+
+void bring_window_forward(QWidget* window, const QString& title, const QString& text) {
+    // T-061: shared by km-window and conf-window (both previously had a
+    // private copy). Raise + activate + a desktop-notification backup:
+    // after a long operation the window can sit buried behind others, and
+    // a modal parented to a buried window is invisible to the user.
+    window->raise();
+    window->activateWindow();
+    QProcess::startDetached("notify-send", {"--app-name=Kernel Manager", title, text});
+}
 
 auto read_whole_file(std::string_view filepath) noexcept -> std::string {
     // Use std::fopen because it's faster than std::ifstream
@@ -113,26 +123,15 @@ namespace {
     };
 }  // namespace
 
-std::string exec(std::string_view command) noexcept {
-    // NOLINTNEXTLINE(bugprone-command-processor) — by design: this is the app's single command-execution primitive (pacman/makepkg/git through a shell); the command strings are built from vetted, single-quoted, charset-guarded inputs, never raw user text.
-    const std::unique_ptr<FILE, pipe_deleter> pipe(popen(std::string{command}.c_str(), "r"));
-    if (!pipe) {
+std::string exec(std::string_view command, std::size_t max_bytes) noexcept {
+    // T-060: delegates to the shared popen_utils::capture helper. The
+    // security rationale (vetted, charset-guarded inputs) is documented at
+    // each call site; this is the app's single command-execution primitive
+    // (pacman/makepkg/git through a shell).
+    const auto result = popen_utils::capture(command, max_bytes);
+    if (result == "-1") {
         fmt::print(stderr, "popen failed! '{}'\n", command);
-        return "-1";
     }
-
-    std::string result{};
-    std::array<char, 128> buffer{};
-    while (!feof(pipe.get())) {
-        if (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-            result += buffer.data();
-        }
-    }
-
-    if (result.ends_with('\n')) {
-        result.pop_back();
-    }
-
     return result;
 }
 
@@ -193,6 +192,19 @@ std::string strip_trailing_separators(std::string dir) noexcept {
     }
     return dir;
 }
+
+namespace {
+    // Trim surrounding whitespace (T-057: shared by set_build_dir and
+    // set_build_source_repo). Operates in-place on a std::string.
+    auto trim_whitespace(std::string& s) noexcept -> void {
+        while (!s.empty() && (s.front() == ' ' || s.front() == '\t' || s.front() == '\n' || s.front() == '\r')) {
+            s.erase(s.begin());
+        }
+        while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\n' || s.back() == '\r')) {
+            s.pop_back();
+        }
+    }
+}  // namespace
 
 namespace {
     // Normalize a clone URL for comparison (drop a trailing '/' and '.git').
@@ -305,10 +317,21 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
         return;
     }
 
-    if (run_process("git", {"checkout", "--force", "master"}) != 0
+    // Detect the remote's default branch (T-079: hard-coded "master" breaks
+    // for repos that use "main" or another default). `git symbolic-ref
+    // refs/remotes/origin/HEAD` returns e.g. "refs/remotes/origin/main"; we
+    // strip the prefix to get the branch name. If the command fails (no
+    // remote HEAD, shallow clone, etc.), fall back to "master" (the
+    // historical default for this project's sources).
+    auto default_branch = utils::exec("git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null");
+    if (default_branch.empty() || default_branch == "-1") {
+        default_branch = "master";
+    }
+
+    if (run_process("git", {"checkout", "--force", default_branch}) != 0
         || run_process("git", {"clean", "-fd"}) != 0
         || run_process("git", {"pull"}) != 0) {
-        fmt::print(stderr, "prepare_git_repo: failed to refresh checkout at '{}'\n", repo_path.string());
+        fmt::print(stderr, "prepare_git_repo: failed to refresh checkout at '{}' (branch '{}')\n", repo_path.string(), default_branch);
     }
 }
 
@@ -319,6 +342,11 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
 // mid-session set_build_dir() is visible immediately.
 namespace {
 
+    // QSettings is not documented as thread-safe (T-064). In this app it is
+    // only ever accessed from the GUI thread (build_repo_path / set_build_dir
+    // are called from the main window's slots), so no synchronization is
+    // needed. If a future change calls these from a worker thread, a mutex
+    // must be added here.
     QSettings& app_settings() {
         static QSettings settings{"ArchLinux", "KernelManager"};
         return settings;
@@ -351,13 +379,8 @@ fs::path build_app_path() noexcept {
 // Persist the user-selected build directory; trimmed, `~`-expanded, empty
 // ⇒ no-op (the set_build_source_repo pattern).
 void set_build_dir(std::string dir) noexcept {
-    // trim surrounding whitespace
-    while (!dir.empty() && (dir.front() == ' ' || dir.front() == '\t' || dir.front() == '\n' || dir.front() == '\r')) {
-        dir.erase(dir.begin());
-    }
-    while (!dir.empty() && (dir.back() == ' ' || dir.back() == '\t' || dir.back() == '\n' || dir.back() == '\r')) {
-        dir.pop_back();
-    }
+    // trim surrounding whitespace (T-057)
+    trim_whitespace(dir);
     // Strip trailing separators so a freshly stored value is clean too
     // (defense in depth; build_repo_path() strips as well, which covers
     // pre-existing INI values).
@@ -386,13 +409,8 @@ const std::string& build_source_repo() noexcept {
 }
 
 void set_build_source_repo(std::string source) noexcept {
-    // trim surrounding whitespace
-    while (!source.empty() && (source.front() == ' ' || source.front() == '\t' || source.front() == '\n' || source.front() == '\r')) {
-        source.erase(source.begin());
-    }
-    while (!source.empty() && (source.back() == ' ' || source.back() == '\t' || source.back() == '\n' || source.back() == '\r')) {
-        source.pop_back();
-    }
+    // trim surrounding whitespace (T-057)
+    trim_whitespace(source);
     if (source.empty()) {
         return;  // keep the current/default source
     }

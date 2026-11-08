@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "conf-window.hpp"
 #include "compile_options.hpp"
@@ -79,7 +78,8 @@ namespace fs = std::filesystem;
 #define GENERATE_CONST_OPTION_VALUES(name, ...)                             \
     [[gnu::pure]] constexpr const char* get_##name(size_t index) noexcept { \
         constexpr std::array list_##name{__VA_ARGS__};                      \
-        return list_##name.at(index);                                       \
+        /* T-055: unchecked operator[] — callers pass combo-box indices that match the array size */ \
+        return list_##name[index];                                          \
     }
 
 /**
@@ -91,7 +91,7 @@ namespace fs = std::filesystem;
     [[gnu::pure]] constexpr ssize_t lookup_##name(std::string_view needle) noexcept { \
         constexpr std::array list_##name{__VA_ARGS__};                                \
         for (size_t i = 0; i < list_##name.size(); ++i) {                             \
-            if (std::string_view{list_##name.at(i)} == needle) {                      \
+            if (std::string_view{list_##name[i]} == needle) {                         \
                 return static_cast<ssize_t>(i);                                       \
             }                                                                         \
         }                                                                             \
@@ -124,8 +124,8 @@ auto flavor_display_name(const std::string& key, const std::string& base_key) no
     if (key == base_key) {
         return "Default";
     }
-    std::string label{};
-    bool capitalize_next{true};
+    std::string label{};  // NOLINT(misc-const-correctness) — built up in the loop below
+    bool capitalize_next{true};  // NOLINT(misc-const-correctness) — toggled in the loop below
     for (const char c : key) {
         if (c == '-') {
             label += ' ';
@@ -149,10 +149,12 @@ auto discover_repo_flavors(const fs::path& repo_root, std::string_view fallback_
     std::vector<std::string> dirs{};
     std::string single_package_dir{};  // set only for the single-package fallback below
     std::error_code ec{};
+    // T-013: explicit iterator + increment(ec) keeps this noexcept function
+    // from throwing via the range-based-for's implicit operator++.
     if (fs::is_directory(repo_root, ec)) {
-        for (const auto& entry : fs::directory_iterator(repo_root, ec)) {
-            if (entry.is_directory(ec) && fs::is_regular_file(entry.path() / "PKGBUILD", ec)) {
-                dirs.push_back(entry.path().filename().string());
+        for (auto it = fs::directory_iterator(repo_root, ec); !ec && it != fs::directory_iterator{}; it.increment(ec)) {
+            if (it->is_directory(ec) && !ec && fs::is_regular_file(it->path() / "PKGBUILD", ec) && !ec) {
+                dirs.push_back(it->path().filename().string());
             }
         }
     }
@@ -204,18 +206,18 @@ auto discover_repo_flavors(const fs::path& repo_root, std::string_view fallback_
     return flavors;
 }
 
-inline bool checkstate_checked(QCheckBox* checkbox) noexcept {
+inline bool checkstate_checked(const QCheckBox* checkbox) noexcept {
     return (checkbox->checkState() == Qt::Checked);
 }
 
-inline void set_checkstate(QCheckBox* checkbox, bool is_checked) noexcept {
+inline void set_checkstate(QCheckBox* checkbox, bool is_checked) noexcept {  // NOLINT(misc-const-correctness) — setCheckState() mutates
     checkbox->setCheckState(is_checked ? Qt::Checked : Qt::Unchecked);
 }
 
 struct CheckboxBinding {
-    QCheckBox* Ui::ConfOptionsPage::*widget;
-    bool ConfigOptions::*config_field;
-    std::string_view build_var;
+    QCheckBox* Ui::ConfOptionsPage::*widget{};
+    bool ConfigOptions::*config_field{};
+    std::string_view build_var{};
 };
 
 inline constexpr std::array<CheckboxBinding, 11> checkbox_bindings{{
@@ -372,9 +374,17 @@ auto run_and_remove_testscript(std::string_view script_path, std::string_view sc
         fmt::print(stderr, "run_and_remove_testscript: failed to write '{}'; not executing\n", std::string{script_path});
         return {};
     }
+    // T-012: use the non-throwing overload (error_code parameter) to keep
+    // this noexcept function from calling std::terminate on permission errors.
+    std::error_code perm_ec{};
     fs::permissions(script_path,
         fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
-        fs::perm_options::add);
+        fs::perm_options::add, perm_ec);
+    if (perm_ec) {
+        fmt::print(stderr, "run_and_remove_testscript: cannot set permissions on '{}': {}\n",
+            std::string{script_path}, perm_ec.message());
+        return {};
+    }
 
     const std::string command = args.empty() ? std::string{script_path} : fmt::format(FMT_COMPILE("{} {}"), std::string{script_path}, std::string{args});
     const std::string result  = utils::exec(command);
@@ -605,7 +615,7 @@ void remove_source_arrays_before_prepare(std::string& src) noexcept {
     }
 }
 
-bool insert_new_source_array_into_pkgbuild(std::string_view kernel_name_path, QListWidget* list_widget, const std::vector<std::string>& orig_source_array) noexcept {
+bool insert_new_source_array_into_pkgbuild(std::string_view kernel_name_path, const QListWidget* list_widget, const std::vector<std::string>& orig_source_array) noexcept {
     static constexpr auto functor = [](auto&& rng) {
         auto rng_str = std::string_view(&*rng.begin(), static_cast<size_t>(std::ranges::distance(rng)));
         return !rng_str.ends_with(".patch");
@@ -675,7 +685,7 @@ auto convert_vector_of_strings_to_stringlist(const std::vector<std::string>& vec
     return result;
 }
 
-inline void list_widget_apply_edit_flag(QListWidget* list_widget) noexcept {
+inline void list_widget_apply_edit_flag(const QListWidget* list_widget) noexcept {
     // Apply flag to each item in list widget
     for (int i = 0; i < list_widget->count(); ++i) {
         auto* item = list_widget->item(i);
@@ -695,12 +705,10 @@ inline void list_widget_apply_edit_flag(QListWidget* list_widget) noexcept {
 // (notify-send is fire-and-forget, like the terminal-helper's own
 // notifications).
 void bring_window_forward(QWidget* window) {
-    window->raise();
-    window->activateWindow();
-    QProcess::startDetached("notify-send",
-        {"--app-name=Kernel Manager",
-            "Kernel build finished",
-            "Do you want to install build packages?"});
+    // T-061: delegates to the shared utils::bring_window_forward with the
+    // build-finished-specific notification text.
+    utils::bring_window_forward(
+        window, "Kernel build finished", "Do you want to install build packages?");
 }
 
 }  // namespace

@@ -40,7 +40,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
   endif()
 endif()
 
-option(ENABLE_IPO "Enable Interprocedural Optimization, aka Link Time Optimization (LTO)" OFF)
+option(ENABLE_IPO "Enable Interprocedural Optimization (LTO) for Release builds" OFF)
 
 if(ENABLE_IPO)
   include(CheckIPOSupported)
@@ -50,7 +50,9 @@ if(ENABLE_IPO)
     OUTPUT
     output)
   if(result)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+    # Apply IPO only to Release builds (mirrors the previous manual -flto Release flags).
+    # CMake translates this to the appropriate compiler/linker flags for GCC and Clang.
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
   else()
     message(SEND_ERROR "IPO is not supported: ${output}")
   endif()

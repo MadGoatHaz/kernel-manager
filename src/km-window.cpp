@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 // NOLINTBEGIN(bugprone-unhandled-exception-at-new)
 
@@ -30,12 +29,11 @@
 #include <cctype>      // for tolower
 #include <cstdio>      // for fopen, fileno, fclose
 #include <filesystem>  // for exists
-#include <future>
-#include <ranges>       // for ranges::*
-#include <span>         // for span
-#include <string_view>  // for string_view
-#include <sys/file.h>   // for flock, LOCK_EX, LOCK_NB
-#include <thread>       // for this_thread
+#include <ranges>      // for ranges::*
+#include <span>        // for span
+#include <string_view> // for string_view
+#include <sys/file.h>  // for flock, LOCK_EX, LOCK_NB
+#include <thread>      // for this_thread
 
 #include <fmt/core.h>
 
@@ -49,7 +47,9 @@
 #include <QFrame>
 #include <QFutureWatcher>
 #include <QGridLayout>
+#include <QGroupBox>
 #include <QHBoxLayout>
+#include <QHeaderView>  // T-059: QHeaderView::ResizeToContents
 #include <QIcon>
 #include <QLabel>
 #include <QMenu>
@@ -76,47 +76,6 @@ namespace {
 // QStringLiteral form is not tr()-able; the constant's value is identical).
 // The k12 harness mirrors this literal.
 const auto kDirectoryRowRaw = "Install from directory…";
-
-bool install_packages(alpm_handle_t* handle, const std::span<Kernel>& kernels, const std::span<std::string>& selected_list) {
-    for (const auto& selected : selected_list) {
-        const auto& kernel = std::ranges::find_if(kernels, [selected](auto&& el) { return el.get_raw() == selected; });
-        if ((kernel != kernels.end()) && (!kernel->is_installed() || kernel->is_update_available())) {
-            if (!kernel->install()) {
-                fmt::print(stderr, "failed to add package to be installed ({})\n", alpm_strerror(alpm_errno(handle)));
-            }
-        }
-    }
-    return true;
-}
-
-bool remove_packages(alpm_handle_t* handle, const std::span<Kernel>& kernels, const std::span<std::string>& selected_list) {
-    for (const auto& selected : selected_list) {
-        const auto& kernel = std::ranges::find_if(kernels, [selected](auto&& el) { return el.get_raw() == selected; });
-        if ((kernel != kernels.end()) && (kernel->is_installed())) {
-            if (!kernel->remove()) {
-                fmt::print(stderr, "failed to add package to be removed ({})\n", alpm_strerror(alpm_errno(handle)));
-            }
-        }
-    }
-
-    return true;
-}
-
-bool is_kernels_change_state(alpm_handle_t* handle, std::span<std::string> kernel_install_list, std::span<std::string> kernel_removal_list) {
-    if (handle == nullptr) {
-        return false;
-    }
-    auto* local_db = alpm_get_localdb(handle);
-
-    if (std::ranges::any_of(kernel_install_list, [local_db](auto&& kernel_install) { return nullptr != alpm_db_get_pkg(local_db, kernel_install.data()); })) {
-        return true;
-    }
-    if (std::ranges::any_of(kernel_removal_list, [local_db](auto&& kernel_removal) { return nullptr == alpm_db_get_pkg(local_db, kernel_removal.data()); })) {
-        return true;
-    }
-
-    return false;
-}
 
 // E14: whether the named repo section is registered among the handle's sync
 // DBs (scans alpm_get_syncdbs by name, same list-walk as
@@ -389,12 +348,11 @@ struct VerdictDialog {
 // user. The gate's modals all share it (notify-send is fire-and-forget,
 // like the terminal-helper's own notifications).
 void bring_window_forward(QWidget* window) {
-    window->raise();
-    window->activateWindow();
-    QProcess::startDetached("notify-send",
-        {"--app-name=Kernel Manager",
-            "nvidia driver check",
-            "Kernel Manager has a question about the nvidia driver before this install."});
+    // T-061: delegates to the shared utils::bring_window_forward with the
+    // driver-gate-specific notification text.
+    utils::bring_window_forward(
+        window, "nvidia driver check",
+        "Kernel Manager has a question about the nvidia driver before this install.");
 }
 
 // The version() display markers ("∨" = the installed version is newer,
@@ -623,7 +581,7 @@ MainWindow::MainWindow(QWidget* parent)
     // driver-banner + header code-side-styling precedent). Warning
     // only: it never disables Execute (a transaction started against a
     // locked DB fails cleanly inside pacman with the usual error
-    // dialog — the m_running guards are untouched).
+    // dialog — the m_transaction_in_flight guards are untouched).
     m_ui->pacmanLockBanner->setStyleSheet(
         "background: rgba(154,119,0,36); border: 1px solid rgba(154,119,0,120); border-radius: 6px; padding: 6px 10px;");
     // The one initial call pins the banner state at startup (the 2 s
@@ -635,72 +593,67 @@ MainWindow::MainWindow(QWidget* parent)
     setAttribute(Qt::WA_NativeWindow);
     setWindowFlags(Qt::Window);  // for the close, min and max buttons
 
-    // Create worker thread
-    m_worker = new Work([&]() {
-        while (m_thread_running.load(std::memory_order_consume)) {
-            std::unique_lock<std::mutex> lock(m_mutex);
-            fmt::print(stderr, "Waiting... \n");
+    // Create the transaction worker: a dedicated QObject that runs pacman
+    // install/remove transactions in its own QThread. The worker creates
+    // and releases its OWN alpm handle for each transaction, so it never
+    // shares the main thread's handle (eliminates C1/C9 use-after-free).
+    // All communication with the UI is via signals/slots (eliminates
+    // C2/C3 direct widget access from the worker thread).
+    m_worker_thread = new QThread(this);
+    m_worker        = new TransactionWorker();
+    m_worker->moveToThread(m_worker_thread);
+    m_worker_thread->setObjectName("TransactionWorker");
 
-            m_cv.wait(lock, [&] { return m_running.load(std::memory_order_consume); });
-
-            if (m_running.load(std::memory_order_consume) && m_thread_running.load(std::memory_order_consume)) {
-                m_ui->ok->setEnabled(false);
-
-                std::vector<std::string> change_list(static_cast<std::size_t>(m_change_list.size()));
-                for (int i = 0; i < m_change_list.size(); ++i) {
-                    change_list.at(static_cast<std::size_t>(i)) = m_change_list.at(i).toStdString();
-                }
-
-                install_packages(m_handle, m_kernels, change_list);
-                remove_packages(m_handle, m_kernels, change_list);
-                Kernel::commit_transaction();
-
-                // check if we need to re-init kernels
-                // [1.1]
-                auto& kernel_install_list = Kernel::get_install_list();
-                auto& kernel_removal_list = Kernel::get_removal_list();
-
-                // NOTE: we don't want to override handle, because we would need to invalidate kernels then.
-                auto* temp_handle = utils::parse_alpm(utils::alpm_root, utils::alpm_libdir, &m_err);
-                if (temp_handle == nullptr) {
-                    QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to initialize alpm handle (%1)").arg(alpm_strerror(m_err)));
-                }
-
-                // [1.2]
-                // iterate over install and removal lists and check if any of the packages
-                // in the lists were either installed or removed
-                const bool is_kernel_status_changed = is_kernels_change_state(temp_handle, std::span{kernel_install_list}, std::span{kernel_removal_list});
-
-                // [1.3]
-                // if kernel status has changed, then re-init alpm handler,
-                // fetch kernels and repopulate tree widget again
-                if (is_kernel_status_changed) {
-                    if (m_handle != nullptr && utils::release_alpm(m_handle, &m_err) != 0) {
-                        QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to release alpm handle (%1)").arg(alpm_strerror(m_err)));
-                    }
-
-                    m_handle = temp_handle;
-                    m_kernels.clear();
-                    m_kernels = Kernel::get_kernels(m_handle);
-
-                    // schedule init_kernels to be executed in the main thread
-                    QMetaObject::invokeMethod(this, "init_kernels", Qt::QueuedConnection);
-                }
-
-                // clear install and removal lists
-                kernel_install_list.clear();
-                kernel_removal_list.clear();
-                m_change_list.clear();
-
-                m_running.store(false, std::memory_order_relaxed);
-                m_ui->ok->setEnabled(!is_kernel_status_changed);
-            }
+    // Worker → main thread: notify when a transaction starts/finishes or
+    // errors. These are auto-connected (queued) because the worker lives
+    // in a different thread.
+    connect(m_worker, &TransactionWorker::transactionStarted, this, [this]() {
+        m_transaction_in_flight = true;
+        m_ui->ok->setEnabled(false);
+        // T-122: show the transaction progress dialog (indeterminate bar +
+        // close button). The dialog is non-modal so the user can still
+        // interact with the app; it simply provides visibility that a
+        // pacman operation is running in the external terminal.
+        if (m_transaction_progress_dialog != nullptr) {
+            m_transaction_progress_dialog->reset();
+            m_transaction_progress_dialog->show();
+            m_transaction_progress_dialog->raise();
+            m_transaction_progress_dialog->activateWindow();
         }
     });
+    connect(m_worker, &TransactionWorker::transactionFinished, this, [this](bool /*success*/, bool kernelsChanged) {
+        m_transaction_in_flight = false;
+        // T-122: hide the transaction progress dialog.
+        if (m_transaction_progress_dialog != nullptr) {
+            m_transaction_progress_dialog->hide();
+        }
+        // If the kernel state changed, re-fetch the kernel list and
+        // rebuild the tree (this also re-enables the OK button if there
+        // are checked items).
+        if (kernelsChanged) {
+            init_kernels();
+        } else {
+            m_ui->ok->setEnabled(false);
+        }
+    });
+    connect(m_worker, &TransactionWorker::error, this, [this](const QString& message) {
+        m_transaction_in_flight = false;
+        // T-122: hide the transaction progress dialog on error.
+        if (m_transaction_progress_dialog != nullptr) {
+            m_transaction_progress_dialog->hide();
+        }
+        m_ui->ok->setEnabled(false);
+        QMessageBox::critical(this, tr("Kernel Manager"), message);
+    });
 
-    m_worker->moveToThread(m_worker_th);
-    // name to appear in ps, task manager, etc.
-    m_worker_th->setObjectName("WorkerThread");
+    // When the worker thread finishes, delete the worker object (Qt
+    // pattern: the worker is parented to the thread's event loop, and
+    // deleteLater ensures it's deleted in the correct thread context).
+    connect(m_worker_thread, &QThread::finished, m_worker, &QObject::deleteLater);
+
+    // Start the worker thread. The worker sits idle (in the thread's
+    // event loop) until startTransaction is called.
+    m_worker_thread->start();
 
     m_ui->ok->setEnabled(false);
 
@@ -723,6 +676,23 @@ MainWindow::MainWindow(QWidget* parent)
     // Setup progress dialog
     set_progress_dialog();
 
+    // T-122: transaction progress dialog — shown while a pacman
+    // install/remove transaction is running in the external terminal.
+    // Indeterminate progress bar (no granular progress from pacman);
+    // the close button dismisses the dialog without aborting the
+    // terminal operation (pacman transactions are atomic).
+    m_transaction_progress_dialog = new QProgressDialog(this);
+    m_transaction_progress_dialog->setWindowTitle(tr("Kernel Manager"));
+    m_transaction_progress_dialog->setLabelText(tr("Running pacman transaction...\nThe operation is executing in the terminal window.\nPlease wait for it to complete."));
+    m_transaction_progress_dialog->setRange(0, 0);  // indeterminate
+    m_transaction_progress_dialog->setCancelButton(nullptr);  // no "Cancel" — use close button
+    m_transaction_progress_dialog->setWindowModality(Qt::NonModal);
+    m_transaction_progress_dialog->setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint
+        | Qt::WindowSystemMenuHint | Qt::WindowStaysOnTopHint);
+    m_transaction_progress_dialog->setAutoClose(false);
+    m_transaction_progress_dialog->setAutoReset(false);
+    m_transaction_progress_dialog->hide();
+
     // Setup configure window
     connect(&m_future_watcher, &QFutureWatcher<void>::finished, this, [&]() {
         m_conf_progress_dialog->hide();
@@ -730,6 +700,11 @@ MainWindow::MainWindow(QWidget* parent)
             return;
         }
         if (m_future_watcher.future().isFinished()) {
+            // UI updates on the main thread (fixes C4: refresh_flavors and
+            // reset_patches_data_tab modify Qt widgets and must not run in
+            // the QtConcurrent background thread).
+            m_conf_window->refresh_flavors();
+            m_conf_window->reset_patches_data_tab();
             m_conf_window->show();
             return;
         }
@@ -755,11 +730,10 @@ MainWindow::MainWindow(QWidget* parent)
 
     tree_kernels->blockSignals(true);
 
-    // TODO(vnepogodin): parallelize it
-    auto a2 = std::async(std::launch::deferred, [&] {
-        const std::scoped_lock guard(m_mutex);
-        init_kernels_tree_widget(tree_kernels, std::span{m_kernels}, m_handle);
-    });
+    // The tree is a Qt widget and must be populated on the GUI thread; a
+    // deferred async wrapper (the old code) ran it synchronously anyway and
+    // added confusion (T-058). Call it directly.
+    init_kernels_tree_widget(tree_kernels, std::span{m_kernels}, m_handle);
 
     if (m_kernels.empty()) {
         QMessageBox::critical(this, tr("Kernel Manager"), tr("No kernels found!\nPlease run `pacman -Sy` to update DB!\nThis is needed for the app to work properly"));
@@ -785,10 +759,6 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_ui->browse, &QPushButton::clicked, this, &MainWindow::on_browse_build_dir);
     update_build_dir_label();
 
-    // Connect worker thread signals
-    connect(m_worker_th, &QThread::finished, m_worker, &QObject::deleteLater);
-    connect(m_worker_th, &QThread::started, m_worker, &Work::doHeavyCalculations, Qt::QueuedConnection);
-
     // check/uncheck tree items space-bar press or double-click
     auto* shortcutToggle = new QShortcut(Qt::Key_Space, this);
     connect(shortcutToggle, &QShortcut::activated, this, &MainWindow::check_uncheck_item);
@@ -809,15 +779,28 @@ MainWindow::MainWindow(QWidget* parent)
             }
         });
 
-    // Wait for async function to finish
-    a2.wait();
     tree_kernels->blockSignals(false);
 }
 
 MainWindow::~MainWindow() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    if (m_worker_th != nullptr) {
-        m_worker_th->exit();
+    // Safety net: if closeEvent didn't run (or the thread is still running
+    // for some reason), request a stop and join the worker thread. The
+    // normal path is closeEvent, which already does this, but the
+    // destructor guards against abnormal termination.
+    if (m_worker_thread != nullptr && m_worker_thread->isRunning()) {
+        if (m_worker != nullptr) {
+            m_worker->requestStop();
+        }
+        m_worker_thread->quit();
+        m_worker_thread->wait(10000);  // 10 s timeout
+        if (m_worker_thread->isRunning()) {
+            fmt::print(stderr, "MainWindow::~MainWindow: worker thread did not stop within 10 s\n");
+        }
+    }
+    // Release the main thread's alpm handle (the worker has its own).
+    if (m_handle != nullptr) {
+        utils::release_alpm(m_handle, &m_err);
+        m_handle = nullptr;
     }
 }
 
@@ -1101,13 +1084,34 @@ void MainWindow::build_change_list(QTreeWidgetItem* item) noexcept {
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
-    // Exit worker thread
-    m_running.store(true, std::memory_order_relaxed);
-    m_thread_running.store(false, std::memory_order_relaxed);
-    m_cv.notify_all();
+    // Stop the transaction worker cleanly (fixes C1/C9):
+    // 1. Request the worker to stop (queued to the worker thread). The
+    //    worker checks this flag before starting any new transaction.
+    //    If a transaction is in flight (pacman running), it completes
+    //    atomically before the worker exits.
+    // 2. Quit the worker thread's event loop.
+    // 3. Wait for the worker thread to actually finish (with a timeout).
+    //    Only after the worker has exited is it safe to release the
+    //    main thread's alpm handle (the worker has its own, so there's
+    //    no cross-thread handle sharing, but we wait to ensure no
+    //    global-list access is in progress).
+    if (m_worker_thread != nullptr && m_worker_thread->isRunning()) {
+        if (m_worker != nullptr) {
+            m_worker->requestStop();
+        }
+        m_worker_thread->quit();
+        m_worker_thread->wait(10000);  // 10 s timeout
+        if (m_worker_thread->isRunning()) {
+            fmt::print(stderr, "MainWindow::closeEvent: worker thread did not stop within 10 s; forcing close\n");
+        }
+    }
 
-    // Release libalpm handle
-    alpm_release(m_handle);
+    // Release the main thread's alpm handle (safe now: the worker has
+    // exited and has its own handle).
+    if (m_handle != nullptr) {
+        utils::release_alpm(m_handle, &m_err);
+        m_handle = nullptr;
+    }
 
     // Execute parent function
     QWidget::closeEvent(event);
@@ -1138,11 +1142,12 @@ void MainWindow::on_configure() noexcept {
     m_conf_window->sync_build_source();
 
     // NOTE: the future created by QtConcurrent::run is not cancelable.
-    // prepare in the background, without blocking the UI
+    // Only the I/O-heavy prepare_build_environment() runs in the
+    // background; the UI updates (refresh_flavors, reset_patches_data_tab)
+    // happen on the main thread in the finished slot (fixes C4: Qt
+    // widgets must only be touched from the main thread).
     m_future_watcher.setFuture(QtConcurrent::run([this] {
         utils::prepare_build_environment();
-        m_conf_window->refresh_flavors();
-        m_conf_window->reset_patches_data_tab();
     }));
 }
 
@@ -1589,10 +1594,6 @@ void MainWindow::on_cancel() noexcept {
     close();
 }
 
-void Work::doHeavyCalculations() {
-    m_func();
-}
-
 void MainWindow::init_kernels() noexcept {
     // show progress dialog to indicate user something is happening
     m_conf_progress_dialog->setLabelText(tr("Please wait...\nInitializing kernels.."));
@@ -1602,31 +1603,39 @@ void MainWindow::init_kernels() noexcept {
     // a repo enabled after app start (this slot's Add-repo success path, or
     // the worker's post-transaction re-init) is only visible through a
     // fresh alpm handle, so release + re-parse it and re-fetch the kernel
-    // list under m_mutex (serializes with the worker's transaction swap;
-    // the worker's own pre-swap parse stays untouched, the double parse is
-    // harmless).
-    {
-        const std::scoped_lock guard(m_mutex);
-        if (m_handle != nullptr) {
-            utils::release_alpm(m_handle, &m_err);
-        }
-        m_handle = utils::parse_alpm(utils::alpm_root, utils::alpm_libdir, &m_err);
+    // list. The worker now has its own handle, so no mutex is needed to
+    // serialize with it (fixes C5: the main thread's handle is only
+    // accessed from the main thread).
+    if (m_handle != nullptr) {
+        utils::release_alpm(m_handle, &m_err);
     }
+    m_handle = utils::parse_alpm(utils::alpm_root, utils::alpm_libdir, &m_err);
     if (m_handle == nullptr) {
         QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to initialize alpm handle (%1)").arg(alpm_strerror(m_err)));
         m_conf_progress_dialog->hide();
         return;
     }
-    {
-        const std::scoped_lock guard(m_mutex);
-        m_kernels = Kernel::get_kernels(m_handle);
-    }
+    m_kernels = Kernel::get_kernels(m_handle);
 
     auto* tree_kernels = m_ui->treeKernels;
     tree_kernels->blockSignals(true);
+
+    // Fix C6: QTreeWidget::clear() deletes the items but NOT the item
+    // widgets (QLabels) attached via setItemWidget — those become orphaned
+    // children of the tree and leak memory on every refresh. Detach and
+    // delete each item widget before clearing (the same pattern used in
+    // purge_stale_rows).
+    for (int r = tree_kernels->topLevelItemCount() - 1; r >= 0; --r) {
+        auto* item = tree_kernels->topLevelItem(r);
+        for (int c = 0; c < item->columnCount(); ++c) {
+            if (auto* w = tree_kernels->itemWidget(item, c)) {
+                tree_kernels->removeItemWidget(item, c);
+                delete w;
+            }
+        }
+    }
     tree_kernels->clear();
 
-    // NOTE: I don't think this should be parallelized, because it's already not running on the main thread
     init_kernels_tree_widget(tree_kernels, std::span{m_kernels}, m_handle);
 
     tree_kernels->blockSignals(false);
@@ -1635,16 +1644,17 @@ void MainWindow::init_kernels() noexcept {
 
 // Refresh (plan v1.29.0 D2): the manual re-scan — the bottom-row button
 // between Configure and Close. Fixed step order:
-//   1. Guards (silent no-op): a transaction in flight (m_running — the
-//      worker's post-transaction auto-refresh is authoritative) or the
+//   1. Guards (silent no-op): a transaction in flight (m_transaction_in_flight —
+//      the worker's post-transaction auto-refresh is authoritative) or the
 //      Configure clone flow owning the shared progress dialog
-//      (m_future_watcher) → return; both mirror on_execute's m_running
-//      early-return.
+//      (m_future_watcher) → return; both mirror on_execute's
+//      m_transaction_in_flight early-return.
 //   2. init_kernels() — the existing full refresh, reused verbatim (the
 //      auto-refresh and the manual refresh share one code path, so they
 //      are idempotent together): the shared progress dialog with its own
-//      label, the alpm re-parse under m_mutex, the Kernel::get_kernels
-//      re-fetch, the tree clear + rebuild. If the re-parse fails, its
+//      label, the alpm re-parse (no mutex needed — the worker has its
+//      own handle), the Kernel::get_kernels re-fetch, the tree clear +
+//      rebuild. If the re-parse fails, its
 //      existing path (critical box + hide + early return) leaves the
 //      previous tree intact; the purge + header steps below still run
 //      (both are data-driven over m_kernels and idempotent — harmless).
@@ -1654,13 +1664,13 @@ void MainWindow::init_kernels() noexcept {
 //      teardown preamble keeps a repeat call at 30 → 30 labels).
 // The progress dialog is the shared m_conf_progress_dialog; step 2 hides
 // it on every path, so nothing is left open here. Threading: reachable
-// only on the main thread (the worker's auto-refresh is a queued
-// invokeMethod, the manual click is the event loop) — no new lock
-// interaction beyond init_kernels' existing m_mutex use. A rapid
-// double-click serializes in the event loop and is a clean no-op
-// re-fetch (steps 3–4 are idempotent by construction).
+// only on the main thread (the worker's auto-refresh is a queued signal
+// slot, the manual click is the event loop) — no mutex needed since the
+// worker has its own alpm handle. A rapid double-click serializes in the
+// event loop and is a clean no-op re-fetch (steps 3–4 are idempotent by
+// construction).
 void MainWindow::on_refresh() noexcept {
-    if (m_running.load(std::memory_order_relaxed)) {
+    if (m_transaction_in_flight) {
         return;  // a transaction is in flight — its auto-refresh is authoritative
     }
     if (m_future_watcher.isRunning()) {
@@ -1754,7 +1764,7 @@ void MainWindow::on_execute() noexcept {
         }
     }
 
-    if (m_running.load(std::memory_order_consume)) {
+    if (m_transaction_in_flight) {
         return;
     }
 
@@ -1789,10 +1799,18 @@ void MainWindow::on_execute() noexcept {
         return;  // the user aborted the install
     }
 
-    m_running.store(true, std::memory_order_relaxed);
-    m_thread_running.store(true, std::memory_order_relaxed);
-    m_cv.notify_all();
-    m_worker_th->start();
+    // Copy the change list and clear it (the worker gets its own copy).
+    // The worker's startTransaction is Q_INVOKABLE; since the worker lives
+    // in a different thread, Qt automatically queues the call.
+    const QStringList changeList = m_change_list;
+    m_change_list.clear();
+
+    // Disable the OK button immediately (the worker's transactionStarted
+    // signal also sets m_transaction_in_flight = true, but this gives
+    // immediate feedback).
+    m_ui->ok->setEnabled(false);
+
+    m_worker->startTransaction(changeList);
 }
 
 void MainWindow::on_schedext_config() noexcept {
@@ -1826,8 +1844,21 @@ bool KernelTreeWidgetItem::operator<(const QTreeWidgetItem& other) const {
         return std_str;
     };
 
-    const auto& version_a = get_comparable_version(text(sort_col));
-    const auto& version_b = get_comparable_version(other.text(sort_col));
+    const auto version_a = get_comparable_version(text(sort_col));
+    const auto version_b = get_comparable_version(other.text(sort_col));
+
+    // Fix C10: info-rows (curated kernels not in any enabled repo) have
+    // version text "—" or "— (repo not enabled)", which are not valid
+    // pacman version strings. Passing them to alpm_pkg_vercmp is undefined
+    // behavior. Guard: if either string is not a valid version, fall back
+    // to lexicographic comparison (which gives a stable, predictable sort
+    // order for the placeholder strings).
+    auto is_valid_version = [](const std::string& s) {
+        return !s.empty() && !s.starts_with("—") && s.find('(') == std::string::npos;
+    };
+    if (!is_valid_version(version_a) || !is_valid_version(version_b)) {
+        return version_a < version_b;  // lexicographic fallback
+    }
 
     return alpm_pkg_vercmp(version_a.c_str(), version_b.c_str()) < 0;
 }

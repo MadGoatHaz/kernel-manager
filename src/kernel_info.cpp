@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,11 +12,11 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "kernel_info.hpp"
+#include "popen_utils.hpp"
 
 #include <algorithm>      // for ranges::replace
 #include <array>          // for array
@@ -77,29 +77,14 @@ namespace {
         return {(std::istreambuf_iterator<char>{in}), std::istreambuf_iterator<char>{}};
     }
 
-    // The module's single popen helper (the driver_gate run_fixed_command
-    // shape): runs one command string and captures its stdout, stopping at
-    // `max_bytes`. The command strings are fixed literals or character-class-
-    // guarded names built at the call site (never raw user text). On popen
-    // failure the sentinel "-1" is returned and callers treat it as "no
-    // signal" (the degradation contract), never as data.
+    // The module's single popen helper: delegates to the shared
+    // popen_utils::capture (T-060: consolidates the three duplicated popen
+    // runners into one). The command strings are fixed literals or
+    // character-class-guarded names built at the call site (never raw user
+    // text). On popen failure the sentinel "-1" is returned and callers
+    // treat it as "no signal" (the degradation contract), never as data.
     [[nodiscard]] std::string run_command(std::string_view command, std::size_t max_bytes = kDefaultCap) {
-        // NOLINTNEXTLINE(bugprone-command-processor) — by design: a shell is required to pipe the fixed tool output (zcat / sysctl -n / lsmod / modinfo / llvm-objdump); the command strings are compile-time literals or character-class-guarded names, so no user input reaches the shell. This is the FOURTH standing suppression project-wide (the other three are utils.cpp's popen, bootloader.cpp's `command -v`, and driver_gate.cpp's popen); per CONTRIBUTING it is specific, names the check, and carries its rationale.
-        if (FILE* const pipe = popen(std::string{command}.c_str(), "r")) {
-            std::string output{};
-            char buffer[4096];
-            while (output.size() < max_bytes) {
-                const std::size_t got = std::fread(buffer, 1, sizeof buffer, pipe);
-                if (got == 0) {
-                    break;
-                }
-                const std::size_t room = max_bytes - output.size();
-                output.append(buffer, got > room ? room : got);
-            }
-            pclose(pipe);
-            return output;
-        }
-        return "-1";
+        return popen_utils::capture(command, max_bytes);
     }
 
     // Character-class guards that keep the parameterized shell strings

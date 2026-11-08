@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "kernel.hpp"
 #include "aur_kernel.hpp"
@@ -40,33 +39,67 @@ namespace {
 static std::vector<std::string> g_aur_kernel_install_list{};  // NOLINT
 #endif
 
-static std::vector<std::string> g_kernel_install_list{};                             // NOLINT
-static std::vector<std::string> g_kernel_removal_list{};                             // NOLINT
-static const bool is_root_on_zfs = utils::exec("findmnt -ln -o FSTYPE /") == "zfs";  // NOLINT
+static std::vector<std::string> g_kernel_install_list{};  // NOLINT
+static std::vector<std::string> g_kernel_removal_list{};  // NOLINT
 
-// NOLINTNEXTLINE
-static const bool has_chwd = [] {
-    // Probe availability before use: chwd is distro-specific tooling and is
-    // absent on a generic install, where detection must rely on alpm-DB checks only.
-    const auto& probe = utils::exec("command -v chwd 2>/dev/null");
-    return !probe.empty() && probe != "-1";
-}();
-// NOLINTNEXTLINE
-static const bool is_nvidia_card_prebuild_module = [] {
-    if (!has_chwd) {
-        return false;
+// Lazy probes (T-056): these run shell commands to inspect the system state.
+// Function-local statics defer the first execution to the first actual use
+// (inside Kernel::install()/remove()), avoiding static-initialization-time
+// shell calls before main() has set up the environment. The std::call_once
+// pattern guarantees the command runs exactly once and is thread-safe.
+
+static bool is_root_on_zfs() {
+    static bool cached = false;
+    static bool done   = false;
+    if (!done) {
+        cached = utils::exec("findmnt -ln -o FSTYPE /") == "zfs";
+        done   = true;
     }
-    const auto& profile_names = utils::exec("chwd --list-installed -d 2>/dev/null | grep Name | awk '{print $4}'");
-    return std::ranges::any_of(utils::make_split_view(profile_names, '\n'), [](auto&& profile_name) { return profile_name.starts_with("nvidia-dkms"); });
-}();
-// NOLINTNEXTLINE
-static const bool is_nvidia_card_prebuild_open_module = [] {
-    if (!has_chwd) {
-        return false;
+    return cached;
+}
+
+static bool has_chwd() {
+    static bool cached = false;
+    static bool done   = false;
+    if (!done) {
+        // Probe availability before use: chwd is distro-specific tooling and is
+        // absent on a generic install, where detection must rely on alpm-DB checks only.
+        const auto& probe = utils::exec("command -v chwd 2>/dev/null");
+        cached            = !probe.empty() && probe != "-1";
+        done              = true;
     }
-    const auto& profile_names = utils::exec("chwd --list-installed -d 2>/dev/null | grep Name | awk '{print $4}'");
-    return std::ranges::any_of(utils::make_split_view(profile_names, '\n'), [](auto&& profile_name) { return profile_name.starts_with("nvidia-open-dkms"); });
-}();
+    return cached;
+}
+
+static bool is_nvidia_card_prebuild_module() {
+    static bool cached = false;
+    static bool done   = false;
+    if (!done) {
+        if (!has_chwd()) {
+            cached = false;
+        } else {
+            const auto& profile_names = utils::exec("chwd --list-installed -d 2>/dev/null | grep Name | awk '{print $4}'");
+            cached                    = std::ranges::any_of(utils::make_split_view(profile_names, '\n'), [](auto&& profile_name) { return profile_name.starts_with("nvidia-dkms"); });
+        }
+        done = true;
+    }
+    return cached;
+}
+
+static bool is_nvidia_card_prebuild_open_module() {
+    static bool cached = false;
+    static bool done   = false;
+    if (!done) {
+        if (!has_chwd()) {
+            cached = false;
+        } else {
+            const auto& profile_names = utils::exec("chwd --list-installed -d 2>/dev/null | grep Name | awk '{print $4}'");
+            cached                    = std::ranges::any_of(utils::make_split_view(profile_names, '\n'), [](auto&& profile_name) { return profile_name.starts_with("nvidia-open-dkms"); });
+        }
+        done = true;
+    }
+    return cached;
+}
 
 // ---------------------------------------------------------------------------
 // Data-driven module pairing, keyed by kernel base.
@@ -132,6 +165,11 @@ auto module_family_query(ModuleKind kind) {
 
 }  // namespace
 
+// T-065: the display sentinel for a missing/unknown version. Defined here so
+// the data layer and the display layer share one named constant instead of
+// scattering the raw "—" literal.
+inline constexpr std::string_view kVersionUnknown = "—";
+
 std::string Kernel::version() noexcept {
 #ifdef ENABLE_AUR_KERNELS
     /* clang-format off */
@@ -140,7 +178,7 @@ std::string Kernel::version() noexcept {
 #endif
     // Curated info-row (m_pkg == nullptr): display-only, no sync-DB version.
     if (m_pkg == nullptr) {
-        return "—";
+        return std::string{kVersionUnknown};
     }
     const char* sync_pkg_ver = alpm_pkg_get_version(m_pkg);
     /* clang-format off */
@@ -182,7 +220,7 @@ bool Kernel::install() const noexcept {
     }
     const char* pkg_name    = alpm_pkg_get_name(m_pkg);
     const char* pkg_headers = alpm_pkg_get_name(m_headers);
-    if (is_root_on_zfs && m_zfs_module != nullptr) {
+    if (is_root_on_zfs() && m_zfs_module != nullptr) {
         g_kernel_install_list.emplace_back(alpm_pkg_get_name(m_zfs_module));
     }
 
@@ -204,8 +242,8 @@ bool Kernel::install() const noexcept {
     const auto nvidia_open_family_query         = module_family_query(ModuleKind::NvidiaOpen);
     const bool is_nvidia_open_modules_installed = !nvidia_open_family_query.empty() && !utils::exec(fmt::format(FMT_COMPILE("pacman -Qqs '{}' 2>/dev/null"), nvidia_open_family_query)).empty();
 
-    bool should_install_nvidia      = (is_nvidia_card_prebuild_module && m_nvidia_module != nullptr);
-    bool should_install_nvidia_open = (is_nvidia_card_prebuild_open_module && m_nvidia_open_module != nullptr);
+    bool should_install_nvidia      = (is_nvidia_card_prebuild_module() && m_nvidia_module != nullptr);
+    bool should_install_nvidia_open = (is_nvidia_card_prebuild_open_module() && m_nvidia_open_module != nullptr);
 
     if (is_nvidia_open_modules_installed && m_nvidia_open_module != nullptr) {
         should_install_nvidia_open = true;
@@ -322,6 +360,12 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
             kernel_obj.m_zfs_module         = find_module_pkg(db, pkg_name, ModuleKind::Zfs);
             kernel_obj.m_nvidia_module      = find_module_pkg(db, pkg_name, ModuleKind::Nvidia);
             kernel_obj.m_nvidia_open_module = find_module_pkg(db, pkg_name, ModuleKind::NvidiaOpen);
+
+            // Dedup by name: a kernel appearing in multiple sync repos
+            // (e.g., core + extra) is listed only once (first repo wins).
+            if (std::ranges::find_if(kernels, [&](const auto& k) { return k.m_name == pkg_name; }) != kernels.end()) {
+                continue;
+            }
 
             kernels.emplace_back(std::move(kernel_obj));
         }

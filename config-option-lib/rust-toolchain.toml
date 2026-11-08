@@ -1,0 +1,18 @@
+# T-131: Pin the Rust toolchain for reproducible builds.
+#
+# edition = "2024" in Cargo.toml requires Rust 1.85+. This file ensures
+# that `cargo build`, `cargo test`, `cargo fmt`, and `cargo clippy` all
+# use the same toolchain version, regardless of what is installed on the
+# host or in CI. rustup reads this file automatically when invoked from
+# within the config-option-lib/ directory (or any subdirectory).
+#
+# CI (build.yml, release-bin.yml) installs the system `rust` package
+# (pacman), which tracks the Arch stable channel. The version pinned here
+# is the minimum that supports edition 2024; a newer stable on the host
+# will also work (the toolchain file does not force a downgrade, only a
+# floor). If the system rust is older than this, rustup (if available)
+# will fetch the pinned channel.
+[toolchain]
+channel = "1.85.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

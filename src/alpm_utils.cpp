@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "alpm_utils.hpp"
 #include "ini.hpp"
@@ -90,7 +89,7 @@ alpm_handle_t* parse_alpm(std::string_view root, std::string_view dbpath, alpm_e
         if (section == ignored_repo || section == "options") {
             continue;
         }
-        [[maybe_unused]] auto* db = alpm_register_syncdb(alpm_handle, section.c_str(), ALPM_SIG_USE_DEFAULT);
+        [[maybe_unused]] const auto* db = alpm_register_syncdb(alpm_handle, section.c_str(), ALPM_SIG_USE_DEFAULT);
     }
 
     return alpm_handle;
@@ -198,7 +197,7 @@ int add_repo_to_pacman_conf(std::string_view repo, RepoCmdRunner runner) noexcep
     std::string cmd{KM_HELPER_DIR};
     cmd += "/repo_add.sh '";
     cmd.append(repo);
-    cmd += "'";
+    cmd += '\'';
     return runner(cmd, true);
 }
 

@@ -80,7 +80,8 @@ MOC_KM_WINDOW="$(ls "$BUILD/kernel-manager_autogen"/*/moc_km-window.cpp 2>/dev/n
 MOC_CONF_WINDOW="$(ls "$BUILD/kernel-manager_autogen"/*/moc_conf-window.cpp 2>/dev/null | head -n1 || true)"
 MOC_CONF_OPTIONS_PAGE="$(ls "$BUILD/kernel-manager_autogen"/*/moc_conf-options-page.cpp 2>/dev/null | head -n1 || true)"
 MOC_CONF_PATCHES_PAGE="$(ls "$BUILD/kernel-manager_autogen"/*/moc_conf-patches-page.cpp 2>/dev/null | head -n1 || true)"
-if [[ -z "${MOC_KM_WINDOW}" || -z "${MOC_CONF_WINDOW}" || -z "${MOC_CONF_OPTIONS_PAGE}" || -z "${MOC_CONF_PATCHES_PAGE}" ]]; then
+MOC_TRANSACTION_WORKER="$(ls "$BUILD/kernel-manager_autogen"/*/moc_transaction_worker.cpp 2>/dev/null | head -n1 || true)"
+if [[ -z "${MOC_KM_WINDOW}" || -z "${MOC_CONF_WINDOW}" || -z "${MOC_CONF_OPTIONS_PAGE}" || -z "${MOC_CONF_PATCHES_PAGE}" || -z "${MOC_TRANSACTION_WORKER}" ]]; then
     echo "error: km-window/conf-window/page mocs not found under $BUILD/kernel-manager_autogen (run the CMake build first)" >&2
     exit 1
 fi
@@ -150,10 +151,12 @@ TUS=(
     src/boot_instructions.cpp
     src/bootloader.cpp
     src/config-options.cpp
+    src/transaction_worker.cpp
     "$MOC_KM_WINDOW"
     "$MOC_CONF_WINDOW"
     "$MOC_CONF_OPTIONS_PAGE"
     "$MOC_CONF_PATCHES_PAGE"
+    "$MOC_TRANSACTION_WORKER"
 )
 OBJS=()
 : > "$LOG"

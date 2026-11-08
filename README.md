@@ -105,7 +105,13 @@ yay -S kernel-manager
 paru -S kernel-manager
 ```
 
-A rolling `kernel-manager-git` variant (tracking the `main` branch) is not currently on the AUR and may be offered in a future release.
+A rolling `kernel-manager-git` variant (tracking the `main` branch) is available for users who want the latest development builds:
+
+```sh
+yay -S kernel-manager-git
+# or
+paru -S kernel-manager-git
+```
 
 ### Packages
 

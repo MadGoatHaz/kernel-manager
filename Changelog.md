@@ -1,5 +1,71 @@
 # Changelog
 
+## v1.31.0 (2026-11-08)
+
+### 🏗️ Architecture
+- Complete `TransactionWorker` refactor: proper Qt threading model replacing the ad-hoc worker thread. The worker now runs in a dedicated `QThread`, owns its own alpm handle, communicates exclusively via signals/slots, and shuts down cleanly (`requestStop` → `quit` → `wait`).
+- Eliminates all 6 Qt undefined-behavior violations from the previous design: thread-unsafe UI widget access, `QMessageBox` shown from the worker thread, mutex held for the entire transaction (UI freeze), use-after-free on window close during a transaction, `QtConcurrent::run` modifying widgets, and `QTreeWidget` item-widget memory leak on refresh.
+
+### 🔒 Security
+- Fixed shell metacharacter injection in `read_pkginfo()` (`install_kernel.cpp`): file paths are now passed through `shell_quote()` before being interpolated into the `tar` command.
+- Standardized the license declaration to **GPL-3.0-or-later** across all 60+ source files (7 files carried the older GPL-2.0-or-later header; all now match the LICENSE file and the PKGBUILDs).
+- Pinned all CI dependencies to specific versions or SHAs: `actions/checkout@v4.2.2`, the `cachyos/cachyos` container image by digest, and CPM.cmake v0.43.2 (stable).
+
+### 🐛 Bug Fixes
+- Fixed `alpm_pkg_vercmp()` being called on non-version strings ("—", "— (repo not enabled)") in the kernel sort comparator, which corrupted the sort order.
+- Fixed 2 `noexcept` functions (`run_and_remove_testscript`, `discover_repo_flavors`) that could throw via `fs::permissions` and `fs::directory_iterator`, risking `std::terminate`.
+- Fixed `conf-window.ui` layout bug: a fixed `geometry` property on the `QTabWidget` was overriding the layout manager.
+- Fixed the Ukrainian translation being missing from `km_locale.qrc` (the `.ts` file existed but was never compiled or loaded).
+- Fixed kernel deduplication in the tree row rendering.
+- Fixed `bootloader_name()` return type to `std::string_view` (all call sites return string literals).
+
+### 🔧 Build System
+- Updated CMake minimum version to 3.22 (required by the Corrosion subproject v0.6.1).
+- Replaced the unstable development-version CPM.cmake with the stable v0.43.2 release.
+- Removed the unsafe GCC `-fwhole-program` flag from Release builds (not sound for dynamically-linked programs).
+- Unified LTO configuration: removed redundant/conflicting manual flags, exposed through `ENABLE_IPO` using `CMAKE_INTERPROCEDURAL_OPTIMIZATION_<CONFIG>`.
+- Fixed hardcoded install paths: `KM_HELPER_DIR` is now derived from `CMAKE_INSTALL_PREFIX` (`${CMAKE_INSTALL_LIBDIR}/kernel-manager`) for proper relocation.
+- Aligned the Rust edition (2024) across `Cargo.toml` and `rustfmt.toml`; added `rust-toolchain.toml` (channel 1.85.0) for reproducible builds.
+- Fixed `configure.sh` overwriting the committed `build.sh` with a machine-specific path; `build.sh` is now in `.gitignore`.
+- Added content-hash-based validation and full JSON schema checking to `mkoptions.py` (replacing fragile mtime logic).
+- Fixed the CI pipeline to actually generate `compile_commands.json` (`-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`) so `clang-tidy` runs correctly.
+
+### 🧪 Testing
+- Integrated all tests into CMake with CTest (20 tests total; `ctest --test-dir build` is the single entry point).
+- Added a unified test runner (`tests/run_all_tests.sh`) that invokes all 20 harnesses.
+- Added new test coverage: `test_k21_config_options.cpp` (76 assertions, Rust cxx bridge), `test_k22_aur_kernel.cpp` (10 assertions), `test_k23_pkgbuild_custom_name.cpp` (37 assertions).
+- Added a sanitizer CI job (ASan + UBSan) — all tests pass clean with zero sanitizer errors.
+- Fixed the CI pipeline to run the full test suite (previously zero functional tests ran in CI).
+- Fixed the broken `clang-tidy` CI step (wrong path layout, `.hpp` files not checked).
+
+### ✨ Enhancements
+- Non-blocking install operations with a `QProgressDialog` and cancel button (install transactions no longer freeze the UI).
+- CI build speed improvements: ccache + CPM dependency caching in all three workflows.
+- Reproducible builds: `SOURCE_DATE_EPOCH` support in PKGBUILD and `release-bin.yml`.
+- Log rotation for `build_helper.sh` (keep last 10) and `repo_add.sh` (keep last 5).
+- Desktop file: fixed category to `System;Settings;`, added `StartupWMClass=kernel-manager`, added 16-language translations.
+- Complete documentation overhaul (`ARCHITECTURE.md`, `USER_GUIDE.md`, `CONTRIBUTING.md`).
+
+### 📦 Packaging
+- Restored all 3 AUR `PKGBUILD`s after the GitHub repository recreation (source URLs, commit pins, and checksums verified).
+- Updated all source URLs to the recreated repository (`MadGoatHaz/kernel-manager`).
+- Verified all three packages pass `makepkg --printsrcinfo`.
+
+### 📝 Documentation
+- Fixed polkit policy `vendor_url` branding (was pointing to the old CachyOS repo).
+- Normalized Changelog heading levels (`## vX.Y.Z` throughout).
+- Fixed `CONTRIBUTING.md` test harness count (17 → 20).
+- Added "Uninstalling" and "Upgrading / Switching packages" sections to `USER_GUIDE.md`.
+- Added code of conduct reference to `CONTRIBUTING.md`.
+- Added a note explaining the version gap (v1.0.0–v1.19.0) in the Changelog.
+
+### 🔍 Code Quality
+- Fixed all 15 `clang-tidy` diagnostics (const-correctness, trailing commas, member initialization, `std::string_view` preference); 3 targeted `NOLINT` suppressions added for confirmed false positives.
+- Consolidated 3 duplicated `popen`-based command runners into a single helper (`src/popen_utils.hpp`).
+- Improved 6 shell scripts (`build_helper.sh`, `repo_add.sh`, `postinstall_tail.sh`, `terminal-helper`, `rootshell.sh`, `utils.cpp` git-branch detection).
+- 17 code quality improvements across 13 files.
+- All files now consistently formatted per `.clang-format` (v16-pinned).
+
 ## v1.30.2 (2026-09-18)
 
 ### Fixed
@@ -43,58 +109,58 @@
 ### Changed
 - Instruction text updated to reference the Refresh button.
 
-### v1.28.0 (2026-09-05)
+## v1.28.0 (2026-09-05)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/016eea3...6b449a5)
 
-#### Added
+### Added
 - **Active Kernel Information header** — an Active Kernel Information header at the top of the main window, showing the booted kernel's toolchain, CPU target, optimization, scheduling, and runtime subsystem parameters.
 
-#### Changed
+### Changed
 - **Instruction text rewritten** — the instruction text now clearly explains checkbox + Execute behavior (install, uninstall, auto-refresh).
 
 > Note: full QA on merged main green — 17/17 harnesses (incl. the new k20 kernel-info harness, 26/26), 0 code warnings, offscreen smoke 124/0B/0B.
 
-### v1.27.1 (2026-09-05)
+## v1.27.1 (2026-09-05)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/a8dda06...016eea3)
 
-#### Fixed
+### Fixed
 - **Driver gate detects headers in the local install folder** — the driver gate now detects kernel headers shipped in the local install folder, so installing a pre-built kernel from a directory no longer falsely warns that headers are unavailable.
 
 > Note: post-fix regression on merged main green — 16/16 harnesses (k19 driver-gate 83/0 incl. the new local-dir case), 0 code warnings, offscreen smoke 124/0B/0B.
 
-### v1.27.0 (2026-09-05)
+## v1.27.0 (2026-09-05)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/bdfcf24...a8dda06)
 
-#### Added
+### Added
 - **Nvidia driver gate** — before the app installs a kernel (and, after a custom build, before it installs the freshly built packages), it checks how your Nvidia driver is packaged and warns you if the new kernel would break it. A precompiled driver (which ships no module for the new kernel) can be moved to the DKMS variant — the one that rebuilds itself for every kernel — with a single click; the app picks the right package for your GPU (the open kernel module on Turing-and-newer cards, the proprietary one on older). You can also proceed with a warning, or cancel.
 - **Persistent driver warning** — if you choose to proceed while a driver problem is still open, a banner stays in the status bar until the driver is fixed or the kernel removed, so the warning cannot be accidentally lost.
 
-#### Changed
+### Changed
 - **Kernel headers install with the kernel** — when a DKMS Nvidia driver is present and the new kernel's headers are available, the install now includes the matching `-headers` package on its own (for directory installs the headers are installed first), so the driver can rebuild for the new kernel without extra steps.
 
 > Note: full QA on merged main green — 16/16 harnesses (incl. the new k19 driver-gate harness, 80/80), 0 code warnings, offscreen smoke 124/0B/0B.
 
-### v1.26.0 (2026-09-04)
+## v1.26.0 (2026-09-04)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/045feca...bdfcf24)
 
-#### Changed
+### Changed
 - **Install flow simplified** — the install now relies on the distro's own alpm hooks (NVIDIA DKMS, `kernel-install`/dracut) for all post-install work instead of the app's own tail script. One code path for every install.
 - **Install result simplified to two states** — an install is **Installed** (green) or **Failed** (red, with the real exit code). The terminal output is the source of truth for DKMS/initramfs details.
 
-#### Added
+### Added
 - **App version displayed in the UI** — the running version now appears in the window title and a permanent status-bar label (auto-tracks the CMake project version).
 
-#### Removed
+### Removed
 - The app no longer invokes `postinstall_tail.sh` during install (the script is kept in the tree as a manual repair tool).
 - The 3-state boot-safety verdict is replaced by the simpler 2-state result.
 
 > Note: the distribution-awareness layer, the machine-state-robust k11 test expectation, and the CMake project-version correction (1.19.0 → 1.25.0) all shipped in v1.25.0 and are recorded in that entry — they are intentionally not repeated here.
 
-### v1.25.0 (2026-09-03)
+## v1.25.0 (2026-09-03)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/97e505b...045feca)
 
@@ -107,7 +173,7 @@
 
 > Note: released — the `v1.25.0` tag is cut at `045feca` (the fully-fixed main after the A→E2 postinstall/sentinel/verdict chain + the F/G/H isolated chunks) and the PKGBUILD is re-pinned to it (`pkgver` 1.25.0). Full QA on merged main: 15/15 harnesses green (1,286 observed checks / 0 FAIL — k11 81/0, k12 264/0 ×2 + stable dump, k16 35/0, k17 46/0, k18 50/50, chunk2 129/129), zero-code-warning forced full recompile, offscreen smoke 124/0B/0B, system-state gates green (`/etc/pacman.conf` + local DB + user config untouched, every mktemp sandbox trap-cleaned), 0 defects. Known limitation (tracked follow-up, not a release defect): the app still has no visible version in the UI — `PROJECT_VERSION` has no C++ consumer (no `--version` flag or about dialog); the package/tag/PKGBUILD chain is fully versioned.
 
-### v1.24.0 (2026-09-01)
+## v1.24.0 (2026-09-01)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/c8ca7c1...97e505b)
 
@@ -118,7 +184,7 @@
 
 > Note: released — the `v1.24.0` tag is cut at `97e505b` (the full post-RC state: the v1.24.0 RC `c8ca7c1` + this cycle's 5 fixes) and the PKGBUILD is re-pinned to it (`pkgver` 1.24.0, `sha256sums` refreshed from the fetched archive). 1163 unit checks green across all 14 harnesses (incl. the new k16 GPG-needle + k17 terminal-helper harnesses), zero-warning build, 0 defects. An optional `lupdate` resync of the locale catalogs for the new `tr()` strings (the RC's "Browse…", "Choose build directory", the directory-row tooltip, the boot-selection/critical dialog texts + the new `Build dir:` caption from the `.ui`) is deferred; the 5 fixes add no further `tr()` strings (the Execute-button change reuses an existing constant, the build-completion messages are `fmt` stderr diagnostics, not `tr()`).
 
-### v1.23.0 (2026-08-31)
+## v1.23.0 (2026-08-31)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/aad790e...0c918d4)
 
@@ -131,7 +197,7 @@
 
 > Note: released — the `v1.23.0` tag is cut at `0c918d4` (the full post-RC state: the v1.23.0 RC `f8536cc` + the 5 post-RC hardening fixes) and the PKGBUILD is pinned to it (`pkgver` 1.23.0, `sha256sums` refreshed). 989/989 unit assertions green across all 10 harnesses (incl. the new k12 tree-render + k13 repo-add harnesses), clean build with 1 pre-existing baseline warning, 0 defects. An optional `lupdate` resync of the locale catalogs for the new `tr()` strings ("Add repo '%1'" + the confirm/refresh texts) is deferred. The official-kernel build-options UI remains deferred (all 6 official PKGBUILDs consume zero user build variables — toggles would be silent no-ops).
 
-### v1.22.0 (2026-08-31)
+## v1.22.0 (2026-08-31)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/4c66803...738e24c)
 
@@ -141,7 +207,7 @@
 
 > Note: released — 476/476 unit assertions green across all 8 harnesses, clean build with 1 pre-existing baseline warning, 0 defects. An optional `lupdate` resync of the 16 locale catalogs for the new UI strings (e.g. the `Installed` header) is deferred. The v1.22.0 tag is cut at aad790e and the PKGBUILD pinned to it (pkgver 1.22.0).
 
-### v1.21.0 (2026-08-31) — release candidate
+## v1.21.0 (2026-08-31) — release candidate
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/33fe35a...262e59a)
 
@@ -152,7 +218,7 @@
 
 > Note: release candidate only — the AUR `PKGBUILD` source pin is still the pre-decoupling `19f1e06` and must be repointed to a current commit/tag (with a pkgver bump) before AUR submission; no version has been cut for this entry yet. An optional `lupdate` resync of the 16 locale catalogs for the new UI strings (context-menu labels, "Install" header) is pending.
 
-### v1.20.0 (2026-08-30) — release candidate
+## v1.20.0 (2026-08-30) — release candidate
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/4e26423...148b961)
 
@@ -165,7 +231,12 @@
 
 > Note: release candidate only — the AUR `PKGBUILD` source pin is still the pre-decoupling `19f1e06` and must be repointed to a current commit/tag (with a pkgver bump) before AUR submission; no version has been cut for this entry yet.
 
-### v0.9.1 (2022-01-27)
+> **Note on version history (v1.0.0–v1.19.0):** Formal changelog entries begin with
+> v1.20.0 (2026-08-30). The versions in between (v1.0.0 through v1.19.0, 2022–2026)
+> were incremental development releases without per-version changelog entries.
+> v0.9.0 and v0.9.1 (2022-01) were the last documented pre-v1.0 releases.
+
+## v0.9.1 (2022-01-27)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/v0.9.0...v0.9.1)
 
@@ -177,7 +248,7 @@
 - ♻  Update fmtlib and cleanup the source code
 - 🐛 Change the behaviour of "execute button" and thread logic
 
-### v0.9.0 (2022-01-23)
+## v0.9.0 (2022-01-23)
 
 [Full Changelog](https://github.com/MadGoatHaz/kernel-manager/compare/f897e30d69055a7ba3d97e461e3b062a7577df86...v0.9.0)
 

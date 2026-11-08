@@ -35,27 +35,45 @@
         </property>
        </spacer>
       </item>
-      <item>
-       <widget class="QToolButton" name="remove_entry_button">
-        <property name="text">
-         <string/>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QToolButton" name="move_up_button">
-        <property name="text">
-         <string/>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QToolButton" name="move_down_button">
-        <property name="text">
-         <string/>
-        </property>
-       </widget>
-      </item>
+       <item>
+        <widget class="QToolButton" name="remove_entry_button">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="accessibleName">
+          <string>Remove selected patch</string>
+         </property>
+         <property name="toolTip">
+          <string>Remove selected patch</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="move_up_button">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="accessibleName">
+          <string>Move patch up</string>
+         </property>
+         <property name="toolTip">
+          <string>Move patch up</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="move_down_button">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="accessibleName">
+          <string>Move patch down</string>
+         </property>
+         <property name="toolTip">
+          <string>Move patch down</string>
+         </property>
+        </widget>
+       </item>
      </layout>
     </widget>
    </item>

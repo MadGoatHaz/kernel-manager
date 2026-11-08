@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 // k12: offscreen render harness for the kernel tree's Choose cell (D3 lock
 // glyph), Version cell (D4 "— (repo not enabled)" annotation), the
@@ -730,6 +729,8 @@ int main(int argc, char** argv) {
             const bool has_date      = !build_date.isEmpty() && build_date != QStringLiteral("—");
             check(has_date, "kiKtBuildDate carries a date value (not empty / —)");
             if (has_date) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsuggest-attribute=pure"
                 const auto is_alpha = [](const QString& s, int from, int len) {
                     for (int k = from; k < from + len; ++k) {
                         if (!s.at(k).isLetter()) {
@@ -746,6 +747,7 @@ int main(int argc, char** argv) {
                     }
                     return true;
                 };
+#pragma GCC diagnostic pop
                 const bool ok_form = build_date.size() == 18
                     && is_alpha(build_date, 0, 3)
                     && build_date.at(3) == QLatin1Char(' ')
@@ -862,12 +864,22 @@ int main(int argc, char** argv) {
         refresh_button->click();
     }
     check(refresh_button != nullptr, "the refresh button is still present after the click");
-    // The shared progress dialog: exactly one (m_conf_progress_dialog —
-    // no other QProgressDialog exists) and hidden again (init_kernels
-    // hides it on every path).
+    // Progress dialogs: exactly two (m_conf_progress_dialog for the
+    // configure clone flow, and m_transaction_progress_dialog for the
+    // T-122 transaction progress). Both must be hidden after the refresh
+    // (init_kernels hides the configure dialog on every path; the
+    // transaction dialog is hidden when the transaction finishes or on
+    // error).
     const auto progress_dialogs = window.findChildren<QProgressDialog*>();
-    check(progress_dialogs.size() == 1, "exactly one QProgressDialog (the shared m_conf_progress_dialog)");
-    check(progress_dialogs.size() == 1 && !progress_dialogs.at(0)->isVisible(), "progress dialog hidden after the refresh");
+    check(progress_dialogs.size() == 2, "exactly two QProgressDialogs (configure + transaction)");
+    bool all_hidden = true;
+    for (const auto* d : progress_dialogs) {
+        if (d->isVisible()) {
+            all_hidden = false;
+            break;
+        }
+    }
+    check(all_hidden, "all progress dialogs hidden after the refresh");
 
     // 6d. The header after the click: still 30 (not 60), the same
     //     objectName set, kiHeroRelease unique, the spot value

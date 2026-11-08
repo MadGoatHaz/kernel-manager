@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 // Standalone unit test for the K8 install-kernel module (no CTest infra
 // in this project; follows the "standalone g++ on the real sources"
@@ -238,7 +237,7 @@ int main() {
         check(plan.postinstall_cmds.empty(),
             "plan_install(linux): postinstall empty (the ALPM hooks do the post-install work)");
         std::printf("INFO: plan_install(linux) -> %zu install + %zu postinstall cmd(s), live bootloader = %s\n",
-            plan.install_cmds.size(), plan.postinstall_cmds.size(), bootloader_name(detect_bootloader()).c_str());
+            plan.install_cmds.size(), plan.postinstall_cmds.size(), bootloader_name(detect_bootloader()).data());
     }
     {
         const InstallPlan prefix = plan_install("core/linux");
@@ -478,7 +477,7 @@ int main() {
         check(boot_instructions_for("core/linux") == steps,
             "boot_instructions_for(core/linux): prefix-tolerant, identical to linux");
         std::printf("INFO: live detection -> %s (%zu boot-instruction step(s))\n",
-            bootloader_name(detect_bootloader()).c_str(), steps.size());
+            bootloader_name(detect_bootloader()).data(), steps.size());
     }
 
     if (g_failures == 0) {

@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 // Standalone unit test for the K5 bootloader detection module (no CTest
 // infra in this project; follows the "standalone g++ on the real
@@ -242,7 +241,7 @@ int main() {
         check(real == Bootloader::UKI || real == Bootloader::SYSTEMD_BOOT || real == Bootloader::GRUB || real == Bootloader::UNKNOWN,
               "real: detect_bootloader() returns a valid enum");
         check(!bootloader_name(real).empty(), "real: bootloader_name() of the live detection is non-empty");
-        std::printf("INFO: live detection on this machine -> %s\n", bootloader_name(real).c_str());
+        std::printf("INFO: live detection on this machine -> %s\n", bootloader_name(real).data());
     }
 
     if (g_failures == 0) {

@@ -72,7 +72,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Resolve tag + version
         id: ver
@@ -113,8 +113,26 @@ jobs:
           # qt6-base is pulled in transitively via qt6-tools + polkit-qt6
           # (the source package does not list it directly either).
           pacman -Syu --noconfirm \
-            cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polkit-qt6 zstd
+            cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polkit-qt6 zstd ccache
         shell: bash
+
+      - name: Cache ccache
+        uses: actions/cache@1.4.0
+        with:
+          path: /home/runner/.cache/ccache
+          key: ccache-release-bin-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            ccache-release-bin-${{ github.ref }}-
+            ccache-release-bin-
+
+      - name: Cache CPM dependencies
+        uses: actions/cache@1.4.0
+        with:
+          path: /home/runner/.cache/cpm
+          key: cpm-release-bin-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            cpm-release-bin-${{ github.ref }}-
+            cpm-release-bin-
 
       - name: Install gh CLI (pinned static binary — AUR-only on Arch)
         run: |
@@ -152,9 +170,20 @@ jobs:
           # exactly as the source PKGBUILD does (PKGBUILD:115-116).
           export CFLAGS="${CFLAGS:+${CFLAGS} }-ffat-lto-objects"
           export CXXFLAGS="${CXXFLAGS:+${CXXFLAGS} }-ffat-lto-objects"
+          # T-146: reproducible builds — SOURCE_DATE_EPOCH makes timestamps
+          # in the built artifacts (e.g. embedded in the Rust staticlib, Qt
+          # resource qrc) deterministic. The checkout is a git repo, so use
+          # the timestamp of the HEAD commit.
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          # T-125: CPM cache to avoid re-downloading dependencies.
+          export CPM_SOURCE_CACHE="$HOME/.cache/cpm"
           # Toolchain = system defaults: GCC + GNU ld + Unix Makefiles.
           # No CC/CXX override, no -fuse-ld, no -G (ninja is not installed,
           # so Unix Makefiles is CMake's default generator).
+          # ccache is transparent (does not change the output), so it is safe
+          # to use for the release build as well.
+          export CMAKE_C_COMPILER_LAUNCHER=ccache
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr

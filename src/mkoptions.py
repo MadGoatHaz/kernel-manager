@@ -3,9 +3,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -13,14 +13,14 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
 from sys import argv
 import os
 import json
+import hashlib
 
 if len(argv) != 3:
     print('Wrong number of arguments! Please specify header directory.')
@@ -28,40 +28,179 @@ if len(argv) != 3:
 
 HEADER_ROOT = argv[1]
 SOURCE_ROOT = argv[2]
-SCRIPT_MTIME = os.stat(__file__).st_mtime
+
+
+def sha256_file(path):
+    """Return the SHA-256 hex digest of a file, or None if it does not exist."""
+    try:
+        with open(path, 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except FileNotFoundError:
+        return None
+
+
+def validate_compile_options(compile_options):
+    """Validate the structure of compile_options.json.
+
+    Expected structure:
+        {
+            "<repo_name>": {
+                "<option_key>": "<pkgbuild_var>"
+                | {"var": "<pkgbuild_var>", "values": {"<ui_value>": "<pkgbuild_value>", ...}},
+                ...
+            },
+            ...
+        }
+
+    Exits with a clear error message on any violation.
+    """
+    if not isinstance(compile_options, dict):
+        print("ERROR: compile_options.json top level must be an object, got {}".format(
+            type(compile_options).__name__))
+        exit(1)
+
+    if not compile_options:
+        print("ERROR: compile_options.json is empty; at least one repo entry is required.")
+        exit(1)
+
+    for repo_name, repo_opts in compile_options.items():
+        if not isinstance(repo_name, str) or not repo_name:
+            print("ERROR: repo key must be a non-empty string, got {!r}".format(repo_name))
+            exit(1)
+        if not isinstance(repo_opts, dict):
+            print("ERROR: repo '{}' value must be an object, got {}".format(
+                repo_name, type(repo_opts).__name__))
+            exit(1)
+        if not repo_opts:
+            print("ERROR: repo '{}' has no options".format(repo_name))
+            exit(1)
+
+        for opt_key, opt_val in repo_opts.items():
+            if not isinstance(opt_key, str) or not opt_key:
+                print("ERROR: repo '{}' option key must be a non-empty string, got {!r}".format(
+                    repo_name, opt_key))
+                exit(1)
+
+            if isinstance(opt_val, str):
+                # Direct mapping: option -> PKGBUILD var
+                if not opt_val:
+                    print("ERROR: repo '{}' option '{}' has an empty string value".format(
+                        repo_name, opt_key))
+                    exit(1)
+            elif isinstance(opt_val, dict):
+                # Translation form: {"var": ..., "values": {...}}
+                if "var" not in opt_val:
+                    print("ERROR: repo '{}' option '{}' dict is missing required 'var' key".format(
+                        repo_name, opt_key))
+                    exit(1)
+                var = opt_val["var"]
+                if not isinstance(var, str) or not var:
+                    print("ERROR: repo '{}' option '{}' 'var' must be a non-empty string, got {!r}".format(
+                        repo_name, opt_key, var))
+                    exit(1)
+
+                if "values" in opt_val:
+                    values = opt_val["values"]
+                    if not isinstance(values, dict):
+                        print("ERROR: repo '{}' option '{}' 'values' must be an object, got {}".format(
+                            repo_name, opt_key, type(values).__name__))
+                        exit(1)
+                    for ui_val, pkg_val in values.items():
+                        if not isinstance(ui_val, str):
+                            print("ERROR: repo '{}' option '{}' 'values' key must be a string, got {!r}".format(
+                                repo_name, opt_key, ui_val))
+                            exit(1)
+                        if not isinstance(pkg_val, str):
+                            print("ERROR: repo '{}' option '{}' 'values' entry for {!r} must be a string, got {!r}".format(
+                                repo_name, opt_key, ui_val, pkg_val))
+                            exit(1)
+
+                # Reject unknown keys in the dict form
+                allowed_keys = {"var", "values"}
+                for k in opt_val:
+                    if k not in allowed_keys:
+                        print("ERROR: repo '{}' option '{}' has unknown key {!r} (allowed: {})".format(
+                            repo_name, opt_key, k, sorted(allowed_keys)))
+                        exit(1)
+            else:
+                print("ERROR: repo '{}' option '{}' value must be a string or object, got {}".format(
+                    repo_name, opt_key, type(opt_val).__name__))
+                exit(1)
+
 
 def needs_run():
-    try:
-        for filename in ['compile_options.hpp']:
-            st = os.stat(HEADER_ROOT + '/' + filename)
-            if st.st_mtime < SCRIPT_MTIME:
-                return True
-    except FileNotFoundError:
+    """Determine if regeneration is needed based on content hashes.
+
+    Compares SHA-256 hashes of the input JSON and this script against
+    hashes stored in the generated header. This is more robust than mtime
+    comparison (which breaks on git checkout, clock skew, etc.).
+    """
+    header_path = HEADER_ROOT + '/compile_options.hpp'
+    json_path = SOURCE_ROOT + '/src/compile_options.json'
+
+    # If the header doesn't exist, regenerate.
+    if not os.path.exists(header_path):
         return True
-    # The per-repo option maps live in compile_options.json: a JSON newer
-    # than the generated header means the header is stale, so regenerate.
-    try:
-        json_mtime = os.stat(SOURCE_ROOT + '/src/compile_options.json').st_mtime
-        header_mtime = os.stat(HEADER_ROOT + '/compile_options.hpp').st_mtime
-        if header_mtime < json_mtime:
-            return True
-    except FileNotFoundError:
+
+    current_json_hash = sha256_file(json_path)
+    current_script_hash = sha256_file(__file__)
+
+    if current_json_hash is None:
+        print("ERROR: input JSON not found: " + json_path)
+        exit(1)
+
+    # Read the stored hashes from the header (they are written as comments).
+    stored_json_hash = None
+    stored_script_hash = None
+    with open(header_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.startswith('// mkoptions_hash: json='):
+                stored_json_hash = line.split('json=', 1)[1].strip()
+            elif line.startswith('// mkoptions_hash: script='):
+                stored_script_hash = line.split('script=', 1)[1].strip()
+
+    # If no stored hashes (old header format), regenerate.
+    if stored_json_hash is None or stored_script_hash is None:
         return True
+
+    # Regenerate if either hash differs.
+    if current_json_hash != stored_json_hash or current_script_hash != stored_script_hash:
+        return True
+
     return False
+
 
 def map_type(values_count):
     return 'frozen::unordered_map<frozen::string, std::string_view, {}>'.format(values_count)
 
+
 def main():
-    if needs_run():
-        header_file = HEADER_ROOT + '/compile_options.hpp'
-        header = open(header_file, 'w', encoding='utf-8', newline='\u000A')
+    if not needs_run():
+        print("Output files up-to-date.")
+        return
 
-        compile_options = {}
-        with open(SOURCE_ROOT + '/src/compile_options.json', 'r') as f:
+    header_file = HEADER_ROOT + '/compile_options.hpp'
+
+    # Load and validate the JSON input.
+    json_path = SOURCE_ROOT + '/src/compile_options.json'
+    try:
+        with open(json_path, 'r') as f:
             compile_options = json.load(f)
+    except json.JSONDecodeError as e:
+        print("ERROR: failed to parse compile_options.json: {} (line {}, col {})".format(
+            e.msg, e.lineno, e.colno))
+        exit(1)
 
+    validate_compile_options(compile_options)
+
+    # Compute content hashes for the staleness check.
+    json_hash = sha256_file(json_path)
+    script_hash = sha256_file(__file__)
+
+    with open(header_file, 'w', encoding='utf-8', newline='\u000A') as header:
         header.write(globals()['__doc__'])
+        header.write("// mkoptions_hash: json={}\n".format(json_hash))
+        header.write("// mkoptions_hash: script={}\n".format(script_hash))
         header.write("""#pragma once
 
 #if defined(__clang__)
@@ -145,8 +284,8 @@ namespace detail {
             header.write('}\n')
 
         header.write("\n} // namespace detail\n")
-        header.close()
-    else:
-        print("Output files up-to-date.")
+
+    print("Generated {} (json={}, script={})".format(header_file, json_hash[:12], script_hash[:12]))
+
 
 main()

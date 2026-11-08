@@ -20,15 +20,7 @@
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
     <widget class="QTabWidget" name="tabWidget">
-    <property name="geometry">
-     <rect>
-      <x>230</x>
-      <y>80</y>
-      <width>541</width>
-      <height>401</height>
-     </rect>
-    </property>
-    <property name="currentIndex">
+     <property name="currentIndex">
      <number>0</number>
     </property>
     <widget class="ConfOptionsPage" name="conf_options_page_widget">

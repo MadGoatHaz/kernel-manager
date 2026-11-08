@@ -83,9 +83,11 @@ LOG="/tmp/km-test-k13-build.log"
 /usr/bin/c++ \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
-    -DQT_CORE_LIB \
+    -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB \
     -I"$ROOT/src" \
     -I"$BUILD/_deps/fmt-src/include" \
+    -isystem /usr/include/qt6/QtWidgets \
+    -isystem /usr/include/qt6/QtGui \
     -isystem /usr/include/qt6/QtCore \
     -isystem /usr/include/qt6 \
     -isystem /usr/lib/qt6/mkspecs/linux-g++ \
@@ -109,6 +111,8 @@ LOG="/tmp/km-test-k13-build.log"
     "$BUILD/_deps/fmt-build/libfmt.a" \
     -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc \
     /usr/lib/libglib-2.0.so \
+    /usr/lib/libQt6Widgets.so \
+    /usr/lib/libQt6Gui.so \
     /usr/lib/libQt6Core.so \
     -lalpm \
     -o "$OUT" 2> "$LOG"

@@ -2,9 +2,9 @@
 //
 // This file is part of kernel-manager.
 //
-// This program is free software; you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -12,9 +12,8 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License along
-// with this program; if not, write to the Free Software Foundation, Inc.,
-// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "install_kernel.hpp"
 
@@ -437,8 +436,10 @@ bool read_pkginfo(const std::filesystem::path& pkg, std::string& name_out, std::
     // present, D2). popen failure ⇒ exec returns its "-1" sentinel and a
     // non-archive ⇒ tar fails behind 2>/dev/null: both leave no pkgname
     // below, so any failure degrades to false.
+    // T-024: shell_quote() escapes embedded single quotes as '\'' to prevent
+    // shell metacharacter injection from a crafted package filename.
     const auto content = utils::exec(
-        fmt::format(FMT_COMPILE("tar --zstd -xOf '{}' .PKGINFO 2>/dev/null"), pkg.string()));
+        fmt::format(FMT_COMPILE("tar --zstd -xOf {} .PKGINFO 2>/dev/null"), shell_quote(pkg.string())));
 
     const auto name = pkginfo_field(content, "pkgname");
     if (name.empty()) {
@@ -556,7 +557,7 @@ DirInstallResult install_from_directory(std::string_view dir,
         for (std::size_t i = 1; i < pkgs.size(); ++i) {
             header += ", " + package_identity(pkgs.at(i));
         }
-        header += "\nBootloader: " + bootloader_name(bl) + "\n";
+        header += "\nBootloader: " + std::string(bootloader_name(bl)) + "\n";
         utils::write_to_file(log_path, header);
         result.log_path = log_path;
     }

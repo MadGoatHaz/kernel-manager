@@ -141,7 +141,7 @@ check "A: exactly 2 makepkg calls" test "$(count_lines "$SANDBOX/makepkg_calls.l
 check "A: makepkg called with --noconfirm" grep -q -- '--noconfirm' "$SANDBOX/makepkg_calls.log"
 check "A: exactly 2 gpg calls" test "$(count_lines "$SANDBOX/gpg_calls.log")" -eq 2
 check "A: recv-keys of the exact 40-hex" grep -qx 'recv-keys 882DCFE48E2562ABF3B607488DB35A47' "$SANDBOX/gpg_calls.log"
-check "A: ownertrust '<id>:5' for it" grep -qx 'ownertrust 882DCFE48E2562ABF3B607488DB35A47:5' "$SANDBOX/gpg_calls.log"
+check "A: ownertrust '<id>:4:' for it" grep -qx 'ownertrust 882DCFE48E2562ABF3B607488DB35A47:4:' "$SANDBOX/gpg_calls.log"
 check "A: log file exists" test -n "$K16_LOG"
 check "A: log file captured the needle" grep -q 'unknown public key 882DCFE48E2562ABF3B607488DB35A47' "$K16_LOG"
 
@@ -153,7 +153,7 @@ check "B: rc 0 (the retry succeeded)" test "$RC" -eq 0
 check "B: exactly 2 makepkg calls" test "$(count_lines "$SANDBOX/makepkg_calls.log")" -eq 2
 check "B: exactly 2 gpg calls" test "$(count_lines "$SANDBOX/gpg_calls.log")" -eq 2
 check "B: recv-keys of the 16-hex from the line" grep -qx 'recv-keys C5ADB4F3FEBBCE27' "$SANDBOX/gpg_calls.log"
-check "B: ownertrust '<id>:5' for it" grep -qx 'ownertrust C5ADB4F3FEBBCE27:5' "$SANDBOX/gpg_calls.log"
+check "B: ownertrust '<id>:4:' for it" grep -qx 'ownertrust C5ADB4F3FEBBCE27:4:' "$SANDBOX/gpg_calls.log"
 check "B: log file exists" test -n "$K16_LOG"
 check "B: log file captured the needle" grep -q 'is not in your keyring' "$K16_LOG"
 
@@ -166,7 +166,7 @@ check "C: rc 0 (the retry succeeded)" test "$RC" -eq 0
 check "C: exactly 2 makepkg calls" test "$(count_lines "$SANDBOX/makepkg_calls.log")" -eq 2
 check "C: exactly 2 gpg calls" test "$(count_lines "$SANDBOX/gpg_calls.log")" -eq 2
 check "C: recv-keys of the 16-hex from the paired line" grep -qx 'recv-keys F3B607488DB35A47' "$SANDBOX/gpg_calls.log"
-check "C: ownertrust '<id>:5' for it" grep -qx 'ownertrust F3B607488DB35A47:5' "$SANDBOX/gpg_calls.log"
+check "C: ownertrust '<id>:4:' for it" grep -qx 'ownertrust F3B607488DB35A47:4:' "$SANDBOX/gpg_calls.log"
 check "C: log file exists" test -n "$K16_LOG"
 check "C: log file captured the paired key-ID line" grep -q 'using RSA key ID F3B607488DB35A47' "$K16_LOG"
 

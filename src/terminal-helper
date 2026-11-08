@@ -37,7 +37,6 @@ done
 shift $(($OPTIND - 1))
 
 file="$(mktemp)"
-pidfile="$file.pid"
 
 # Escalation: the C++ passes exactly 'pkexec "<KM_HELPER_DIR>/rootshell.sh"'
 # via -s (run_cmd_async / runCmdTerminal) — prefix-match on pkexec.
@@ -146,7 +145,7 @@ deadline=$(( SECONDS + ${KMH_START_TIMEOUT:-120} ))
 while [ ! -f "$run_dir/started" ]; do
     if [ "$SECONDS" -ge "$deadline" ]; then
         rm -rf "$run_dir"
-        rm -f "$pidfile" "$file"
+        rm -f "$file"
         exit 126
     fi
     sleep 0.2
@@ -174,7 +173,7 @@ if [ -z "$rc" ]; then
 fi
 
 # Cleanup: the user owns $run_dir (0755), so the root-written markers
-# inside are unlinkable by the user's helper; $file/$pidfile never leak.
+# inside are unlinkable by the user's helper; $file never leaks.
 rm -rf "$run_dir"
-rm -f "$pidfile" "$file"
+rm -f "$file"
 exit "$rc"
