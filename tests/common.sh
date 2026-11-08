@@ -46,6 +46,15 @@
 #
 # The functions are idempotent and cheap (path tests only).
 
+# Optional extra compiler/linker flags for the standalone g++ invocations.
+# The ASan/UBSan workflow job exports KM_CXX_FLAGS and KM_LINK_FLAGS so the
+# harnesses' hand-compiled TUs carry the same instrumentation as the CMake
+# build; without this, linking against the instrumented libfmtd.a fails with
+# undefined __asan_* / __ubsan_* symbols. In the normal build job these are
+# empty and the g++ command is unchanged.
+KM_CXX_FLAGS="${KM_CXX_FLAGS:-}"
+KM_LINK_FLAGS="${KM_LINK_FLAGS:-}"
+
 # --- helpers ----------------------------------------------------------------
 
 # Print the first existing path from the arguments, else exit 1.

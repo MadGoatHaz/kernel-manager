@@ -77,6 +77,12 @@ jobs:
       - name: Run tests (sanitizers)
         run: |
           export KM_BUILD_DIR=build-san
+          # The standalone test harnesses compile their own TUs; they must
+          # carry the same sanitizer flags as the CMake build or linking
+          # against the instrumented libfmtd.a fails with undefined
+          # __asan_*/__ubsan_* references.
+          export KM_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          export KM_LINK_FLAGS="-fsanitize=address,undefined"
           ctest --test-dir build-san --output-on-failure --parallel "$(nproc)"
         shell: bash
 

@@ -88,6 +88,7 @@ LOG="/tmp/km-test-k13-build.log"
     -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
     -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
     -D_FILE_OFFSET_BITS=64 -pthread \
+    $KM_CXX_FLAGS $KM_LINK_FLAGS \
     tests/test_k13_repo_add.cpp \
     src/alpm_utils.cpp \
     src/utils.cpp \

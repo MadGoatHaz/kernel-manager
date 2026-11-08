@@ -54,6 +54,7 @@ OUT="/tmp/km-test-chunk1"
     -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
     -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
     -D_FILE_OFFSET_BITS=64 -pthread \
+    $KM_CXX_FLAGS $KM_LINK_FLAGS \
     tests/test_chunk1_paths.cpp \
     src/utils.cpp \
     src/config-options.cpp \

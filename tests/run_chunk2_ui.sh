@@ -58,6 +58,7 @@ OUT="/tmp/km-test-chunk2-ui"
     -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
     -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
     -D_FILE_OFFSET_BITS=64 -pthread \
+    $KM_CXX_FLAGS $KM_LINK_FLAGS \
     tests/test_chunk2_conf_window.cpp \
     src/install_kernel.cpp \
     src/driver_gate.cpp \

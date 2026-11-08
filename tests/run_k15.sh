@@ -76,6 +76,7 @@ LOG="$GATE/build.log"
     -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
     -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
     -D_FILE_OFFSET_BITS=64 -pthread \
+    $KM_CXX_FLAGS $KM_LINK_FLAGS \
     tests/test_k15_build_dir.cpp \
     src/utils.cpp \
     src/aur_kernel.cpp \
