@@ -223,6 +223,9 @@ struct CheckboxBinding {
     std::string_view build_var{};
 };
 
+/* clang-format off */
+// The double-brace form is required for std::array aggregate initialization
+// with designated initializers; clang-format v16 misformats the inner braces.
 inline constexpr std::array<CheckboxBinding, 11> checkbox_bindings{{
     {.widget = &Ui::ConfOptionsPage::hardly_check, .config_field = &ConfigOptions::hardly_check, .build_var = "hardly"},
     {.widget = &Ui::ConfOptionsPage::perfgovern_check, .config_field = &ConfigOptions::per_gov_check, .build_var = "per_gov"},
@@ -236,9 +239,12 @@ inline constexpr std::array<CheckboxBinding, 11> checkbox_bindings{{
     {.widget = &Ui::ConfOptionsPage::builtin_nvidia_open_check, .config_field = &ConfigOptions::builtin_nvidia_open_check, .build_var = "builtin_nvidia_open"},
     {.widget = &Ui::ConfOptionsPage::build_debug_check, .config_field = &ConfigOptions::build_debug_check, .build_var = "build_debug"},
 }};
+/* clang-format on */
 
 // Option rows of the Configure page mapped to their per-repo option key, so
 // the visible option set can follow the selected build source.
+/* clang-format off */
+// Same double-brace constraint as checkbox_bindings above.
 inline constexpr std::array<std::pair<std::string_view, QWidget * Ui::ConfOptionsPage::*>, 17> option_row_bindings{{
     {"hardly", &Ui::ConfOptionsPage::hardly_widget},
     {"per_gov", &Ui::ConfOptionsPage::perfgovern_widget},
@@ -258,6 +264,7 @@ inline constexpr std::array<std::pair<std::string_view, QWidget * Ui::ConfOption
     {"cpu_opt", &Ui::ConfOptionsPage::processor_opt_widget},
     {"lto", &Ui::ConfOptionsPage::lto_widget},
 }};
+/* clang-format on */
 
 inline auto set_combobox_val(QComboBox* combobox, ssize_t index) noexcept {
     if (index < 0) {
@@ -1176,9 +1183,9 @@ void ConfWindow::update_option_set() noexcept {
 auto ConfWindow::effective_build_source() const noexcept -> std::string {
     const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
     const auto* source_combo        = options_page_ui_obj->build_source_combo;
-    const std::int32_t index  = source_combo->currentIndex();
+    const std::int32_t index = source_combo->currentIndex();
     if (index < 0) {
-        return {};
+        return std::string{};
     }
     if (index == source_combo->count() - 1) {  // the trailing "Custom URL…" entry
         return options_page_ui_obj->build_source_custom_edit->text().toStdString();
@@ -1596,9 +1603,9 @@ void ConfWindow::on_save() noexcept {
         QString::fromStdString(utils::fix_path("~/")),
         tr("Config file (*.toml)"))
                                .toStdString();
-    /* clang-format off */
-    if (save_file_path.empty()) { return; }
-    /* clang-format on */
+    if (save_file_path.empty()) {
+        return;
+    }
 
     if (!ConfigOptions::write_config_file(config_options, save_file_path)) {
         QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to save config options to file: %1").arg(QString::fromStdString(save_file_path)));
@@ -1613,9 +1620,9 @@ void ConfWindow::on_load() noexcept {
         QString::fromStdString(utils::fix_path("~/")),
         tr("Config file (*.toml)"))
                                .toStdString();
-    /* clang-format off */
-    if (load_file_path.empty()) { return; }
-    /* clang-format on */
+    if (load_file_path.empty()) {
+        return;
+    }
 
     auto config_options = ConfigOptions::parse_from_file(load_file_path);
     if (!config_options) {
