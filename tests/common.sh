@@ -55,9 +55,16 @@
 KM_CXX_FLAGS="${KM_CXX_FLAGS:-}"
 KM_LINK_FLAGS="${KM_LINK_FLAGS:-}"
 
-# Compiler selection: use the CXX env var (set by the workflow to clang++
-# in CI) or fall back to c++ (the system default, typically g++ locally).
-KM_CXX="${CXX:-c++}"
+# Compiler selection for the standalone harnesses.
+#
+# We deliberately do NOT follow the CXX env var here. The workflow sets
+# CXX=clang++ for the CMake build, but the clang driver binary in the CI
+# container links against libstdc++.so.6, which is fragile to lose during
+# package operations. g++ ships its own libstdc++ in gcc-libs and its
+# driver is robust; the Itanium C++ ABI is identical between the two, so
+# object files from either link cleanly against the other's static libs.
+# Local dev and CI both have g++ from base-devel.
+KM_CXX="g++"
 
 # LTO/whole-program flags are compiler-specific:
 #   GCC:   -flto -fwhole-program -fuse-linker-plugin -mno-direct-extern-access
