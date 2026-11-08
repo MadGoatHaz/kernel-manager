@@ -86,7 +86,7 @@ bool is_repo_in_syncdbs(alpm_handle_t* handle, std::string_view repo) {
         return false;
     }
     for (const alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
-        auto* db            = reinterpret_cast<alpm_db_t*>(i->data);
+        const auto* db            = reinterpret_cast<const alpm_db_t*>(i->data);
         const char* db_name = alpm_db_get_name(db);
         if (db_name == nullptr) {
             continue;
@@ -541,7 +541,8 @@ MainWindow::MainWindow(QWidget* parent)
     m_driver_banner(new QLabel(parent)),
     m_elide_filter(new ElideFilter(this)),
     m_worker_thread(new QThread(parent)),
-    m_worker(new TransactionWorker()) {
+    m_worker(new TransactionWorker()),
+    m_transaction_progress_dialog(new QProgressDialog(this)) {
     m_ui->setupUi(this);
     // D5 (plan v1.30.0): the shared resize-time ellipsis filter — created
     // once in the member-initializer-list above (window-parented, so it
@@ -684,7 +685,6 @@ MainWindow::MainWindow(QWidget* parent)
     // Indeterminate progress bar (no granular progress from pacman);
     // the close button dismisses the dialog without aborting the
     // terminal operation (pacman transactions are atomic).
-    m_transaction_progress_dialog = new QProgressDialog(this);
     m_transaction_progress_dialog->setWindowTitle(tr("Kernel Manager"));
     m_transaction_progress_dialog->setLabelText(tr("Running pacman transaction...\nThe operation is executing in the terminal window.\nPlease wait for it to complete."));
     m_transaction_progress_dialog->setRange(0, 0);            // indeterminate

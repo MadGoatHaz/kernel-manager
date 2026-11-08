@@ -36,7 +36,7 @@ constexpr auto make_split_view(std::string_view str, char delim = '\n') noexcept
     constexpr auto functor = [](auto&& rng) {
         return std::string_view(&*rng.begin(), static_cast<size_t>(std::ranges::distance(rng)));
     };
-    constexpr auto second = [](auto&& rng) { return rng != ""; };
+    constexpr auto second = [](auto&& rng) { return !rng.empty(); };
 
     return str
         | std::ranges::views::split(delim)

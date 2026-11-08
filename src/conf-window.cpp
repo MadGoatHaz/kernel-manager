@@ -75,12 +75,14 @@ namespace fs = std::filesystem;
  *
  * Used to define constant values for options.
  */
+/* clang-format off */
 #define GENERATE_CONST_OPTION_VALUES(name, ...) \
     [[gnu::pure]] constexpr const char* get_##name(size_t index) noexcept { \
         constexpr std::array list_##name{__VA_ARGS__}; \
         /* T-055: unchecked operator[] — callers pass combo-box indices that match the array size */ \
         return list_##name[index]; \
     }
+/* clang-format on */
 
 /**
  * GENERATE_CONST_LOOKUP_VALUES(name, ...):
@@ -232,7 +234,8 @@ inline constexpr std::array<CheckboxBinding, 11> checkbox_bindings{{
     {.widget = &Ui::ConfOptionsPage::builtin_zfs_check, .config_field = &ConfigOptions::builtin_zfs_check, .build_var = "builtin_zfs"},
     {.widget = &Ui::ConfOptionsPage::builtin_nvidia_open_check, .config_field = &ConfigOptions::builtin_nvidia_open_check, .build_var = "builtin_nvidia_open"},
     {.widget = &Ui::ConfOptionsPage::build_debug_check, .config_field = &ConfigOptions::build_debug_check, .build_var = "build_debug"},
-}};
+},
+};
 
 // Option rows of the Configure page mapped to their per-repo option key, so
 // the visible option set can follow the selected build source.
@@ -254,7 +257,8 @@ inline constexpr std::array<std::pair<std::string_view, QWidget * Ui::ConfOption
     {"hugepage", &Ui::ConfOptionsPage::hugepage_widget},
     {"cpu_opt", &Ui::ConfOptionsPage::processor_opt_widget},
     {"lto", &Ui::ConfOptionsPage::lto_widget},
-}};
+},
+};
 
 inline auto set_combobox_val(QComboBox* combobox, ssize_t index) noexcept {
     if (index < 0) {
@@ -628,7 +632,7 @@ bool insert_new_source_array_into_pkgbuild(std::string_view kernel_name_path, co
 
     // Apply flag to each item in list widget
     for (int i = 0; i < list_widget->count(); ++i) {
-        auto* item = list_widget->item(i);
+        const auto* item = list_widget->item(i);
         array_entries.emplace_back(fmt::format(FMT_COMPILE("\"{}\""), item->text().toStdString()));
     }
     const auto& pkgbuild_path = fmt::format(FMT_COMPILE("{}/PKGBUILD"), kernel_name_path);
@@ -645,13 +649,13 @@ bool insert_new_source_array_into_pkgbuild(std::string_view kernel_name_path, co
     // above prepare() before inserting this one — otherwise each run
     // stacks another block (see remove_source_arrays_before_prepare).
     remove_source_arrays_before_prepare(pkgbuildsrc);
-    if (auto foundpos = pkgbuildsrc.find("prepare()"); foundpos != std::string::npos) {
+    if (const auto foundpos = pkgbuildsrc.find("prepare()"); foundpos != std::string::npos) {
         // Insert right AFTER the newline that ends the line above
         // prepare(): the block always starts on its own line and its
         // trailing newline keeps it separated from whatever follows.
         // (Inserting at the newline's position would glue the block's
         // first line to the preceding content.)
-        if (auto last_newline_before = pkgbuildsrc.find_last_of('\n', foundpos); last_newline_before != std::string::npos) {
+        if (const auto last_newline_before = pkgbuildsrc.find_last_of('\n', foundpos); last_newline_before != std::string::npos) {
             pkgbuildsrc.insert(last_newline_before + 1, new_source_array);
         }
     }
@@ -829,7 +833,7 @@ void ConfWindow::handle_build_done() noexcept {
         return;  // the user aborted the install
     }
 
-    auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Do you want to install build packages?"));
+    const auto res = QMessageBox::question(this, tr("Kernel Manager"), tr("Do you want to install build packages?"));
     if (res == QMessageBox::Yes) {
         fmt::print("pressed yes\n");
 
@@ -1044,13 +1048,13 @@ void ConfWindow::on_done_status_tick() noexcept {
 }
 
 void ConfWindow::connect_all_checkboxes() noexcept {
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
 
     const std::array checkbox_list{
         options_page_ui_obj->builtin_nvidia_open_check,
     };
 
-    for (auto* checkbox : checkbox_list) {
+    for (const auto* checkbox : checkbox_list) {
         connect(checkbox, &QCheckBox::checkStateChanged, this, [this](Qt::CheckState) {
             reset_patches_data_tab();
         });
@@ -1059,7 +1063,7 @@ void ConfWindow::connect_all_checkboxes() noexcept {
 
 std::string ConfWindow::get_all_set_values() const noexcept {
     std::string result{};
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
 
     // The option set is per-repo: resolved from the selected build source
     // (single utils accessor, synced from the UI before builds) by the
@@ -1101,7 +1105,7 @@ std::string ConfWindow::get_all_set_values() const noexcept {
 }
 
 void ConfWindow::clear_patches_data_tab() noexcept {
-    auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
+    const auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
     patches_page_ui_obj->list_widget->clear();
 }
 
@@ -1115,8 +1119,8 @@ auto ConfWindow::kernel_path_for_index(std::int32_t index) const noexcept -> std
 // (Re)discover the build flavors from the kernel source repo and repopulate
 // the flavor combo, preserving the user's current selection when possible.
 void ConfWindow::refresh_flavors() noexcept {
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    auto* combo               = options_page_ui_obj->main_combo_box;
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    auto* combo                     = options_page_ui_obj->main_combo_box;
 
     // remember the currently selected flavor key (if any) to restore it
     std::string previous_key{};
@@ -1161,8 +1165,8 @@ void ConfWindow::sync_build_source() noexcept {
 // Make the option rows reflect the option set of the repo selected in the
 // source field (unknown sources fall back to the generic reduced set).
 void ConfWindow::update_option_set() noexcept {
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    const auto map            = detail::resolve_option_map(normalize_repo_key(effective_build_source()));
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto map                  = detail::resolve_option_map(normalize_repo_key(effective_build_source()));
     for (const auto& [option_key, row] : option_row_bindings) {
         (options_page_ui_obj->*row)->setVisible(option_build_var(map, option_key).has_value());
     }
@@ -1171,8 +1175,8 @@ void ConfWindow::update_option_set() noexcept {
 // The effective build source: the custom URL text when the "Custom URL…"
 // entry is selected, otherwise the selected known source.
 auto ConfWindow::effective_build_source() const noexcept -> std::string {
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    auto* source_combo        = options_page_ui_obj->build_source_combo;
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto* source_combo        = options_page_ui_obj->build_source_combo;
     const std::int32_t index  = source_combo->currentIndex();
     if (index < 0) {
         return {};
@@ -1190,8 +1194,8 @@ void ConfWindow::set_build_source(const std::string& source) noexcept {
     if (source.empty()) {
         return;
     }
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    auto* source_combo        = options_page_ui_obj->build_source_combo;
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    auto* source_combo              = options_page_ui_obj->build_source_combo;
 
     {
         // Apply the selection without firing the change handlers (which
@@ -1211,9 +1215,9 @@ void ConfWindow::set_build_source(const std::string& source) noexcept {
 // Show or hide the custom URL edit according to the dropdown selection and
 // keep the visible option rows in sync with the effective source.
 void ConfWindow::update_build_source_ui() noexcept {
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    auto* source_combo        = options_page_ui_obj->build_source_combo;
-    const bool is_custom      = (source_combo->currentIndex() == source_combo->count() - 1);
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto* source_combo        = options_page_ui_obj->build_source_combo;
+    const bool is_custom            = (source_combo->currentIndex() == source_combo->count() - 1);
 
     options_page_ui_obj->build_source_custom_edit->setVisible(is_custom);
     if (is_custom) {
@@ -1237,8 +1241,8 @@ void ConfWindow::apply_source_for_kernel(std::string_view kernel_name) noexcept 
 }
 
 void ConfWindow::reset_patches_data_tab() noexcept {
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
 
     const std::int32_t main_combo_index = options_page_ui_obj->main_combo_box->currentIndex();
     const auto cpusched_path            = kernel_path_for_index(main_combo_index);
@@ -1276,8 +1280,8 @@ ConfWindow::ConfWindow(QWidget* parent)
     m_driver_banner->hide();
     statusBar()->addPermanentWidget(m_driver_banner);
 
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
 
     // Selecting the kernel flavor: the list is discovered from the kernel
     // source repo (populated/refreshed via refresh_flavors), so no flavor
@@ -1518,8 +1522,8 @@ void ConfWindow::on_execute() noexcept {
     /* clang-format on */
     m_running = true;
 
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
-    auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto* patches_page_ui_obj = m_ui->conf_patches_page_widget->get_ui_obj();
 
     sync_build_source();  // apply the user-selected build source first
     utils::prepare_build_environment();
@@ -1568,7 +1572,7 @@ void ConfWindow::on_execute() noexcept {
 }
 
 void ConfWindow::on_save() noexcept {
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
 
     ConfigOptions config_options{};
 
@@ -1587,12 +1591,12 @@ void ConfWindow::on_save() noexcept {
 
     config_options.custom_name_edit = options_page_ui_obj->custom_name_edit->text().toStdString();
 
-    auto save_file_path = QFileDialog::getSaveFileName(
+    const auto save_file_path = QFileDialog::getSaveFileName(
         this,
         tr("Save file as"),
         QString::fromStdString(utils::fix_path("~/")),
         tr("Config file (*.toml)"))
-                              .toStdString();
+                               .toStdString();
     /* clang-format off */
     if (save_file_path.empty()) { return; }
     /* clang-format on */
@@ -1604,12 +1608,12 @@ void ConfWindow::on_save() noexcept {
 }
 
 void ConfWindow::on_load() noexcept {
-    auto load_file_path = QFileDialog::getOpenFileName(
+    const auto load_file_path = QFileDialog::getOpenFileName(
         this,
         tr("Load from"),
         QString::fromStdString(utils::fix_path("~/")),
         tr("Config file (*.toml)"))
-                              .toStdString();
+                               .toStdString();
     /* clang-format off */
     if (load_file_path.empty()) { return; }
     /* clang-format on */
@@ -1620,7 +1624,7 @@ void ConfWindow::on_load() noexcept {
         return;
     }
 
-    auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
+    const auto* options_page_ui_obj = m_ui->conf_options_page_widget->get_ui_obj();
 
     // checkboxes values (booleans)
     for (const auto& binding : checkbox_bindings) {
