@@ -60,7 +60,7 @@ OUT="/tmp/km-test-k22"
 LOG="$SANDBOX/build.log"
 : > "$LOG"
 
-/usr/bin/c++ \
+${CXX:-c++} \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB \

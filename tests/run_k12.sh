@@ -149,14 +149,14 @@ OBJS=()
 : > "$LOG"
 for tu in "${TUS[@]}"; do
     obj="/tmp/km-test-k12-$(printf '%s' "$tu" | tr '/.' '__').o"
-    /usr/bin/c++ $INCLUDES $COMPILE_FLAGS $KM_CXX_FLAGS -c "$tu" -o "$obj" 2>> "$LOG" \
+    ${CXX:-c++} $INCLUDES $COMPILE_FLAGS $KM_CXX_FLAGS -c "$tu" -o "$obj" 2>> "$LOG" \
         || { echo "error: k12 compile of $tu failed:" >&2; tail -n 30 "$LOG" >&2; exit 1; }
     OBJS+=("$obj")
 done
 
 # Phase 2: the LTO link WITHOUT the -W flags (the link line never carries
 # code diagnostics — the cmake pipeline shape).
-/usr/bin/c++ -O3 -flto -fuse-linker-plugin -fPIE $KM_LINK_FLAGS "${OBJS[@]}" \
+${CXX:-c++} -O3 -flto -fuse-linker-plugin -fPIE $KM_LINK_FLAGS "${OBJS[@]}" \
     "$FMT_LIB" \
     "$CXXBRIDGE_LIB_A" \
     "$CXXBRIDGE_LIB_B" \

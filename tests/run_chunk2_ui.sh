@@ -29,7 +29,7 @@ fi
 
 OUT="/tmp/km-test-chunk2-ui"
 
-/usr/bin/c++ \
+${CXX:-c++} \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_DISABLE_DEPRECATED_BEFORE=0x050F00 -DQT_GUI_LIB -DQT_NO_DEBUG -DQT_WIDGETS_LIB \

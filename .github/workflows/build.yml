@@ -13,6 +13,12 @@ concurrency:
 env:
   BUILD_TYPE: Debug
   CTEST_OUTPUT_ON_FAILURE: 1
+  # The standalone test harnesses must use the same compiler as the CMake
+  # build (clang++ in these containers). Without this, /usr/bin/c++
+  # (g++) is picked up and fails to locate the 'as' assembler that the
+  # slimmed CI image does not provide for the GCC toolchain.
+  CXX: clang++
+  CC: clang
 
 jobs:
   # T-132: Sanitizer build — catches memory bugs (use-after-free, buffer

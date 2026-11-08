@@ -52,7 +52,7 @@ fi
 # --- compile + run (k7 recipe, sandboxed env) -----------------------------
 LOG="$GATE/build.log"
 
-/usr/bin/c++ \
+${CXX:-c++} \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB \

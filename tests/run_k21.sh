@@ -44,7 +44,7 @@ OUT="/tmp/km-test-k21"
 LOG="$OUT-build.log"
 : > "$LOG"
 
-/usr/bin/c++ \
+${CXX:-c++} \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -I"$ROOT/src" \

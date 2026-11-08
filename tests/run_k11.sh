@@ -25,7 +25,7 @@ FMT_LIB="$(resolve_fmt_lib)" || exit 1
 
 OUT="/tmp/km-test-k11"
 
-/usr/bin/c++ \
+${CXX:-c++} \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB \
