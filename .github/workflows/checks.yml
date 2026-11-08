@@ -27,9 +27,10 @@ jobs:
 
       - name: install deps
         run: |
-          # base-devel already ships gcc, binutils (as), make, cmake, ninja,
-          # pkgconf, git, python. Only add what it lacks; no -Syu/-Sy so we
-          # never disturb the working system packages.
+          # base-devel ships gcc, binutils (as), make, cmake, ninja, pkgconf,
+          # git, python. Download the package DB (-Sy, no -u) then add only
+          # what the image lacks.
+          pacman -Sy --noconfirm
           pacman -S --noconfirm --needed clang rust mold llvm libc++ \
             qt6-base qt6-tools polkit-qt6 ccache
         shell: bash
@@ -94,10 +95,10 @@ jobs:
 
       - name: install deps
         run: |
-          # base-devel already ships gcc, binutils (as), make, cmake, ninja,
-          # pkgconf, git, python. Only add what it lacks; no -Syu/-Sy so we
-          # never disturb the working system packages. scx-manager is the
-          # cachyOS-specific addition for this job.
+          # cachyOS base ships the standard toolchain. Download the package
+          # DB (-Sy, no -u) then add only what the image lacks; scx-manager
+          # is the cachyOS-specific addition for this job.
+          pacman -Sy --noconfirm
           pacman -S --noconfirm --needed clang rust mold llvm libc++ \
             qt6-base qt6-tools polkit-qt6 ccache scx-manager
         shell: bash

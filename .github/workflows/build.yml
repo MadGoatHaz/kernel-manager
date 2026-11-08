@@ -28,11 +28,10 @@ jobs:
 
       - name: install deps
         run: |
-          # base-devel already ships gcc, binutils (as), make, cmake, ninja,
-          # pkgconf, git, python. Only add what it lacks. Use -S --needed
-          # (no -Syu/-Sy) so we never touch the working system packages —
-          # a full DB sync + upgrade in this image has been observed to
-          # drop glibc/readline/gcc-libs and break every tool after it.
+          # base-devel ships gcc, binutils (as), make, cmake, ninja, pkgconf,
+          # git, python. Download the package DB (-Sy, no -u so we never
+          # upgrade system packages) then add only what the image lacks.
+          pacman -Sy --noconfirm
           pacman -S --noconfirm --needed clang rust mold llvm libc++ \
             qt6-base qt6-tools polkit-qt6 ccache
         shell: bash
@@ -101,11 +100,10 @@ jobs:
 
       - name: install deps
         run: |
-          # base-devel already ships gcc, binutils (as), make, cmake, ninja,
-          # pkgconf, git, python. Only add what it lacks. Use -S --needed
-          # (no -Syu/-Sy) so we never touch the working system packages —
-          # a full DB sync + upgrade in this image has been observed to
-          # drop glibc/readline/gcc-libs and break every tool after it.
+          # base-devel ships gcc, binutils (as), make, cmake, ninja, pkgconf,
+          # git, python. Download the package DB (-Sy, no -u so we never
+          # upgrade system packages) then add only what the image lacks.
+          pacman -Sy --noconfirm
           pacman -S --noconfirm --needed clang rust mold llvm libc++ \
             qt6-base qt6-tools polkit-qt6 ccache
         shell: bash
