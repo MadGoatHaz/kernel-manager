@@ -75,11 +75,11 @@ namespace fs = std::filesystem;
  *
  * Used to define constant values for options.
  */
-#define GENERATE_CONST_OPTION_VALUES(name, ...)                                                      \
-    [[gnu::pure]] constexpr const char* get_##name(size_t index) noexcept {                          \
-        constexpr std::array list_##name{__VA_ARGS__};                                               \
+#define GENERATE_CONST_OPTION_VALUES(name, ...) \
+    [[gnu::pure]] constexpr const char* get_##name(size_t index) noexcept { \
+        constexpr std::array list_##name{__VA_ARGS__}; \
         /* T-055: unchecked operator[] — callers pass combo-box indices that match the array size */ \
-        return list_##name[index];                                                                   \
+        return list_##name[index]; \
     }
 
 /**

@@ -53,7 +53,8 @@ const std::vector<KnownKernel>& known_kernels() {
     // buildable.
     static const std::vector<KnownKernel> table{{
         // ---- Official Arch kernels (core/extra repos) ----
-        {.name                     = "linux",
+        {
+            .name                  = "linux",
             .display_name          = "Linux (mainline)",
             .description           = "Arch's default kernel — upstream stable releases; the general-purpose reference for desktops and "
                                      "servers.",
@@ -63,7 +64,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-lts",
+        {
+            .name                  = "linux-lts",
             .display_name          = "Linux LTS",
             .description           = "Long-Term-Support kernel on the designated stable LTS branch — maximum stability and hardware "
                                      "compatibility.",
@@ -73,7 +75,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-zen",
+        {
+            .name                  = "linux-zen",
             .display_name          = "Linux Zen",
             .description           = "Low-latency desktop kernel with the collaborative Zen patchset (tuned schedulers, memory, "
                                      "high-frequency timers) — a good daily driver.",
@@ -83,7 +86,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-hardened",
+        {
+            .name                  = "linux-hardened",
             .display_name          = "Linux Hardened",
             .description           = "Security-hardened kernel with exploit-mitigation patches (dmesg restriction, strict RWX, page "
                                      "poisoning) for threat-aware users.",
@@ -93,7 +97,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-rt",
+        {
+            .name                  = "linux-rt",
             .display_name          = "Linux RT",
             .description           = "PREEMPT_RT real-time kernel (Molnar/Gleixner patchset) — deterministic, bounded latency for audio, "
                                      "automation and control workloads.",
@@ -103,7 +108,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-rt-lts",
+        {
+            .name                  = "linux-rt-lts",
             .display_name          = "Linux RT LTS",
             .description           = "PREEMPT_RT on an LTS base — real-time determinism with long-term-support stability.",
             .default_source        = "linux-rt-lts",
@@ -113,7 +119,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .buildable             = true,
         },
         // ---- CachyOS kernels (cachyos repo) ----
-        {.name                     = "linux-cachyos",
+        {
+            .name                  = "linux-cachyos",
             .display_name          = "Linux CachyOS",
             .description           = "CachyOS's heavily optimized mainline kernel — Clang ThinLTO, AutoFDO, Propeller, BORE scheduler; "
                                      "maximum desktop/gaming performance.",
@@ -123,7 +130,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-cachyos-bore",
+        {
+            .name                  = "linux-cachyos-bore",
             .display_name          = "Linux CachyOS BORE",
             .description           = "Dedicated BORE (Burst-Oriented Response Enhancer) scheduler variant for interactive latency and frame "
                                      "pacing.",
@@ -133,7 +141,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-cachyos-rt-bore",
+        {
+            .name                  = "linux-cachyos-rt-bore",
             .display_name          = "Linux CachyOS RT BORE",
             .description           = "PREEMPT_RT + BORE — low-jitter real-time audio and simulation.",
             .default_source        = "linux-cachyos-rt-bore",
@@ -142,7 +151,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-cachyos-lts",
+        {
+            .name                  = "linux-cachyos-lts",
             .display_name          = "Linux CachyOS LTS",
             .description           = "LTS base with the CachyOS patchset — stable desktop with performance tuning.",
             .default_source        = "linux-cachyos-lts",
@@ -151,7 +161,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-cachyos-server",
+        {
+            .name                  = "linux-cachyos-server",
             .display_name          = "Linux CachyOS Server",
             .description           = "Server-oriented kernel — lazy preemption and server EEVDF tuning for high-concurrency and "
                                      "virtualization nodes.",
@@ -161,7 +172,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-cachyos-deckify",
+        {
+            .name                  = "linux-cachyos-deckify",
             .display_name          = "Linux CachyOS Deckify",
             .description           = "Optimized for handheld gaming consoles (Steam Deck, MSI Claw).",
             .default_source        = "linux-cachyos-deckify",
@@ -170,7 +182,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-cachyos-bmq",
+        {
+            .name                  = "linux-cachyos-bmq",
             .display_name          = "Linux CachyOS BMQ",
             .description           = "BMQ (BitMap Queue) alternative-runqueue variant for scheduler benchmarking (no sched-ext).",
             .default_source        = "linux-cachyos-bmq",
@@ -180,7 +193,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .buildable             = true,
         },
         // ---- Community kernels (chaotic-aur / liquorix repos) ----
-        {.name                     = "linux-mainline",
+        {
+            .name                  = "linux-mainline",
             .display_name          = "Linux Mainline",
             .description           = "Tracks Linus' master branch and weekly release candidates — newest hardware enablement, pre-stable.",
             .default_source        = "linux-mainline",
@@ -189,7 +203,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-tkg",
+        {
+            .name                  = "linux-tkg",
             .display_name          = "Linux TKG",
             .description           = "Frogging-Family's modular custom-kernel framework — user-selected scheduler (BORE/BMQ/PDS/EEVDF), "
                                      "compiler and patches; built from the tkg repo.",
@@ -199,7 +214,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = false,
             .buildable             = true,
         },
-        {.name                     = "linux-xanmod",
+        {
+            .name                  = "linux-xanmod",
             .display_name          = "Linux XanMod",
             .description           = "Performance kernel — memory-allocation tuning, high-frequency ticks, BBRv3 and CAKE queueing; for "
                                      "multimedia and low latency.",
@@ -209,7 +225,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-xanmod-edge",
+        {
+            .name                  = "linux-xanmod-edge",
             .display_name          = "Linux XanMod Edge",
             .description           = "XanMod on a mainline (edge) base — experimental features with low-latency desktop tuning.",
             .default_source        = "linux-xanmod-edge",
@@ -218,7 +235,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-xanmod-lts",
+        {
+            .name                  = "linux-xanmod-lts",
             .display_name          = "Linux XanMod LTS",
             .description           = "XanMod on an LTS base — stable desktop with XanMod subsystems.",
             .default_source        = "linux-xanmod-lts",
@@ -227,7 +245,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-xanmod-rt",
+        {
+            .name                  = "linux-xanmod-rt",
             .display_name          = "Linux XanMod RT",
             .description           = "XanMod + PREEMPT_RT — deterministic processing with XanMod enhancements.",
             .default_source        = "linux-xanmod-rt",
@@ -236,7 +255,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-lqx",
+        {
+            .name                  = "linux-lqx",
             .display_name          = "Linux Liquorix",
             .description           = "Liquorix — Zen-based kernel tuned for desktop audio latency, multimedia and low-latency preemption.",
             .default_source        = "linux-lqx",
@@ -245,7 +265,8 @@ const std::vector<KnownKernel>& known_kernels() {
             .precompiled_available = true,
             .buildable             = true,
         },
-        {.name                     = "linux-clear",
+        {
+            .name                  = "linux-clear",
             .display_name          = "Linux Clear",
             .description           = "Intel Clear Linux performance and power-management patchset port — optimized for Intel platforms.",
             .default_source        = "linux-clear",

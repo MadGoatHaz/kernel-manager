@@ -46,9 +46,10 @@ Checks: '-*,
          -readability-identifier-length,
          -readability-implicit-bool-conversion,
          -readability-magic-numbers,
-         -readability-named-parameter,
-         -readability-uppercase-literal-suffix,
-          -readability-use-anyofallof'
+          -readability-named-parameter,
+          -readability-uppercase-literal-suffix,
+          -readability-use-anyofallof,
+          -readability-redundant-member-init'
 # By default clang-tidy reports diagnostics from ALL non-system headers in
 # a translation unit, which drowns the run in third-party and machine
 # output this repo does not own: the CPM/FetchContent deps under

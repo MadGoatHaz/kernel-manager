@@ -1070,13 +1070,9 @@ void MainWindow::build_change_list(QTreeWidgetItem* item) noexcept {
     // Checked rows: an immutable one is unselected (removed from the
     // change list), a regular one is selected; unchecked rows (the
     // immutable+unchecked case early-returned above) are always dropped.
-    if (item->checkState(0) == Qt::Checked) {
-        if (immutable == "true") {
-            m_change_list.removeOne(item_text);
-        } else {
-            m_ui->ok->setEnabled(true);
-            m_change_list.append(item_text);
-        }
+    if (item->checkState(0) == Qt::Checked && immutable != "true") {
+        m_ui->ok->setEnabled(true);
+        m_change_list.append(item_text);
     } else {
         m_change_list.removeOne(item_text);
     }
@@ -1235,6 +1231,8 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
         QMessageBox confirm(this);
         confirm.setText(tr("Install the pre-compiled package for '%1'?").arg(display));
         confirm.setInformativeText(tr("This installs the package as root (pacman) and refreshes the initramfs."));
+        // NOLINTNEXTLINE(bugprone-signed-bitwise) — Qt flag enum; | is the
+        // standard way to combine StandardButton values.
         confirm.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
         confirm.setDefaultButton(QMessageBox::No);
         if (confirm.exec() != QMessageBox::Yes) {
@@ -1302,6 +1300,8 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
         QMessageBox confirm(this);
         confirm.setText(tr("Enable the '%1' pacman repository?").arg(repo));
         confirm.setInformativeText(tr("This appends the [%1] section to /etc/pacman.conf (a backup is written first) and runs `pacman -Sy` as an administrator.").arg(repo));
+        // NOLINTNEXTLINE(bugprone-signed-bitwise) — Qt flag enum; | is the
+        // standard way to combine StandardButton values.
         confirm.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
         confirm.setDefaultButton(QMessageBox::No);
         if (confirm.exec() != QMessageBox::Yes) {
@@ -1834,9 +1834,9 @@ bool KernelTreeWidgetItem::operator<(const QTreeWidgetItem& other) const {
         return QTreeWidgetItem::operator<(other);
     }
 
-    const auto get_comparable_version = [](QString&& version_string) {
+    const auto get_comparable_version = [](const QString& version_string) {
         using namespace std::string_view_literals;
-        auto std_str = std::move(version_string).toStdString();
+        auto std_str = version_string.toStdString();
         for (auto&& prefix : {"∨"sv, "∧"sv}) {
             if (std_str.starts_with(prefix)) {
                 return std_str.substr(prefix.size());

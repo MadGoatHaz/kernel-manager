@@ -75,6 +75,18 @@ jobs:
             -GNinja
         shell: bash
 
+      - name: Build (generate headers for clang-tidy)
+        run: |
+          # Build the autogen + cxxbridge targets so the generated headers
+          # (ui_km-window.h, ui_conf-window.h, moc_*.cpp,
+          # config-option-lib-cxxbridge/lib.h) exist on disk before
+          # clang-tidy runs. Without them clang-tidy cannot resolve the
+          # Qt UI classes or the Rust/C++ bridge and produces false
+          # positives (missing member state → "can be made static",
+          # "file not found", etc.).
+          ninja -C build kernel-manager_autogen config-option-lib-cxxbridge
+        shell: bash
+
       - name: Run clang-tidy
         run: |
           # compile_commands.json lives in the build dir; clang-tidy -p
@@ -141,6 +153,18 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -GNinja
+        shell: bash
+
+      - name: Build (generate headers for clang-tidy)
+        run: |
+          # Build the autogen + cxxbridge targets so the generated headers
+          # (ui_km-window.h, ui_conf-window.h, moc_*.cpp,
+          # config-option-lib-cxxbridge/lib.h) exist on disk before
+          # clang-tidy runs. Without them clang-tidy cannot resolve the
+          # Qt UI classes or the Rust/C++ bridge and produces false
+          # positives (missing member state → "can be made static",
+          # "file not found", etc.).
+          ninja -C build kernel-manager_autogen config-option-lib-cxxbridge
         shell: bash
 
       - name: Run clang-tidy
