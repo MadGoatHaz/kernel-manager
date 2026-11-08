@@ -23,7 +23,7 @@ FMT_LIB="$(resolve_fmt_lib)" || exit 1
 
 OUT="/tmp/km-test-k8"
 
-${CXX:-c++} \
+${KM_CXX} \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB \
@@ -37,15 +37,14 @@ ${CXX:-c++} \
     -isystem /usr/include/glib-2.0 \
     -isystem /usr/lib/glib-2.0/include \
     -isystem /usr/include/sysprof-6 \
-    -O3 -flto -fwhole-program -fuse-linker-plugin \
-    -std=c++23 -fPIE -fdiagnostics-color=always -mno-direct-extern-access \
+    -O3 ${KM_LTO_FLAGS} \
+    -std=c++23 -fPIE -fdiagnostics-color=always \
     -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual \
     -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 \
     -Wimplicit-fallthrough -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
     -Wuseless-cast -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
     -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
-    -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
-    -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
+    -Wsuggest-final-types -Wdiv-by-zero ${KM_ANALYZER_FLAGS} \
     -D_FILE_OFFSET_BITS=64 -pthread \
     $KM_CXX_FLAGS $KM_LINK_FLAGS \
     tests/test_k8_install_kernel.cpp \

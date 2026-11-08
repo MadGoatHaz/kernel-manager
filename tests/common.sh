@@ -46,14 +46,37 @@
 #
 # The functions are idempotent and cheap (path tests only).
 
-# Optional extra compiler/linker flags for the standalone g++ invocations.
+# Optional extra compiler/linker flags for the standalone invocations.
 # The ASan/UBSan workflow job exports KM_CXX_FLAGS and KM_LINK_FLAGS so the
 # harnesses' hand-compiled TUs carry the same instrumentation as the CMake
 # build; without this, linking against the instrumented libfmtd.a fails with
 # undefined __asan_* / __ubsan_* symbols. In the normal build job these are
-# empty and the g++ command is unchanged.
+# empty and the compile command is unchanged.
 KM_CXX_FLAGS="${KM_CXX_FLAGS:-}"
 KM_LINK_FLAGS="${KM_LINK_FLAGS:-}"
+
+# Compiler selection: use the CXX env var (set by the workflow to clang++
+# in CI) or fall back to c++ (the system default, typically g++ locally).
+KM_CXX="${CXX:-c++}"
+
+# LTO/whole-program flags are compiler-specific:
+#   GCC:   -flto -fwhole-program -fuse-linker-plugin -mno-direct-extern-access
+#   Clang: -flto (whole-program LTO is the default with -flto=full, but we
+#          only need regular -flto here; -fwhole-program/-fuse-linker-plugin
+#          and -mno-direct-extern-access are GCC-only and rejected by clang).
+# The -Wanalyzer-* flags are also GCC-only; clang has its own static analyzer
+# but we don't enable it here (it's slow and the CMake build already runs
+# clang-tidy for that purpose).
+case "$KM_CXX" in
+    *clang*)
+        KM_LTO_FLAGS="-flto"
+        KM_ANALYZER_FLAGS=""
+        ;;
+    *)
+        KM_LTO_FLAGS="-flto -fwhole-program -fuse-linker-plugin -mno-direct-extern-access"
+        KM_ANALYZER_FLAGS="-Wanalyzer-double-fclose -Wanalyzer-double-free -Wanalyzer-malloc-leak -Wanalyzer-use-after-free"
+        ;;
+esac
 
 # --- helpers ----------------------------------------------------------------
 

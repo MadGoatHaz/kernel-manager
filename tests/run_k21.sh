@@ -44,7 +44,7 @@ OUT="/tmp/km-test-k21"
 LOG="$OUT-build.log"
 : > "$LOG"
 
-${CXX:-c++} \
+${KM_CXX} \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -I"$ROOT/src" \
@@ -54,16 +54,16 @@ ${CXX:-c++} \
     -I"$CXXBRIDGE_INC" \
     -isystem /usr/include/glib-2.0 \
     -isystem /usr/lib/glib-2.0/include \
-    -O3 -flto -fwhole-program -fuse-linker-plugin \
-    -std=c++23 -fPIE -fdiagnostics-color=always -mno-direct-extern-access \
+    -O3 ${KM_LTO_FLAGS} \
+    -std=c++23 -fPIE -fdiagnostics-color=always \
     -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual \
     -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 \
     -Wimplicit-fallthrough -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
     -Wuseless-cast -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
     -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
-    -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
-    -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
+    -Wsuggest-final-types -Wdiv-by-zero ${KM_ANALYZER_FLAGS} \
     -D_FILE_OFFSET_BITS=64 -pthread \
+    $KM_CXX_FLAGS $KM_LINK_FLAGS \
     tests/test_k21_config_options.cpp \
     src/config-options.cpp \
     "$FMT_LIB" \

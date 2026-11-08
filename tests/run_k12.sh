@@ -89,15 +89,14 @@ LOG="/tmp/km-test-k12-build.log"
 # The shared compiler settings: the original single command's flags,
 # verbatim, split into the compile phase (with the warning set) and the
 # LTO-link phase (without — the canonical cmake shape).
-COMPILE_FLAGS="-O3 -flto -fwhole-program -fuse-linker-plugin \
-    -std=c++23 -fPIE -fdiagnostics-color=always -mno-direct-extern-access \
+COMPILE_FLAGS="-O3 ${KM_LTO_FLAGS} \
+    -std=c++23 -fPIE -fdiagnostics-color=always \
     -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual \
     -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 \
     -Wimplicit-fallthrough -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
     -Wuseless-cast -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
     -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
-    -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
-    -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
+    -Wsuggest-final-types -Wdiv-by-zero ${KM_ANALYZER_FLAGS} \
     -D_FILE_OFFSET_BITS=64 -pthread"
 
 INCLUDES="-DAPP_VERSION=\"$APP_VERSION\" \
@@ -149,14 +148,14 @@ OBJS=()
 : > "$LOG"
 for tu in "${TUS[@]}"; do
     obj="/tmp/km-test-k12-$(printf '%s' "$tu" | tr '/.' '__').o"
-    ${CXX:-c++} $INCLUDES $COMPILE_FLAGS $KM_CXX_FLAGS -c "$tu" -o "$obj" 2>> "$LOG" \
+    ${KM_CXX} $INCLUDES $COMPILE_FLAGS $KM_CXX_FLAGS -c "$tu" -o "$obj" 2>> "$LOG" \
         || { echo "error: k12 compile of $tu failed:" >&2; tail -n 30 "$LOG" >&2; exit 1; }
     OBJS+=("$obj")
 done
 
 # Phase 2: the LTO link WITHOUT the -W flags (the link line never carries
 # code diagnostics — the cmake pipeline shape).
-${CXX:-c++} -O3 -flto -fuse-linker-plugin -fPIE $KM_LINK_FLAGS "${OBJS[@]}" \
+${KM_CXX} -O3 -flto -fPIE $KM_LINK_FLAGS "${OBJS[@]}" \
     "$FMT_LIB" \
     "$CXXBRIDGE_LIB_A" \
     "$CXXBRIDGE_LIB_B" \
