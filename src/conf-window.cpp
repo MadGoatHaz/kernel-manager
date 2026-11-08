@@ -1603,8 +1603,7 @@ void ConfWindow::on_save() noexcept {
         this,
         tr("Save file as"),
         QString::fromStdString(utils::fix_path("~/")),
-        tr("Config file (*.toml)"))
-                                   .toStdString();
+        tr("Config file (*.toml)")).toStdString();
     if (save_file_path.empty()) {
         return;
     }
@@ -1620,8 +1619,7 @@ void ConfWindow::on_load() noexcept {
         this,
         tr("Load from"),
         QString::fromStdString(utils::fix_path("~/")),
-        tr("Config file (*.toml)"))
-                                   .toStdString();
+        tr("Config file (*.toml)")).toStdString();
     if (load_file_path.empty()) {
         return;
     }
