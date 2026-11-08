@@ -79,10 +79,10 @@ ${KM_CXX} \
     -std=c++23 -fPIE -fdiagnostics-color=never \
     -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual \
     -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 \
-    -Wimplicit-fallthrough -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
-    -Wuseless-cast -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
-    -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
-    -Wsuggest-final-types -Wdiv-by-zero ${KM_ANALYZER_FLAGS} \
+    -Wimplicit-fallthrough -Wmisleading-indentation \
+    ${KM_GCC_WARNING_FLAGS} \
+    \
+    -Wdiv-by-zero ${KM_ANALYZER_FLAGS} \
     -D_FILE_OFFSET_BITS=64 -pthread \
     $KM_CXX_FLAGS $KM_LINK_FLAGS \
     tests/test_k14_dir_install.cpp \

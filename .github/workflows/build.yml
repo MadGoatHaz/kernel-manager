@@ -35,6 +35,9 @@ jobs:
       - name: install deps
         run: |
           pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+          # The -Syu above can drop gcc-libs (libstdc++.so.6) and binutils
+          # (as), which the clang driver and standalone harnesses need.
+          pacman -S --noconfirm gcc-libs binutils
         shell: bash
 
       - name: Cache ccache
@@ -102,6 +105,9 @@ jobs:
       - name: install deps
         run: |
           pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+          # The -Syu above can drop gcc-libs (libstdc++.so.6) and binutils
+          # (as), which the clang driver and standalone harnesses need.
+          pacman -S --noconfirm gcc-libs binutils
         shell: bash
 
       - name: Cache ccache

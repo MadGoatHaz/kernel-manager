@@ -71,10 +71,17 @@ case "$KM_CXX" in
     *clang*)
         KM_LTO_FLAGS="-flto"
         KM_ANALYZER_FLAGS=""
+        # These -W flags exist only in GCC; clang rejects them (or offers
+        # different names). Omit them entirely for clang.
+        KM_GCC_WARNING_FLAGS=""
         ;;
     *)
         KM_LTO_FLAGS="-flto -fwhole-program -fuse-linker-plugin -mno-direct-extern-access"
         KM_ANALYZER_FLAGS="-Wanalyzer-double-fclose -Wanalyzer-double-free -Wanalyzer-malloc-leak -Wanalyzer-use-after-free"
+        KM_GCC_WARNING_FLAGS="-Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wuseless-cast \
+            -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
+            -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
+            -Wsuggest-final-types"
         ;;
 esac
 
