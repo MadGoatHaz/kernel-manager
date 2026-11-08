@@ -474,9 +474,9 @@ namespace {
     // to the "Mon DD, YYYY HH:MM" display form; if no token is found,
     // degrade to the full trimmed value and shorten that too.
     [[nodiscard]] std::string build_date_from_uname_v(std::string_view uname_v) {
-        const std::string_view full = trim(uname_v);
-        const std::array<std::string_view, 7> dows = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
-        std::size_t best_pos = std::string::npos;
+        const std::string_view               full     = trim(uname_v);
+        const std::array<std::string_view, 7> dows     = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+        std::size_t                          best_pos = std::string::npos;
         for (const auto& dow : dows) {
             std::size_t search_from = 0;
             while (search_from < full.size()) {
@@ -487,9 +487,9 @@ namespace {
                 // The day-of-week must be a whole token: preceded by
                 // start-of-string or a non-letter, and followed by either
                 // ", " (Arch) or " " (Ubuntu).
-                const bool preceded_ok = (found == 0) || !std::isalpha(static_cast<unsigned char>(full.at(found - 1)));
-                const std::size_t after = found + dow.size();
-                bool followed_ok = false;
+                const bool        preceded_ok = (found == 0) || !std::isalpha(static_cast<unsigned char>(full.at(found - 1)));
+                const std::size_t after       = found + dow.size();
+                bool              followed_ok = false;
                 if (after < full.size()) {
                     if (full.at(after) == ',' && after + 1 < full.size() && full.at(after + 1) == ' ') {
                         followed_ok = true;  // "Thu, " (Arch)
