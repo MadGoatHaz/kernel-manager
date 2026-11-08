@@ -263,6 +263,18 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
         }
     } const cwd_guard{entry_cwd};
 
+    // A repo path ending in a separator (or the filesystem root) has an
+    // empty filename(); the clone would be invoked as `git clone <url> ""`
+    // and die with "could not create work tree dir ''". Refuse with a
+    // clear diagnostic before any filesystem mutation — in particular
+    // before the remove_all() below, which would otherwise try to delete
+    // the root directory if repo_path is "/". The CwdGuard restores the
+    // CWD on this return path like on every other one.
+    if (repo_path.filename().empty()) {
+        fmt::print(stderr, "prepare_git_repo: cannot derive a repo directory name from '{}'; the build directory must not be a filesystem root or end in a separator\n", repo_path.string());
+        return;
+    }
+
     const auto enter = [&ec](const fs::path& dir) {
         fs::current_path(dir, ec);
         if (ec) {
@@ -295,16 +307,6 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
                 }
             }
         }
-    }
-
-    // A repo path ending in a separator (or the filesystem root) has an
-    // empty filename(); the clone would be invoked as `git clone <url> ""`
-    // and die with "could not create work tree dir ''". Refuse with a
-    // clear diagnostic instead (the CwdGuard above restores the CWD on
-    // this return path like on every other one).
-    if (repo_path.filename().empty()) {
-        fmt::print(stderr, "prepare_git_repo: cannot derive a repo directory name from '{}'; the build directory must not be a filesystem root or end in a separator\n", repo_path.string());
-        return;
     }
 
     if (!fs::exists(repo_path, ec)
