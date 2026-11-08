@@ -86,7 +86,7 @@ bool is_repo_in_syncdbs(alpm_handle_t* handle, std::string_view repo) {
         return false;
     }
     for (const alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
-        const auto* db      = reinterpret_cast<const alpm_db_t*>(i->data);
+        const auto* db = reinterpret_cast<const alpm_db_t*>(i->data);
         const char* db_name = alpm_db_get_name(db);
         if (db_name == nullptr) {
             continue;
@@ -538,11 +538,11 @@ bool ElideFilter::eventFilter(QObject* obj, QEvent* event) {
 
 MainWindow::MainWindow(QWidget* parent)
   : QMainWindow(parent),
+    m_transaction_progress_dialog(new QProgressDialog(this)),
     m_driver_banner(new QLabel(this)),
     m_elide_filter(new ElideFilter(this)),
     m_worker_thread(new QThread(this)),
-    m_worker(new TransactionWorker()),
-    m_transaction_progress_dialog(new QProgressDialog(this)) {
+    m_worker(new TransactionWorker()) {
     m_ui->setupUi(this);
     // D5 (plan v1.30.0): the shared resize-time ellipsis filter — created
     // once in the member-initializer-list above (window-parented, so it
@@ -1145,7 +1145,7 @@ void MainWindow::on_configure() noexcept {
     // background; the UI updates (refresh_flavors, reset_patches_data_tab)
     // happen on the main thread in the finished slot (fixes C4: Qt
     // widgets must only be touched from the main thread).
-    m_future_watcher.setFuture(QtConcurrent::run([this] {
+    m_future_watcher.setFuture(QtConcurrent::run([] {
         utils::prepare_build_environment();
     }));
 }
