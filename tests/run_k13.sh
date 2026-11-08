@@ -51,7 +51,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ROOT="$(pwd)"
-BUILD="$ROOT/build"
+BUILD="$ROOT/${KM_BUILD_DIR:-build}"
 SCRIPT="$ROOT/src/repo_add.sh"
 source "$ROOT/tests/common.sh"
 

@@ -14,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ROOT="$(pwd)"
-BUILD="$ROOT/build"
+BUILD="$ROOT/${KM_BUILD_DIR:-build}"
 source "$ROOT/tests/common.sh"
 
 # The harness needs only the fmt artifacts (header + static lib) from the

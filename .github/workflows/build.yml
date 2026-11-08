@@ -76,6 +76,7 @@ jobs:
 
       - name: Run tests (sanitizers)
         run: |
+          export KM_BUILD_DIR=build-san
           ctest --test-dir build-san --output-on-failure --parallel "$(nproc)"
         shell: bash
 
@@ -139,6 +140,7 @@ jobs:
 
       - name: Run tests (CTest)
         run: |
+          export KM_BUILD_DIR=build
           ctest --test-dir build --output-on-failure --parallel "$(nproc)"
         shell: bash
 
