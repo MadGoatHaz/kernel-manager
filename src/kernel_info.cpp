@@ -387,13 +387,15 @@ namespace {
     }
 
     // The compact display form of the build date: "Mon DD, YYYY HH:MM"
-    // (e.g. "Thu, 03 Sep 2026 21:56:27 +0000" => "Sep 03, 2026 21:56")
-    // — the day-of-week prefix is dropped, the day reordered ahead of
-    // the month with a comma, and the seconds + the UTC offset dropped.
-    // The shape is validated token by token (a 2-digit day, a 3-letter
-    // month, a 4-digit year, and an HH:MM:SS clock after an optional
-    // leading "Thu," day-of-week token); if any token is unexpected the
-    // ORIGINAL string is returned (graceful degradation).
+    // (e.g. "Thu, 03 Sep 2026 21:56:27 +0000" => "Sep 03, 2026 21:56", or
+    // "Mon Oct 19 22:41:16 UTC 2026" => "Oct 19, 2026 22:41") — the
+    // day-of-week prefix is dropped, the day and month reordered into
+    // "Mon DD, YYYY", and the seconds + UTC offset dropped. Two input
+    // shapes are accepted:
+    //   Arch (ctime):  [DOW,] DD Mon YYYY HH:MM:SS [TZ]
+    //   Ubuntu:        [DOW] Mon DD HH:MM:SS [TZ] YYYY
+    // The shape is validated token by token; if any token is unexpected
+    // the ORIGINAL string is returned (graceful degradation).
     [[nodiscard]] std::string shorten_build_date(std::string_view date_portion) {
         const std::string_view s = trim(date_portion);
         std::vector<std::string_view> tokens{};
@@ -412,46 +414,97 @@ namespace {
             }
             pos = end + 1;
         }
-        // An optional leading day-of-week token ("Thu," — the 4-char
-        // comma form; a bare 3-letter token is not a day and simply
-        // fails the checks below).
+        // An optional leading day-of-week token. Two forms:
+        //   "Thu," (Arch: 4 chars, 3 alpha + comma)
+        //   "Mon"  (Ubuntu: 3 alpha chars — but only if immediately
+        //           followed by another 3-letter token, the month; a
+        //           lone 3-letter token is a month, not a day-of-week)
         std::size_t i = 0;
-        if (i < tokens.size() && tokens.at(i).size() == 4 && tokens.at(i).at(3) == ',' && all_alpha(tokens.at(i).substr(0, 3), 3)) {
-            ++i;
+        if (i < tokens.size()) {
+            const auto& t = tokens.at(i);
+            if (t.size() == 4 && t.at(3) == ',' && all_alpha(t.substr(0, 3), 3)) {
+                ++i;  // Arch form: "Thu,"
+            } else if (t.size() == 3 && all_alpha(t, 3)
+                && i + 1 < tokens.size() && tokens.at(i + 1).size() == 3 && all_alpha(tokens.at(i + 1), 3)) {
+                ++i;  // Ubuntu form: "Mon" followed by month "Oct"
+            }
         }
-        if (tokens.size() - i < 4) {
-            return std::string{s};  // unexpected shape → the original
+
+        const auto valid_clock = [](std::string_view c) {
+            return c.size() == 8 && c.at(2) == ':' && c.at(5) == ':'
+                && all_digits(c.substr(0, 2), 2) && all_digits(c.substr(3, 2), 2) && all_digits(c.substr(6, 2), 2);
+        };
+
+        // Format 1 (Arch ctime): DD Mon YYYY HH:MM:SS [TZ]
+        if (tokens.size() - i >= 4) {
+            const std::string_view dd    = tokens.at(i);
+            const std::string_view mon   = tokens.at(i + 1);
+            const std::string_view yyyy  = tokens.at(i + 2);
+            const std::string_view clock = tokens.at(i + 3);
+            if (all_digits(dd, 2) && all_alpha(mon, 3) && all_digits(yyyy, 4) && valid_clock(clock)) {
+                return std::string{mon} + " " + std::string{dd} + ", " + std::string{yyyy} + " " + std::string{clock.substr(0, 5)};
+            }
         }
-        const std::string_view dd    = tokens.at(i);
-        const std::string_view mon   = tokens.at(i + 1);
-        const std::string_view yyyy  = tokens.at(i + 2);
-        const std::string_view clock = tokens.at(i + 3);
-        const bool clock_ok          = clock.size() == 8 && clock.at(2) == ':' && clock.at(5) == ':'
-            && all_digits(clock.substr(0, 2), 2) && all_digits(clock.substr(3, 2), 2) && all_digits(clock.substr(6, 2), 2);
-        if (!all_digits(dd, 2) || !all_alpha(mon, 3) || !all_digits(yyyy, 4) || !clock_ok) {
-            return std::string{s};  // unexpected shape → the original
+
+        // Format 2 (Ubuntu): Mon DD HH:MM:SS [TZ] YYYY
+        if (tokens.size() - i >= 4) {
+            const std::string_view mon   = tokens.at(i);
+            const std::string_view dd    = tokens.at(i + 1);
+            const std::string_view clock = tokens.at(i + 2);
+            if (all_alpha(mon, 3) && all_digits(dd, 2) && valid_clock(clock)) {
+                // The year is the last 4-digit token.
+                for (std::size_t j = tokens.size(); j > i + 3; --j) {
+                    if (all_digits(tokens.at(j - 1), 4)) {
+                        return std::string{mon} + " " + std::string{dd} + ", " + std::string{tokens.at(j - 1)} + " " + std::string{clock.substr(0, 5)};
+                    }
+                }
+            }
         }
-        return std::string{mon} + " " + std::string{dd} + ", " + std::string{yyyy} + " " + std::string{clock.substr(0, 5)};
+
+        return std::string{s};  // unexpected shape → the original
     }
 
     // The compact build date for the header: the `uname -v` value starts
-    // with the SMP/PREEMPT build flags ("#1 SMP PREEMPT_DYNAMIC ...") and
-    // the date always begins with a day-of-week abbreviation, so take the
-    // substring from the first such token on, then shorten it to the
-    // "Mon DD, YYYY HH:MM" display form (the day-of-week prefix, the
-    // seconds, and the UTC offset dropped); if no token is found, degrade
-    // to the full trimmed value (never emptier than the input) and
-    // shorten that too.
+    // with the SMP/PREEMPT build flags ("#1 SMP PREEMPT_DYNAMIC ..." or
+    // "#20-Ubuntu SMP PREEMPT ...") and the date begins with a
+    // day-of-week abbreviation. Two forms are known:
+    //   Arch:   "Thu, " (day-of-week + comma + space)
+    //   Ubuntu: "Mon "  (day-of-week + space only)
+    // Take the substring from the first such token on, then shorten it
+    // to the "Mon DD, YYYY HH:MM" display form; if no token is found,
+    // degrade to the full trimmed value and shorten that too.
     [[nodiscard]] std::string build_date_from_uname_v(std::string_view uname_v) {
-        const std::string_view full                = trim(uname_v);
-        const std::array<std::string_view, 7> dows = {"Mon, ", "Tue, ", "Wed, ", "Thu, ", "Fri, ", "Sat, ", "Sun, "};
-        std::size_t pos                            = std::string::npos;
+        const std::string_view full = trim(uname_v);
+        const std::array<std::string_view, 7> dows = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+        std::size_t best_pos = std::string::npos;
         for (const auto& dow : dows) {
-            if (const std::size_t found = full.find(dow); found != std::string::npos && (pos == std::string::npos || found < pos)) {
-                pos = found;
+            std::size_t search_from = 0;
+            while (search_from < full.size()) {
+                const std::size_t found = full.find(dow, search_from);
+                if (found == std::string::npos) {
+                    break;
+                }
+                // The day-of-week must be a whole token: preceded by
+                // start-of-string or a non-letter, and followed by either
+                // ", " (Arch) or " " (Ubuntu).
+                const bool preceded_ok = (found == 0) || !std::isalpha(static_cast<unsigned char>(full.at(found - 1)));
+                const std::size_t after = found + dow.size();
+                bool followed_ok = false;
+                if (after < full.size()) {
+                    if (full.at(after) == ',' && after + 1 < full.size() && full.at(after + 1) == ' ') {
+                        followed_ok = true;  // "Thu, " (Arch)
+                    } else if (full.at(after) == ' ') {
+                        followed_ok = true;  // "Mon " (Ubuntu)
+                    }
+                }
+                if (preceded_ok && followed_ok && (best_pos == std::string::npos || found < best_pos)) {
+                    best_pos = found;
+                    break;  // earliest occurrence for this DOW found
+                }
+                search_from = found + 1;
             }
         }
-        const std::string_view date_portion = (pos == std::string::npos) ? full : full.substr(pos);
+        const std::string_view date_portion = (best_pos == std::string::npos) ? full : full.substr(best_pos);
         return shorten_build_date(date_portion);
     }
 
