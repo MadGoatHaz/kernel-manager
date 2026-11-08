@@ -29,8 +29,10 @@ jobs:
       - name: install deps
         run: |
           pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
-          # Refresh the dynamic linker cache: the full upgrade can leave
-          # /etc/ld.so.cache stale so tools like 'as' fail to find libz etc.
+          # The full upgrade replaces binutils/gcc; make sure their shared
+          # libs (libbfd, libz, libreadline, ...) are resolvable before any
+          # subsequent step invokes a compiler driver.
+          echo "/usr/lib" > /etc/ld.so.conf.d/00-ci-lib.conf
           ldconfig
         shell: bash
 
@@ -99,8 +101,10 @@ jobs:
       - name: install deps
         run: |
           pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
-          # Refresh the dynamic linker cache: the full upgrade can leave
-          # /etc/ld.so.cache stale so tools like 'as' fail to find libz etc.
+          # The full upgrade replaces binutils/gcc; make sure their shared
+          # libs (libbfd, libz, libreadline, ...) are resolvable before any
+          # subsequent step invokes a compiler driver.
+          echo "/usr/lib" > /etc/ld.so.conf.d/00-ci-lib.conf
           ldconfig
         shell: bash
 

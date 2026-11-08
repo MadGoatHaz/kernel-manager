@@ -29,6 +29,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
           mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+          echo "/usr/lib" > /etc/ld.so.conf.d/00-ci-lib.conf
           ldconfig
         shell: bash
 
@@ -94,6 +95,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
           mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git scx-manager ccache
+          echo "/usr/lib" > /etc/ld.so.conf.d/00-ci-lib.conf
           ldconfig
         shell: bash
 
