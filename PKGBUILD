@@ -21,8 +21,8 @@
 #   architectural refactor (TransactionWorker), security fixes, build
 #   system modernization, test suite overhaul, and documentation polish.
 #
-#   NOTE: `_commit` and `sha256sums` below are updated in the next commit
-#   after the version-bump commit SHA is known (per the RELEASE PROCEDURE).
+#   `_commit` and `sha256sums` below are pinned to the version-bump commit
+#   (double-fetch verified per the RELEASE PROCEDURE).
 #
 #   RELEASE PROCEDURE (v1.30.x and later):
 #     1. Bump the CMake VERSION — the version-bump commit is the tag target.
@@ -102,11 +102,10 @@ makedepends=(cmake make gcc git rust qt6-tools pkgconf python pacman glib2 polki
 install=kernel-manager.install
 
 # Pinned v1.31.0 release commit (the version-bump commit, the tag target
-# for v1.31.0 — see the VERSIONING note above). Updated in the next commit
-# after the version-bump SHA is known.
-_commit=e120613de5677f678ca2604a8930d03a2a790e18
+# for v1.31.0 — see the VERSIONING note above).
+_commit=202e5674d4c7ad899b2fe31ef9cacbd21bfe50ff
 source=("https://github.com/MadGoatHaz/kernel-manager/archive/${_commit}.tar.gz")
-sha256sums=("a2efa6f4305cd4885bf559a40d43da89ce56d2deca124ca0f859ce044de93aad")
+sha256sums=("39b0cc2f43f9b0c533b945a4f369616ab19257320fb096f6ab1a6fdd79e6c30c")
 
 # GitHub archive top dir for a commit is `<repo>-<full-sha>`.
 _srcdir="kernel-manager-${_commit}"

@@ -69,10 +69,11 @@ install=kernel-manager.install
 source=("https://github.com/MadGoatHaz/kernel-manager/releases/download/v${pkgver}/kernel-manager-${pkgver}-x86_64.tar.zst")
 
 # Pinned via the project's standing double-fetch discipline (source
-# PKGBUILD:27-30; Work/Docs/AUR_PACKAGING.md:9). Updated in the next
-# commit after the v1.31.0 release-bin build publishes the new asset
-# (plan §3 Step 7 item 3: fetch twice, cmp byte-identical, record).
-sha256sums=("777dc90aeddbe11bf7f5784fed916efe97c9bfc1aa3a7cdcec9a5f24275bffc7")
+# PKGBUILD:27-30; Work/Docs/AUR_PACKAGING.md:9) after the v1.31.0
+# release-bin build (workflow_dispatch run 42456399934, 2026-11-08)
+# published the release assets (plan §3 Step 7 item 3: fetch twice,
+# cmp byte-identical, record).
+sha256sums=("aab7746412d84af2497efb617255ca4090b8fa813f1e2ce4e0002806d1fb6551")
 
 package() {
   # The tarball's root is `usr/`, so a plain extraction into $pkgdir
