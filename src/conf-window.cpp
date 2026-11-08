@@ -80,6 +80,7 @@ namespace fs = std::filesystem;
     [[gnu::pure]] constexpr const char* get_##name(size_t index) noexcept { \
         constexpr std::array list_##name{__VA_ARGS__}; \
         /* T-055: unchecked operator[] — callers pass combo-box indices that match the array size */ \
+        /* NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access) */ \
         return list_##name[index]; \
     }
 /* clang-format on */

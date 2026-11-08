@@ -431,7 +431,7 @@ void restore_clean_environment(std::vector<std::string>& previously_set_options,
     }
     previously_set_options.clear();
 
-    auto set_values_list = utils::make_split_view(all_set_values, '\n');
+    const auto set_values_list = utils::make_split_view(all_set_values, '\n');
     for (auto&& expr : set_values_list) {
         auto expr_split = utils::make_multiline(std::move(expr), '=');
         auto var_name   = expr_split.at(0);
