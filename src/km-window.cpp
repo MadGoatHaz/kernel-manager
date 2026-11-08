@@ -86,7 +86,7 @@ bool is_repo_in_syncdbs(alpm_handle_t* handle, std::string_view repo) {
         return false;
     }
     for (const alpm_list_t* i = alpm_get_syncdbs(handle); i != nullptr; i = i->next) {
-        const auto* db = reinterpret_cast<const alpm_db_t*>(i->data);
+        const auto* db      = reinterpret_cast<const alpm_db_t*>(i->data);
         const char* db_name = alpm_db_get_name(db);
         if (db_name == nullptr) {
             continue;
