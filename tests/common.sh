@@ -134,10 +134,13 @@ resolve_fmt_include() {
     local candidates=(
         "$BUILD/_deps/fmt-src/include"
     )
-    # CPM cache: $CPM_SOURCE_CACHE/fmt/<tag-or-hash>/include
-    if [[ -n "${CPM_SOURCE_CACHE:-}" && -d "$CPM_SOURCE_CACHE" ]]; then
+    # CPM cache: $CPM_SOURCE_CACHE (or $HOME/.cache/cpm by default) /fmt/<tag-or-hash>/include
+    # Note: CPM_SOURCE_CACHE is only set in the "Configure CMake" step of CI;
+    # the test step doesn't inherit it, so fall back to the conventional path.
+    local cpm_cache="${CPM_SOURCE_CACHE:-$HOME/.cache/cpm}"
+    if [[ -d "$cpm_cache" ]]; then
         local d
-        for d in "$CPM_SOURCE_CACHE"/fmt/*/; do
+        for d in "$cpm_cache"/fmt/*/; do
             [[ -d "$d/include" ]] && candidates+=("$d/include")
         done
     fi
@@ -181,9 +184,11 @@ resolve_frozen_include() {
     local candidates=(
         "$BUILD/_deps/frozen-src/include"
     )
-    if [[ -n "${CPM_SOURCE_CACHE:-}" && -d "$CPM_SOURCE_CACHE" ]]; then
+    # CPM cache: $CPM_SOURCE_CACHE (or $HOME/.cache/cpm by default) /frozen/<tag-or-hash>/include
+    local cpm_cache="${CPM_SOURCE_CACHE:-$HOME/.cache/cpm}"
+    if [[ -d "$cpm_cache" ]]; then
         local d
-        for d in "$CPM_SOURCE_CACHE"/frozen/*/; do
+        for d in "$cpm_cache"/frozen/*/; do
             [[ -d "$d/include" ]] && candidates+=("$d/include")
         done
     fi
