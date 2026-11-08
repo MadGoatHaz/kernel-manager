@@ -117,7 +117,7 @@ jobs:
         shell: bash
 
       - name: Cache ccache
-        uses: actions/cache@1.4.0
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cache/ccache
           key: ccache-release-bin-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
@@ -126,7 +126,7 @@ jobs:
             ccache-release-bin-
 
       - name: Cache CPM dependencies
-        uses: actions/cache@1.4.0
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cache/cpm
           key: cpm-release-bin-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}

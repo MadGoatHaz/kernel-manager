@@ -32,7 +32,7 @@ jobs:
         shell: bash
 
       - name: Cache ccache
-        uses: actions/cache@1.4.0
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cache/ccache
           key: ccache-cpp-linter-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
@@ -41,7 +41,7 @@ jobs:
             ccache-cpp-linter-
 
       - name: Cache CPM dependencies
-        uses: actions/cache@1.4.0
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cache/cpm
           key: cpm-cpp-linter-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
@@ -96,7 +96,7 @@ jobs:
         shell: bash
 
       - name: Cache ccache
-        uses: actions/cache@1.4.0
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cache/ccache
           key: ccache-cpp-linter-scx-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
@@ -105,7 +105,7 @@ jobs:
             ccache-cpp-linter-scx-
 
       - name: Cache CPM dependencies
-        uses: actions/cache@1.4.0
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cache/cpm
           key: cpm-cpp-linter-scx-${{ github.ref }}-${{ hashFiles('CMakeLists.txt') }}
