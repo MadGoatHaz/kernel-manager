@@ -39,15 +39,15 @@ namespace kernel_info {
 // instead of throwing — the module never reads a file or shell directly,
 // only through these.
 struct KernelInfoProbe {
-    std::function<std::string()> uname_r;                          // the booted release (/proc/sys/kernel/osrelease)
-    std::function<std::string()> uname_v;                          // the build-date portion of /proc/version (the "#" on)
-    std::function<std::string()> proc_version;                     // the whole /proc/version line
-    std::function<std::string()> kconfig;                          // the booted kernel's config text (zcat /proc/config.gz or /boot/config-<release>)
-    std::function<std::string(std::string_view)> sys_read;         // read one /sys (or /proc/sys) attribute file by path
-    std::function<std::string(std::string_view)> sysctl_get;       // read one sysctl value by dotted key
-    std::function<std::vector<std::string>()> loaded_modules;      // the loaded module names, in lsmod order
-    std::function<std::string(std::string_view)> module_filename;  // a module's on-disk filename (modinfo -F filename)
-    std::function<std::string(std::string_view)> disassemble;      // a module file's disassembly text (llvm-objdump -d)
+    std::function<std::string()> uname_r{};                          // the booted release (/proc/sys/kernel/osrelease)
+    std::function<std::string()> uname_v{};                          // the build-date portion of /proc/version (the "#" on)
+    std::function<std::string()> proc_version{};                     // the whole /proc/version line
+    std::function<std::string()> kconfig{};                          // the booted kernel's config text (zcat /proc/config.gz or /boot/config-<release>)
+    std::function<std::string(std::string_view)> sys_read{};         // read one /sys (or /proc/sys) attribute file by path
+    std::function<std::string(std::string_view)> sysctl_get{};       // read one sysctl value by dotted key
+    std::function<std::vector<std::string>()> loaded_modules{};      // the loaded module names, in lsmod order
+    std::function<std::string(std::string_view)> module_filename{};  // a module's on-disk filename (modinfo -F filename)
+    std::function<std::string(std::string_view)> disassemble{};      // a module file's disassembly text (llvm-objdump -d)
 };
 
 // The 15 display-ready booted-kernel facts (empty = unknown / not available;

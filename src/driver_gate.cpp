@@ -289,7 +289,7 @@ GpuGeneration classify_gpu(std::string_view lspci_line) {
     return GpuGeneration::UNKNOWN;
 }
 
-std::string select_dkms_package(GpuGeneration gen) {
+std::string_view select_dkms_package(GpuGeneration gen) {
     switch (gen) {
     case GpuGeneration::TURING_PLUS:
         return "nvidia-open-dkms";  // the open module supports Turing and newer

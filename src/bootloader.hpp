@@ -41,9 +41,9 @@ enum class Bootloader : std::uint8_t { UKI,
 // one question the heuristics ask; an unbound (empty) predicate
 // contributes no signal, so a partially populated probe is safe.
 struct BootloaderProbe {
-    std::function<bool(std::string_view path)> path_exists{};    // file or directory exists
-    std::function<bool(std::string_view cmd)> command_exists{};  // command on PATH (`command -v`)
-    std::function<bool(std::string_view dir)> dir_has_uki{};     // a regular *.efi file in dir
+    std::function<bool(std::string_view path)> path_exists;    // file or directory exists
+    std::function<bool(std::string_view cmd)> command_exists;  // command on PATH (`command -v`)
+    std::function<bool(std::string_view dir)> dir_has_uki;     // a regular *.efi file in dir
 };
 
 // Pure detection (first match wins): UKI > systemd-boot > GRUB > UNKNOWN.

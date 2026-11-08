@@ -81,7 +81,7 @@ bool read_os_release_key(std::string_view content, std::string_view key, std::st
 
 }  // namespace
 
-std::string distro_name(DistroFamily family) {
+std::string_view distro_name(DistroFamily family) {
     switch (family) {
     case DistroFamily::ARCH:
         return "Arch";

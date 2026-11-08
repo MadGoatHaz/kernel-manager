@@ -193,7 +193,7 @@ int main() {
               || real == DistroFamily::GARUDA || real == DistroFamily::UNKNOWN,
               "real: detect_distro() returns a valid enum");
         check(!distro_name(real).empty(), "real: distro_name() of the live detection is non-empty");
-        std::printf("INFO: live detection on this machine -> %s\n", distro_name(real).c_str());
+        std::printf("INFO: live detection on this machine -> %s\n", distro_name(real).data());
 
         const std::string bls = bls_entries_dir();
         check(bls == "/efi/loader/entries" || bls == "/boot/loader/entries" || bls.empty(),

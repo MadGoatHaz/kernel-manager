@@ -79,7 +79,8 @@ enum class TreeCol : std::uint8_t { Check,
     Version,
     Category,
     Install,  // K10: installed-on-system indicator ("✓" / "—") from the alpm local DB, read-only; availability is the context-menu's concern
-    Immutable };
+    Immutable,
+};
 
 class KernelTreeWidgetItem : public QTreeWidgetItem {
  public:

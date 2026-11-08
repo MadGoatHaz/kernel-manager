@@ -294,17 +294,15 @@ void prepare_git_repo(const fs::path& parent_dir, const fs::path& repo_path, std
 
     // A repo already cloned from a different source (the user switched the
     // build source): wipe it so the requested source is actually used.
-    if (fs::exists(repo_path / ".git", ec)) {
-        if (enter(repo_path)) {
-            const auto origin = utils::exec("git remote get-url origin 2>/dev/null");
-            enter(parent_dir);  // restore cwd before any removal
-            if (!origin.empty() && normalize_clone_url(origin) != normalize_clone_url(clone_url)) {
-                fmt::print("prepare_git_repo: source changed, replacing '{}' with '{}'\n", origin, clone_url);
-                fs::remove_all(repo_path, ec);
-                if (ec) {
-                    fmt::print(stderr, "prepare_git_repo: cannot remove stale repo '{}': {}\n", repo_path.string(), ec.message());
-                    return;
-                }
+    if (fs::exists(repo_path / ".git", ec) && enter(repo_path)) {
+        const auto origin = utils::exec("git remote get-url origin 2>/dev/null");
+        enter(parent_dir);  // restore cwd before any removal
+        if (!origin.empty() && normalize_clone_url(origin) != normalize_clone_url(clone_url)) {
+            fmt::print("prepare_git_repo: source changed, replacing '{}' with '{}'\n", origin, clone_url);
+            fs::remove_all(repo_path, ec);
+            if (ec) {
+                fmt::print(stderr, "prepare_git_repo: cannot remove stale repo '{}': {}\n", repo_path.string(), ec.message());
+                return;
             }
         }
     }

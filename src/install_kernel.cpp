@@ -95,7 +95,7 @@ std::string shell_quote(std::string_view s) {
             quoted += c;
         }
     }
-    quoted += "'";
+    quoted.push_back('\'');
     return quoted;
 }
 
@@ -300,23 +300,22 @@ InstallKernelResult install_kernel(const KnownKernel& kernel,
     if (use_default_runner
         && kernel.install_repo == "aur"
         && !steps.empty()
-        && steps.front().cmd.starts_with("paru ")) {
-        if (utils::exec("command -v paru").empty()) {
-            std::vector<std::string> packages{kernel.install_package};
-            detail::install_aur_kernels(packages);  // blocks until the build terminal closes
-            // The build + install command was the install step here and
-            // it ran, but install_aur_kernels is void and discards the
-            // build's exit code, so this flow cannot confirm the
-            // outcome: report an honest failure + a pointer at the
-            // terminal output (the authoritative record), never a false
-            // success. (Capturing the AUR build's rc is a separate
-            // improvement — it would need an rc-returning
-            // install_aur_kernels.)
-            result.verdict = InstallVerdict::INSTALL_FAILED;
-            result.ok      = false;
-            result.error   = "AUR build + install ran via the build path (makepkg -sicf); this flow does not capture its exit code — check the terminal output";
-            return result;
-        }
+        && steps.front().cmd.starts_with("paru ")
+        && utils::exec("command -v paru").empty()) {
+        std::vector<std::string> packages{kernel.install_package};
+        detail::install_aur_kernels(packages);  // blocks until the build terminal closes
+        // The build + install command was the install step here and
+        // it ran, but install_aur_kernels is void and discards the
+        // build's exit code, so this flow cannot confirm the
+        // outcome: report an honest failure + a pointer at the
+        // terminal output (the authoritative record), never a false
+        // success. (Capturing the AUR build's rc is a separate
+        // improvement — it would need an rc-returning
+        // install_aur_kernels.)
+        result.verdict = InstallVerdict::INSTALL_FAILED;
+        result.ok      = false;
+        result.error   = "AUR build + install ran via the build path (makepkg -sicf); this flow does not capture its exit code — check the terminal output";
+        return result;
     }
 
     // The execution loop (simplify-K1, the 2-state result): the install

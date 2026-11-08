@@ -85,12 +85,12 @@ void check(bool condition, const char* what) {
 }
 
 // A string-equality check that names the actual value on failure.
-void check_str(const std::string& actual, const std::string& expected, const char* what) {
+void check_str(std::string_view actual, const std::string& expected, const char* what) {
     if (actual == expected) {
         std::printf("PASS: %s\n", what);
     } else {
         ++g_failures;
-        std::printf("FAIL: %s (actual: '%s', expected: '%s')\n", what, actual.c_str(), expected.c_str());
+        std::printf("FAIL: %s (actual: '%s', expected: '%s')\n", what, actual.data(), expected.c_str());
     }
 }
 

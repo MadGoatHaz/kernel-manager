@@ -43,7 +43,7 @@
 // terminal path, utils::runCmdTerminal(cmd, true); an unescalated one
 // runs as the user).
 struct InstallStep {
-    std::string cmd;
+    std::string cmd{};
     bool escalate = true;
 };
 
@@ -89,7 +89,8 @@ using CommandRunner = std::function<int(const std::string& cmd, bool escalate)>;
 //                     command could run / its rc is not captured (the
 //                     reason is in the result's `error` text).
 enum class InstallVerdict : std::uint8_t { INSTALL_SUCCESS,
-    INSTALL_FAILED };
+    INSTALL_FAILED,
+};
 
 // Result of one install_kernel() run: the outcome flag + error text, the
 // 2-state install verdict, the install command's real exit code (`rc`;
@@ -101,8 +102,8 @@ enum class InstallVerdict : std::uint8_t { INSTALL_SUCCESS,
 // failure.
 struct InstallKernelResult {
     bool ok = false;
-    std::string error;
-    std::vector<std::string> boot_instructions;
+    std::string error{};
+    std::vector<std::string> boot_instructions{};
     InstallVerdict verdict = InstallVerdict::INSTALL_FAILED;
     int rc                 = -1;
 };
@@ -143,13 +144,13 @@ struct InstallKernelResult {
 // (its own package as the build source, no precompiled path, never
 // unbuildable).
 struct InstallPlan {
-    std::string kernel;   // the kernel name (repo prefix stripped)
-    std::string package;  // pre-compiled package name ("" if none)
-    std::string repo;     // pacman repo name ("aur" when AUR; "" when unknown)
+    std::string kernel{};   // the kernel name (repo prefix stripped)
+    std::string package{};  // pre-compiled package name ("" if none)
+    std::string repo{};     // pacman repo name ("aur" when AUR; "" when unknown)
     bool precompiled = false;
-    std::vector<std::string> install_cmds;      // the package install step(s)
-    std::vector<std::string> postinstall_cmds;  // always empty since simplify-K1: the post-install work (nvidia DKMS, initramfs, BLS entry) is done by the distro's ALPM hooks inside the pacman transaction — there is no app-side tail
-    std::string note;                           // build-only guidance ("" when precompiled)
+    std::vector<std::string> install_cmds{};      // the package install step(s)
+    std::vector<std::string> postinstall_cmds{};  // always empty since simplify-K1: the post-install work (nvidia DKMS, initramfs, BLS entry) is done by the distro's ALPM hooks inside the pacman transaction — there is no app-side tail
+    std::string note{};                           // build-only guidance ("" when precompiled)
 };
 
 // The install plan for a kernel name: the table lookup + plan_steps,
@@ -222,11 +223,11 @@ struct InstallPlan {
 // so it gets an empty `log_path` (zero filesystem side effects).
 struct DirInstallResult {
     bool ok = false;
-    std::string error;
-    std::string name;
-    std::string version;
-    std::vector<std::string> boot_instructions;
-    std::string log_path;  // the install log ("" for an injected runner)
+    std::string error{};
+    std::string name{};
+    std::string version{};
+    std::vector<std::string> boot_instructions{};
+    std::string log_path{};  // the install log ("" for an injected runner)
     InstallVerdict verdict = InstallVerdict::INSTALL_FAILED;
     int rc                 = -1;
 };

@@ -111,8 +111,8 @@ void prepare_build_environment() noexcept;
 // error message explains the failure and the file must be left untouched.
 struct PkgbuildRenameResult {
     bool ok{};
-    std::string error;
-    std::string new_content;
+    std::string error{};
+    std::string new_content{};
 };
 
 // Generic PKGBUILD custom-name handling (no vendor-specific anchors):

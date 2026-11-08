@@ -63,7 +63,7 @@ constexpr std::size_t remove_all(std::string& inout, std::string_view what) noex
 /// @param delim The delimiter to split the string.
 /// @return A vector of strings representing the split lines.
 constexpr auto make_multiline(std::string_view str, char delim = '\n') noexcept -> std::vector<std::string> {
-    return [&]() constexpr {
+    return [&] constexpr {
         std::vector<std::string> lines{};
         std::ranges::for_each(utils::make_split_view(str, delim), [&](auto&& rng) { lines.emplace_back(rng); });
         return lines;
@@ -75,7 +75,7 @@ constexpr auto make_multiline(std::string_view str, char delim = '\n') noexcept 
 /// @param delim The delimiter to split the string.
 /// @return A vector of string views representing the split lines.
 constexpr auto make_multiline_view(std::string_view str, char delim = '\n') noexcept -> std::vector<std::string_view> {
-    return [&]() constexpr {
+    return [&] constexpr {
         std::vector<std::string_view> lines{};
         std::ranges::for_each(utils::make_split_view(str, delim), [&](auto&& rng) { lines.emplace_back(rng); });
         return lines;

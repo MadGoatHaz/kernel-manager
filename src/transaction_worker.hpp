@@ -79,7 +79,7 @@ class TransactionWorker final : public QObject {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(TransactionWorker)
 
-  public:
+ public:
     explicit TransactionWorker(QObject* parent = nullptr);
     ~TransactionWorker() override;
 
@@ -100,7 +100,7 @@ class TransactionWorker final : public QObject {
     // transactions are atomic and should not be killed mid-run.
     Q_INVOKABLE void requestStop();
 
-  signals:
+ signals:
     // Emitted when the worker is about to start processing a transaction.
     // The main thread uses this to disable the Execute button and show
     // a "working" state.
@@ -118,7 +118,7 @@ class TransactionWorker final : public QObject {
     // QMessageBox — the worker itself never creates dialogs.
     void error(const QString& message);
 
-  private:
+ private:
     // Whether the worker has been asked to stop. Checked before starting
     // any new transaction. Once set, the worker will not start new work
     // but will finish the current transaction if one is in flight.

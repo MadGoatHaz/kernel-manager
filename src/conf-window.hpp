@@ -131,13 +131,13 @@ class ConfWindow final : public QMainWindow {
 
     bool m_running{};
     QProcess m_cmd;
-    std::string m_build_conf_path;
-    std::vector<std::string> m_previously_set_options;
-    std::vector<KernelFlavor> m_flavors;
+    std::string m_build_conf_path{};
+    std::vector<std::string> m_previously_set_options{};
+    std::vector<KernelFlavor> m_flavors{};
 
     // Last kernel name (repo prefix stripped) auto-populated via
     // apply_source_for_kernel; a repeat for the same kernel is a no-op.
-    std::string m_last_applied_kernel;
+    std::string m_last_applied_kernel{};
 
     // Build completion tracking (cycle-7 C3/D3): the terminal-helper's
     // lifetime equals the launched command's lifetime (the D2 contract), so

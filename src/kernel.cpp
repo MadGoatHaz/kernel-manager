@@ -48,7 +48,7 @@ static std::vector<std::string> g_kernel_removal_list{};  // NOLINT
 // shell calls before main() has set up the environment. The std::call_once
 // pattern guarantees the command runs exactly once and is thread-safe.
 
-static bool is_root_on_zfs() {
+bool is_root_on_zfs() {
     static bool cached = false;
     static bool done   = false;
     if (!done) {
@@ -58,7 +58,7 @@ static bool is_root_on_zfs() {
     return cached;
 }
 
-static bool has_chwd() {
+bool has_chwd() {
     static bool cached = false;
     static bool done   = false;
     if (!done) {
@@ -71,7 +71,7 @@ static bool has_chwd() {
     return cached;
 }
 
-static bool is_nvidia_card_prebuild_module() {
+bool is_nvidia_card_prebuild_module() {
     static bool cached = false;
     static bool done   = false;
     if (!done) {
@@ -86,7 +86,7 @@ static bool is_nvidia_card_prebuild_module() {
     return cached;
 }
 
-static bool is_nvidia_card_prebuild_open_module() {
+bool is_nvidia_card_prebuild_open_module() {
     static bool cached = false;
     static bool done   = false;
     if (!done) {
@@ -118,7 +118,8 @@ static bool is_nvidia_card_prebuild_open_module() {
 // ---------------------------------------------------------------------------
 enum class ModuleKind : std::uint8_t { Zfs,
     Nvidia,
-    NvidiaOpen };
+    NvidiaOpen,
+};
 
 struct KernelModuleSpec {
     std::string_view kernel_base;
@@ -201,8 +202,8 @@ std::string Kernel::version() noexcept {
 
 // Name must be without any repo name (e.g. core/linux)
 bool Kernel::is_installed() const noexcept {
-    auto* db  = alpm_get_localdb(m_handle);
-    auto* pkg = alpm_db_get_pkg(db, m_name.c_str());
+    auto* db        = alpm_get_localdb(m_handle);
+    const auto* pkg = alpm_db_get_pkg(db, m_name.c_str());
 
     return pkg != nullptr;
 }
@@ -282,8 +283,8 @@ bool Kernel::remove() const noexcept {
         const char* pkg_name = alpm_pkg_get_name(sync_pkg);
 
         // check if requested package is installed
-        auto* db        = alpm_get_localdb(m_handle);
-        auto* local_pkg = alpm_db_get_pkg(db, pkg_name);
+        auto* db              = alpm_get_localdb(m_handle);
+        const auto* local_pkg = alpm_db_get_pkg(db, pkg_name);
         if (local_pkg != nullptr) {
             g_kernel_removal_list.emplace_back(pkg_name);
         }
@@ -315,8 +316,8 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
     static constexpr std::string_view replace_part = "-headers";
     std::vector<Kernel> kernels{};
 
-    auto* dbs      = alpm_get_syncdbs(handle);
-    auto* local_db = alpm_get_localdb(handle);
+    const auto* dbs = alpm_get_syncdbs(handle);
+    auto* local_db  = alpm_get_localdb(handle);
     for (const alpm_list_t* i = dbs; i != nullptr; i = i->next) {
         static constexpr auto needle = "linux[^ ]*-headers";
         alpm_list_t* needles         = nullptr;
@@ -488,7 +489,7 @@ std::vector<Kernel> Kernel::get_kernels(alpm_handle_t* handle) noexcept {
             // Dedup by name: a real repo/AUR row wins (skip); a display
             // placeholder (info-row, m_pkg == nullptr) is replaced by the
             // local row — the list stays duplicate-free either way.
-            auto existing = std::ranges::find_if(kernels, [&](const auto& kernel) { return kernel.m_name == base; });
+            const auto existing = std::ranges::find_if(kernels, [&](const auto& kernel) { return kernel.m_name == base; });
             if (existing != kernels.end()) {
                 if (existing->has_pkg()) {
                     continue;

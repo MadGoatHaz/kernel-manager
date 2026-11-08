@@ -25,15 +25,15 @@
 #include "known_kernels.hpp"
 #include "utils.hpp"
 
-#include <algorithm>   // for any_of, find_if, max
-#include <cctype>      // for tolower
-#include <cstdio>      // for fopen, fileno, fclose
-#include <filesystem>  // for exists
-#include <ranges>      // for ranges::*
-#include <span>        // for span
-#include <string_view> // for string_view
-#include <sys/file.h>  // for flock, LOCK_EX, LOCK_NB
-#include <thread>      // for this_thread
+#include <algorithm>    // for any_of, find_if, max
+#include <cctype>       // for tolower
+#include <cstdio>       // for fopen, fileno, fclose
+#include <filesystem>   // for exists
+#include <ranges>       // for ranges::*
+#include <span>         // for span
+#include <string_view>  // for string_view
+#include <sys/file.h>   // for flock, LOCK_EX, LOCK_NB
+#include <thread>       // for this_thread
 
 #include <fmt/core.h>
 
@@ -437,7 +437,8 @@ void bring_window_forward(QWidget* window) {
 // madvise/always THP, bbr, tsc, …).
 enum class InfoColor : std::uint8_t { Green,
     Yellow,
-    Gray };
+    Gray,
+};
 
 // Lowercased copy (the color rule compares case-insensitively — the
 // kernel_info lower() precedent).
@@ -536,7 +537,11 @@ bool ElideFilter::eventFilter(QObject* obj, QEvent* event) {
 }
 
 MainWindow::MainWindow(QWidget* parent)
-  : QMainWindow(parent), m_driver_banner(new QLabel(parent)), m_elide_filter(new ElideFilter(this)) {
+  : QMainWindow(parent),
+    m_driver_banner(new QLabel(parent)),
+    m_elide_filter(new ElideFilter(this)),
+    m_worker_thread(new QThread(parent)),
+    m_worker(new TransactionWorker()) {
     m_ui->setupUi(this);
     // D5 (plan v1.30.0): the shared resize-time ellipsis filter — created
     // once in the member-initializer-list above (window-parented, so it
@@ -599,15 +604,13 @@ MainWindow::MainWindow(QWidget* parent)
     // shares the main thread's handle (eliminates C1/C9 use-after-free).
     // All communication with the UI is via signals/slots (eliminates
     // C2/C3 direct widget access from the worker thread).
-    m_worker_thread = new QThread(this);
-    m_worker        = new TransactionWorker();
     m_worker->moveToThread(m_worker_thread);
     m_worker_thread->setObjectName("TransactionWorker");
 
     // Worker → main thread: notify when a transaction starts/finishes or
     // errors. These are auto-connected (queued) because the worker lives
     // in a different thread.
-    connect(m_worker, &TransactionWorker::transactionStarted, this, [this]() {
+    connect(m_worker, &TransactionWorker::transactionStarted, this, [this] {
         m_transaction_in_flight = true;
         m_ui->ok->setEnabled(false);
         // T-122: show the transaction progress dialog (indeterminate bar +
@@ -684,7 +687,7 @@ MainWindow::MainWindow(QWidget* parent)
     m_transaction_progress_dialog = new QProgressDialog(this);
     m_transaction_progress_dialog->setWindowTitle(tr("Kernel Manager"));
     m_transaction_progress_dialog->setLabelText(tr("Running pacman transaction...\nThe operation is executing in the terminal window.\nPlease wait for it to complete."));
-    m_transaction_progress_dialog->setRange(0, 0);  // indeterminate
+    m_transaction_progress_dialog->setRange(0, 0);            // indeterminate
     m_transaction_progress_dialog->setCancelButton(nullptr);  // no "Cancel" — use close button
     m_transaction_progress_dialog->setWindowModality(Qt::NonModal);
     m_transaction_progress_dialog->setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint
@@ -694,7 +697,7 @@ MainWindow::MainWindow(QWidget* parent)
     m_transaction_progress_dialog->hide();
 
     // Setup configure window
-    connect(&m_future_watcher, &QFutureWatcher<void>::finished, this, [&]() {
+    connect(&m_future_watcher, &QFutureWatcher<void>::finished, this, [&] {
         m_conf_progress_dialog->hide();
         if (m_future_watcher.future().isCanceled()) {
             return;
@@ -710,7 +713,7 @@ MainWindow::MainWindow(QWidget* parent)
         }
         QMessageBox::critical(this, tr("Kernel Manager"), tr("Failed to clone repository!\nPlease check your internet connection and try again"));
     });
-    connect(m_conf_progress_dialog, &QProgressDialog::canceled, this, [&]() {
+    connect(m_conf_progress_dialog, &QProgressDialog::canceled, this, [&] {
         fmt::print("the operation was canceled!\n");
         // that doesn't really stop execution, it just hides the progress dialog
         m_future_watcher.cancel();
@@ -760,7 +763,7 @@ MainWindow::MainWindow(QWidget* parent)
     update_build_dir_label();
 
     // check/uncheck tree items space-bar press or double-click
-    auto* shortcutToggle = new QShortcut(Qt::Key_Space, this);
+    const auto* shortcutToggle = new QShortcut(Qt::Key_Space, this);
     connect(shortcutToggle, &QShortcut::activated, this, &MainWindow::check_uncheck_item);
 
     // Connect tree widget
@@ -1037,11 +1040,11 @@ void MainWindow::build_kernel_info_header() noexcept {
 }
 
 void MainWindow::check_uncheck_item() noexcept {
-    if (auto* t_widget = qobject_cast<QTreeWidget*>(focusWidget())) {
+    if (const auto* t_widget = qobject_cast<QTreeWidget*>(focusWidget())) {
         if (t_widget->currentItem() == nullptr || t_widget->currentItem()->childCount() > 0) {
             return;
         }
-        auto new_state = (t_widget->currentItem()->checkState(static_cast<int>(TreeCol::Check)) == Qt::Checked) ? Qt::Unchecked : Qt::Checked;
+        const auto new_state = (t_widget->currentItem()->checkState(static_cast<int>(TreeCol::Check)) == Qt::Checked) ? Qt::Unchecked : Qt::Checked;
         t_widget->currentItem()->setCheckState(static_cast<int>(TreeCol::Check), new_state);
     }
 }
@@ -1056,8 +1059,8 @@ void MainWindow::item_changed(QTreeWidgetItem* item, int /*unused*/) noexcept {
 
 // Build the change_list when selecting on item in the tree
 void MainWindow::build_change_list(QTreeWidgetItem* item) noexcept {
-    auto item_text = item->text(static_cast<int>(TreeCol::PkgName));
-    auto immutable = item->text(static_cast<int>(TreeCol::Immutable));
+    const auto item_text = item->text(static_cast<int>(TreeCol::PkgName));
+    const auto immutable = item->text(static_cast<int>(TreeCol::Immutable));
     if (immutable == "true" && item->checkState(0) == Qt::Unchecked) {
         m_ui->ok->setEnabled(true);
         m_change_list.append(item_text);
@@ -1125,7 +1128,7 @@ void MainWindow::on_configure() noexcept {
     // Auto-populate the build source for the kernel selected in the tree
     // (data-driven kernel -> source mapping); a repeat for the same kernel
     // is a no-op, so a manual source choice is preserved.
-    if (auto* current = m_ui->treeKernels->currentItem()) {
+    if (const auto* current = m_ui->treeKernels->currentItem()) {
         // D1 (plan v1.24.0): the "Install from directory…" pseudo-row has
         // no build source — configure is a no-op for it. The progress
         // dialog was already shown above, so hide it first (no leftover
@@ -1179,7 +1182,7 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
     // action opens the folder picker + install flow (the slot below).
     if (item->text(static_cast<int>(TreeCol::PkgName)) == tr(kDirectoryRowRaw)) {
         QMenu dmenu(this);
-        auto* dir_action = dmenu.addAction(tr("Install from directory…"));
+        const auto* dir_action = dmenu.addAction(tr("Install from directory…"));
         if (dmenu.exec(tree_kernels->viewport()->mapToGlobal(pos)) == dir_action) {
             on_install_from_directory();
         }
@@ -1219,9 +1222,9 @@ void MainWindow::on_kernel_context_menu(const QPoint& pos) noexcept {
         }
     }
 
-    auto* build_action = menu.addAction(tr("Build custom %1").arg(display));
+    const auto* build_action = menu.addAction(tr("Build custom %1").arg(display));
 
-    auto* boot_action = menu.addAction(tr("Show boot instructions"));
+    const auto* boot_action = menu.addAction(tr("Show boot instructions"));
 
     const QAction* chosen = menu.exec(tree_kernels->viewport()->mapToGlobal(pos));
     if (chosen == nullptr) {
@@ -1456,7 +1459,7 @@ bool MainWindow::run_driver_gate(const driver_gate::GateTarget& target) {
         box.setIcon(QMessageBox::Warning);
         box.setWindowTitle(tr("Kernel Manager"));
         box.setText(QCoreApplication::translate("MainWindow", qPrintable(QString::fromStdString(v.message))));
-        auto* proceed = box.addButton(tr("Proceed"), QMessageBox::AcceptRole);
+        const auto* proceed = box.addButton(tr("Proceed"), QMessageBox::AcceptRole);
         box.addButton(tr("Cancel"), QMessageBox::RejectRole);
         box.exec();
         if (box.clickedButton() == proceed) {
@@ -1473,8 +1476,8 @@ bool MainWindow::run_driver_gate(const driver_gate::GateTarget& target) {
         box.setWindowTitle(tr("Kernel Manager"));
         box.setText(QCoreApplication::translate("MainWindow", qPrintable(QString::fromStdString(v.message))));
         box.addButton(tr("Migrate to %1").arg(QString::fromStdString(v.dkms_package)), QMessageBox::AcceptRole);
-        auto* without = box.addButton(tr("Proceed without"), QMessageBox::ActionRole);
-        auto* cancel  = box.addButton(tr("Abort install"), QMessageBox::RejectRole);
+        const auto* without = box.addButton(tr("Proceed without"), QMessageBox::ActionRole);
+        const auto* cancel  = box.addButton(tr("Abort install"), QMessageBox::RejectRole);
         box.exec();
         if (box.clickedButton() == cancel) {
             return false;  // the install is aborted
@@ -1628,7 +1631,7 @@ void MainWindow::init_kernels() noexcept {
     for (int r = tree_kernels->topLevelItemCount() - 1; r >= 0; --r) {
         auto* item = tree_kernels->topLevelItem(r);
         for (int c = 0; c < item->columnCount(); ++c) {
-            if (auto* w = tree_kernels->itemWidget(item, c)) {
+            if (const auto* w = tree_kernels->itemWidget(item, c)) {
                 tree_kernels->removeItemWidget(item, c);
                 delete w;
             }
@@ -1737,7 +1740,7 @@ void MainWindow::purge_stale_rows() noexcept {
             // tree's item-widget hash entry first (probe P2b), so no
             // later clear() dereferences a dangling widget.
             for (int c = 0; c < item->columnCount(); ++c) {
-                if (auto* w = tree_kernels->itemWidget(item, c)) {
+                if (const auto* w = tree_kernels->itemWidget(item, c)) {
                     tree_kernels->removeItemWidget(item, c);
                     delete w;
                 }
@@ -1754,14 +1757,12 @@ void MainWindow::on_execute() noexcept {
     // starting the worker thread (which would see an empty change list and no-op).
     // A checked kernel + selected pseudo-row ⇒ the directory flow wins (documented);
     // the checked kernel stays in m_change_list for a later Execute.
-    if (auto* current = m_ui->treeKernels->currentItem()) {
-        if (current->text(static_cast<int>(TreeCol::PkgName)) == tr(kDirectoryRowRaw)) {
-            on_install_from_directory();
-            if (m_change_list.isEmpty()) {
-                m_ui->ok->setEnabled(false);
-            }
-            return;
+    if (const auto* current = m_ui->treeKernels->currentItem(); current->text(static_cast<int>(TreeCol::PkgName)) == tr(kDirectoryRowRaw)) {
+        on_install_from_directory();
+        if (m_change_list.isEmpty()) {
+            m_ui->ok->setEnabled(false);
         }
+        return;
     }
 
     if (m_transaction_in_flight) {
@@ -1781,8 +1782,8 @@ void MainWindow::on_execute() noexcept {
     driver_gate::GateTarget target{};
     bool has_installable = false;
     for (const auto& selected : m_change_list) {
-        auto kernel = std::ranges::find_if(m_kernels, [selected](auto&& el) { return el.get_raw() == selected.toStdString(); });
-        if ((kernel != m_kernels.end()) && kernel->has_pkg() && (!kernel->is_installed() || kernel->is_update_available())) {
+        const auto kernel = std::ranges::find_if(m_kernels, [selected](auto&& el) { return el.get_raw() == selected.toStdString(); });
+        if (kernel != m_kernels.end() && kernel->has_pkg() && (!kernel->is_installed() || kernel->is_update_available())) {
             const std::string name{km::kernel_name_from_raw(kernel->get_raw())};
             if (target.kernel.empty()) {
                 target.kernel = name;
@@ -1833,7 +1834,7 @@ bool KernelTreeWidgetItem::operator<(const QTreeWidgetItem& other) const {
         return QTreeWidgetItem::operator<(other);
     }
 
-    auto get_comparable_version = [](QString&& version_string) {
+    const auto get_comparable_version = [](QString&& version_string) {
         using namespace std::string_view_literals;
         auto std_str = std::move(version_string).toStdString();
         for (auto&& prefix : {"∨"sv, "∧"sv}) {
@@ -1853,8 +1854,8 @@ bool KernelTreeWidgetItem::operator<(const QTreeWidgetItem& other) const {
     // behavior. Guard: if either string is not a valid version, fall back
     // to lexicographic comparison (which gives a stable, predictable sort
     // order for the placeholder strings).
-    auto is_valid_version = [](const std::string& s) {
-        return !s.empty() && !s.starts_with("—") && s.find('(') == std::string::npos;
+    const auto is_valid_version = [](const std::string& s) {
+        return !s.empty() && !s.starts_with("—") && !s.contains('(');
     };
     if (!is_valid_version(version_a) || !is_valid_version(version_b)) {
         return version_a < version_b;  // lexicographic fallback

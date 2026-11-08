@@ -40,10 +40,8 @@ namespace {
 bool install_packages(alpm_handle_t* handle, const std::span<Kernel>& kernels, const std::span<std::string>& selected_list) {
     for (const auto& selected : selected_list) {
         const auto kernel = std::ranges::find_if(kernels, [selected](auto&& el) { return el.get_raw() == selected; });
-        if ((kernel != kernels.end()) && (!kernel->is_installed() || kernel->is_update_available())) {
-            if (!kernel->install()) {
-                fmt::print(stderr, "failed to add package to be installed ({})\n", alpm_strerror(alpm_errno(handle)));
-            }
+        if (kernel != kernels.end() && (!kernel->is_installed() || kernel->is_update_available()) && !kernel->install()) {
+            fmt::print(stderr, "failed to add package to be installed ({})\n", alpm_strerror(alpm_errno(handle)));
         }
     }
     return true;
@@ -58,10 +56,8 @@ bool install_packages(alpm_handle_t* handle, const std::span<Kernel>& kernels, c
 bool remove_packages(alpm_handle_t* handle, const std::span<Kernel>& kernels, const std::span<std::string>& selected_list) {
     for (const auto& selected : selected_list) {
         const auto kernel = std::ranges::find_if(kernels, [selected](auto&& el) { return el.get_raw() == selected; });
-        if ((kernel != kernels.end()) && (kernel->is_installed())) {
-            if (!kernel->remove()) {
-                fmt::print(stderr, "failed to add package to be removed ({})\n", alpm_strerror(alpm_errno(handle)));
-            }
+        if (kernel != kernels.end() && kernel->is_installed() && !kernel->remove()) {
+            fmt::print(stderr, "failed to add package to be removed ({})\n", alpm_strerror(alpm_errno(handle)));
         }
     }
     return true;
@@ -181,8 +177,8 @@ void TransactionWorker::startTransaction(const QStringList& changeList) {
 
     // Check if the kernel state actually changed (to decide whether the
     // main thread needs to re-fetch the kernel list).
-    auto& kernel_install_list = Kernel::get_install_list();
-    auto& kernel_removal_list = Kernel::get_removal_list();
+    auto& kernel_install_list           = Kernel::get_install_list();
+    auto& kernel_removal_list           = Kernel::get_removal_list();
     const bool is_kernel_status_changed = is_kernels_change_state(handle, std::span{kernel_install_list}, std::span{kernel_removal_list});
 
     // Release our handle and clean up the global lists.

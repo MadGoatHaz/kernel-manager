@@ -33,11 +33,12 @@ enum class DistroFamily : std::uint8_t { ARCH,
     MANJARO,
     CACHYOS,
     GARUDA,
-    UNKNOWN };
+    UNKNOWN,
+};
 
 // Human-readable name of a detected family (UI-facing text, the
 // bootloader_name() analog).
-[[nodiscard]] [[gnu::pure]] std::string distro_name(DistroFamily family);
+[[nodiscard]] [[gnu::pure]] std::string_view distro_name(DistroFamily family);
 
 // Injection point for the detection: returns the raw /etc/os-release
 // content (empty string when the file is absent/unreadable). Unit tests

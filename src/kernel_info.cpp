@@ -422,11 +422,11 @@ namespace {
         std::size_t i = 0;
         if (i < tokens.size()) {
             const auto& t = tokens.at(i);
-            if (t.size() == 4 && t.at(3) == ',' && all_alpha(t.substr(0, 3), 3)) {
-                ++i;  // Arch form: "Thu,"
-            } else if (t.size() == 3 && all_alpha(t, 3)
-                && i + 1 < tokens.size() && tokens.at(i + 1).size() == 3 && all_alpha(tokens.at(i + 1), 3)) {
-                ++i;  // Ubuntu form: "Mon" followed by month "Oct"
+            // Arch form: "Thu," (4 chars, 3 alpha + comma); Ubuntu form:
+            // "Mon" (3 alpha chars immediately followed by another 3-letter
+            // token, the month).
+            if ((t.size() == 4 && t.at(3) == ',' && all_alpha(t.substr(0, 3), 3)) || (t.size() == 3 && all_alpha(t, 3) && i + 1 < tokens.size() && tokens.at(i + 1).size() == 3 && all_alpha(tokens.at(i + 1), 3))) {
+                ++i;
             }
         }
 
@@ -490,12 +490,9 @@ namespace {
                 const bool preceded_ok  = (found == 0) || !std::isalpha(static_cast<unsigned char>(full.at(found - 1)));
                 const std::size_t after = found + dow.size();
                 bool followed_ok        = false;
-                if (after < full.size()) {
-                    if (full.at(after) == ',' && after + 1 < full.size() && full.at(after + 1) == ' ') {
-                        followed_ok = true;  // "Thu, " (Arch)
-                    } else if (full.at(after) == ' ') {
-                        followed_ok = true;  // "Mon " (Ubuntu)
-                    }
+                // "Thu, " (Arch) or "Mon " (Ubuntu)
+                if (after < full.size() && ((full.at(after) == ',' && after + 1 < full.size() && full.at(after + 1) == ' ') || full.at(after) == ' ')) {
+                    followed_ok = true;
                 }
                 if (preceded_ok && followed_ok && (best_pos == std::string::npos || found < best_pos)) {
                     best_pos = found;

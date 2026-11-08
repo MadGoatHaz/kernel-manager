@@ -38,7 +38,8 @@ namespace driver_gate {
 // select_dkms_package() falls back to it conservatively.
 enum class GpuGeneration : std::uint8_t { TURING_PLUS,
     PRE_TURING,
-    UNKNOWN };
+    UNKNOWN,
+};
 
 // The gate outcome (the D3 decision table): PROCEED = nothing to gate (no
 // nvidia hardware, no nvidia driver, or the DKMS driver + headers are in
@@ -51,17 +52,18 @@ enum class GpuGeneration : std::uint8_t { TURING_PLUS,
 enum class GateAction : std::uint8_t { PROCEED,
     WARN_MIGRATE,
     ENSURE_HEADERS,
-    WARN_ONLY };
+    WARN_ONLY,
+};
 
 // The install the gate is protecting: the target kernel package name ("" =
 // none known) and its release string for the build-dir check ("" = unknown
 // or a fresh flavor that has no build dir yet — the pairing provides it).
 struct GateTarget {
-    std::string kernel;
-    std::string kver;
+    std::string kernel{};
+    std::string kver{};
     // Local install folder (empty unless installing from a directory);
     // lets the gate see headers shipped alongside the kernel package.
-    std::string dir;
+    std::string dir{};
 };
 
 // Injection point (the DistroProbe precedent in distro.hpp): all system
@@ -84,12 +86,12 @@ struct GateProbe {
 // non-PROCEED row, ensure_cmd for ENSURE_HEADERS — "" otherwise).
 struct GateVerdict {
     GateAction action = GateAction::PROCEED;
-    std::string message;
-    std::string banner;
-    std::string dkms_package;
-    std::string headers_package;
-    std::string migration_cmd;
-    std::string ensure_cmd;
+    std::string message{};
+    std::string banner{};
+    std::string dkms_package{};
+    std::string headers_package{};
+    std::string migration_cmd{};
+    std::string ensure_cmd{};
 };
 
 // Derive the companion -headers package for a kernel (D3): append
@@ -111,7 +113,7 @@ struct GateVerdict {
 // open module does not support pre-Turing); UNKNOWN -> "nvidia-dkms"
 // (conservative — the proprietary module has the broadest GPU coverage; a
 // false "open" is never selected on an unknown GPU).
-[[nodiscard]] std::string select_dkms_package(GpuGeneration gen);
+[[nodiscard]] std::string_view select_dkms_package(GpuGeneration gen);
 
 // The full D3 decision table over the injected probe (pure — no
 // filesystem, no shell): returns the verdict with its message, banner,

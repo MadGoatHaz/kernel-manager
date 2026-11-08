@@ -131,10 +131,10 @@ class Kernel {
  private:
     bool m_update{};
 
-    std::string m_name;
+    std::string m_name{};
     std::string m_repo{"local"};
-    std::string m_raw;
-    std::string m_installed_db;
+    std::string m_raw{};
+    std::string m_installed_db{};
 #ifdef ENABLE_AUR_KERNELS
     std::string m_version{};
     std::string m_name_headers{};

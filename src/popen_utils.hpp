@@ -45,12 +45,12 @@
 namespace popen_utils {
 
 [[nodiscard]] inline std::string capture(std::string_view command, std::size_t max_bytes = 1u << 20u) {
-    // NOLINTNEXTLINE(bugprone-command-processor) — by design: this is the
-    // app's single command-execution primitive (pacman/makepkg/git/lspci/
-    // dkms through a shell); the command strings are built at each call
-    // site from vetted, single-quoted, charset-guarded inputs, never raw
-    // user text. Each call site carries its own specific NOLINT explaining
-    // its particular inputs.
+    // By design: this is the app's single command-execution primitive
+    // (pacman/makepkg/git/lspci/dkms through a shell); the command strings
+    // are built at each call site from vetted, single-quoted,
+    // charset-guarded inputs, never raw user text. Each call site carries
+    // its own specific NOLINT explaining its particular inputs.
+    // NOLINTNEXTLINE(bugprone-command-processor)
     if (FILE* const pipe = ::popen(std::string{command}.c_str(), "r")) {
         std::string result{};
         result.reserve(std::min(max_bytes, std::size_t{4096}));

@@ -75,11 +75,11 @@ namespace fs = std::filesystem;
  *
  * Used to define constant values for options.
  */
-#define GENERATE_CONST_OPTION_VALUES(name, ...)                             \
-    [[gnu::pure]] constexpr const char* get_##name(size_t index) noexcept { \
-        constexpr std::array list_##name{__VA_ARGS__};                      \
+#define GENERATE_CONST_OPTION_VALUES(name, ...)                                                      \
+    [[gnu::pure]] constexpr const char* get_##name(size_t index) noexcept {                          \
+        constexpr std::array list_##name{__VA_ARGS__};                                               \
         /* T-055: unchecked operator[] — callers pass combo-box indices that match the array size */ \
-        return list_##name[index];                                          \
+        return list_##name[index];                                                                   \
     }
 
 /**
@@ -124,7 +124,7 @@ auto flavor_display_name(const std::string& key, const std::string& base_key) no
     if (key == base_key) {
         return "Default";
     }
-    std::string label{};  // NOLINT(misc-const-correctness) — built up in the loop below
+    std::string label{};         // NOLINT(misc-const-correctness) — built up in the loop below
     bool capitalize_next{true};  // NOLINT(misc-const-correctness) — toggled in the loop below
     for (const char c : key) {
         if (c == '-') {
@@ -426,7 +426,7 @@ auto prepare_func_names(std::vector<std::string> parse_lines, std::string_view p
     using namespace std::string_view_literals;
 
     static constexpr auto functor = [](auto&& rng) {
-        auto rng_str = std::string_view(&*rng.begin(), static_cast<size_t>(std::ranges::distance(rng)));
+        const auto rng_str = std::string_view(&*rng.begin(), static_cast<size_t>(std::ranges::distance(rng)));
         return rng_str.starts_with("package_"sv);
     };
 
@@ -468,7 +468,7 @@ auto get_package_names_glob_from_pkgbuild(std::string_view kernel_name_path) noe
     const auto& src_entries = run_and_remove_testscript(testscript_path, testscript_src, fmt::format(FMT_COMPILE("{}/PKGBUILD"), kernel_name_path));
     const auto& parse_lines = utils::make_multiline(src_entries, '\n');
 
-    auto it = std::ranges::find_if(parse_lines, [](auto&& line) { return line.starts_with(pkgver_prefix); });
+    const auto it = std::ranges::find_if(parse_lines, [](auto&& line) { return line.starts_with(pkgver_prefix); });
     if (it == std::ranges::end(parse_lines)) {
         fmt::print(stderr, "broken pkgbuild; pkgver must be present\n");
         return {};
@@ -498,7 +498,7 @@ auto is_source_block_bottom(std::string_view line) noexcept -> bool {
     if (trimmed == ")") {
         return true;
     }
-    if (!trimmed.ends_with(")")) {
+    if (!trimmed.ends_with(')')) {
         return false;
     }
     const auto inner = trimmed.substr(0, trimmed.size() - 1);
@@ -617,7 +617,7 @@ void remove_source_arrays_before_prepare(std::string& src) noexcept {
 
 bool insert_new_source_array_into_pkgbuild(std::string_view kernel_name_path, const QListWidget* list_widget, const std::vector<std::string>& orig_source_array) noexcept {
     static constexpr auto functor = [](auto&& rng) {
-        auto rng_str = std::string_view(&*rng.begin(), static_cast<size_t>(std::ranges::distance(rng)));
+        const auto rng_str = std::string_view(&*rng.begin(), static_cast<size_t>(std::ranges::distance(rng)));
         return !rng_str.ends_with(".patch");
     };
 
@@ -891,7 +891,7 @@ bool ConfWindow::run_driver_gate(const driver_gate::GateTarget& target) {
                 box.setIcon(QMessageBox::Warning);
                 box.setWindowTitle(tr("Kernel Manager"));
                 box.setText(QCoreApplication::translate("ConfWindow", qPrintable(QString::fromStdString(w.message))));
-                auto* proceed = box.addButton(tr("Proceed"), QMessageBox::AcceptRole);
+                const auto* proceed = box.addButton(tr("Proceed"), QMessageBox::AcceptRole);
                 box.addButton(tr("Cancel"), QMessageBox::RejectRole);
                 box.exec();
                 if (box.clickedButton() == proceed) {
@@ -937,7 +937,7 @@ bool ConfWindow::run_driver_gate(const driver_gate::GateTarget& target) {
         box.setIcon(QMessageBox::Warning);
         box.setWindowTitle(tr("Kernel Manager"));
         box.setText(QCoreApplication::translate("ConfWindow", qPrintable(QString::fromStdString(v.message))));
-        auto* proceed = box.addButton(tr("Proceed"), QMessageBox::AcceptRole);
+        const auto* proceed = box.addButton(tr("Proceed"), QMessageBox::AcceptRole);
         box.addButton(tr("Cancel"), QMessageBox::RejectRole);
         box.exec();
         if (box.clickedButton() == proceed) {
@@ -953,8 +953,8 @@ bool ConfWindow::run_driver_gate(const driver_gate::GateTarget& target) {
         box.setWindowTitle(tr("Kernel Manager"));
         box.setText(QCoreApplication::translate("ConfWindow", qPrintable(QString::fromStdString(v.message))));
         box.addButton(tr("Migrate to %1").arg(QString::fromStdString(v.dkms_package)), QMessageBox::AcceptRole);
-        auto* without = box.addButton(tr("Proceed without"), QMessageBox::ActionRole);
-        auto* cancel  = box.addButton(tr("Abort install"), QMessageBox::RejectRole);
+        const auto* without = box.addButton(tr("Proceed without"), QMessageBox::ActionRole);
+        const auto* cancel  = box.addButton(tr("Abort install"), QMessageBox::RejectRole);
         box.exec();
         if (box.clickedButton() == cancel) {
             return false;  // the install is aborted
@@ -1469,7 +1469,7 @@ ConfWindow::ConfWindow(QWidget* parent)
     patches_page_ui_obj->move_down_button->setIcon(QApplication::style()->standardIcon(QStyle::SP_ArrowDown));
 
     // remove entry
-    connect(patches_page_ui_obj->remove_entry_button, &QPushButton::clicked, this, [patches_page_ui_obj]() {
+    connect(patches_page_ui_obj->remove_entry_button, &QPushButton::clicked, this, [patches_page_ui_obj] {
         const auto current_index = patches_page_ui_obj->list_widget->currentRow();
         if (current_index < 0) {
             return;
@@ -1478,7 +1478,7 @@ ConfWindow::ConfWindow(QWidget* parent)
     });
 
     // move up
-    connect(patches_page_ui_obj->move_up_button, &QPushButton::clicked, this, [patches_page_ui_obj]() {
+    connect(patches_page_ui_obj->move_up_button, &QPushButton::clicked, this, [patches_page_ui_obj] {
         const auto current_index = patches_page_ui_obj->list_widget->currentRow();
         if (current_index <= 0) {
             return;
@@ -1488,7 +1488,7 @@ ConfWindow::ConfWindow(QWidget* parent)
         patches_page_ui_obj->list_widget->setCurrentRow(current_index - 1);
     });
     // move down
-    connect(patches_page_ui_obj->move_down_button, &QPushButton::clicked, this, [patches_page_ui_obj]() {
+    connect(patches_page_ui_obj->move_down_button, &QPushButton::clicked, this, [patches_page_ui_obj] {
         const auto current_index = patches_page_ui_obj->list_widget->currentRow();
         if (current_index < 0 || current_index >= patches_page_ui_obj->list_widget->count() - 1) {
             return;
