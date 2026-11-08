@@ -29,6 +29,9 @@ jobs:
       - name: install deps
         run: |
           pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+          # Refresh the dynamic linker cache: the full upgrade can leave
+          # /etc/ld.so.cache stale so tools like 'as' fail to find libz etc.
+          ldconfig
         shell: bash
 
       - name: Cache ccache
@@ -96,6 +99,9 @@ jobs:
       - name: install deps
         run: |
           pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+          # Refresh the dynamic linker cache: the full upgrade can leave
+          # /etc/ld.so.cache stale so tools like 'as' fail to find libz etc.
+          ldconfig
         shell: bash
 
       - name: Cache ccache

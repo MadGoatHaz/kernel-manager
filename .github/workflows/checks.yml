@@ -29,6 +29,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
           mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+          ldconfig
         shell: bash
 
       - name: Cache ccache
@@ -93,6 +94,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
           mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git scx-manager ccache
+          ldconfig
         shell: bash
 
       - name: Cache ccache
