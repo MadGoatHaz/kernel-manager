@@ -28,7 +28,14 @@ jobs:
 
       - name: install deps
         run: |
-          pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+          # Never run `pacman -Syu` in an Arch Docker container: the full
+          # system upgrade breaks the image's coherent package set and can
+          # remove or break /usr/bin/as (binutils), causing "cannot execute
+          # 'as'" failures in the standalone test harnesses (which use g++).
+          # Instead, sync the package databases and install only what we need.
+          pacman -Sy --noconfirm
+          pacman -S --needed --noconfirm cmake pkgconf ninja clang rust mold llvm libc++ \
+            qt6-base qt6-tools polkit-qt6 python git ccache glib2
         shell: bash
 
       - name: Cache ccache
@@ -76,6 +83,13 @@ jobs:
 
       - name: Run tests (sanitizers)
         run: |
+          export KM_BUILD_DIR=build-san
+          # The standalone test harnesses compile their own TUs; they must
+          # carry the same sanitizer flags as the CMake build or linking
+          # against the instrumented libfmtd.a fails with undefined
+          # __asan_*/__ubsan_* references.
+          export KM_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          export KM_LINK_FLAGS="-fsanitize=address,undefined"
           ctest --test-dir build-san --output-on-failure --parallel "$(nproc)"
         shell: bash
 
@@ -88,7 +102,14 @@ jobs:
 
       - name: install deps
         run: |
-          pacman -Syu --noconfirm cmake pkg-config ninja clang rust mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+          # Never run `pacman -Syu` in an Arch Docker container: the full
+          # system upgrade breaks the image's coherent package set and can
+          # remove or break /usr/bin/as (binutils), causing "cannot execute
+          # 'as'" failures in the standalone test harnesses (which use g++).
+          # Instead, sync the package databases and install only what we need.
+          pacman -Sy --noconfirm
+          pacman -S --needed --noconfirm cmake pkgconf ninja clang rust mold llvm libc++ \
+            qt6-base qt6-tools polkit-qt6 python git ccache glib2
         shell: bash
 
       - name: Cache ccache
@@ -139,6 +160,7 @@ jobs:
 
       - name: Run tests (CTest)
         run: |
+          export KM_BUILD_DIR=build
           ctest --test-dir build --output-on-failure --parallel "$(nproc)"
         shell: bash
 

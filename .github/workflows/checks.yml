@@ -27,8 +27,13 @@ jobs:
 
       - name: install deps
         run: |
-          pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
-          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache
+          # Never run `pacman -Syu` in an Arch Docker container: the full
+          # system upgrade breaks the image's coherent package set and can
+          # remove or break /usr/bin/as (binutils). Sync the package
+          # databases and install only what we need.
+          pacman -Sy --noconfirm
+          pacman -S --needed --noconfirm cmake pkgconf ninja clang rust \
+            mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git ccache glib2
         shell: bash
 
       - name: Cache ccache
@@ -91,8 +96,12 @@ jobs:
 
       - name: install deps
         run: |
-          pacman -Syu --noconfirm cmake pkg-config ninja clang rust \
-          mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git scx-manager ccache
+          # Never run `pacman -Syu` in a Docker container: the full system
+          # upgrade breaks the image's coherent package set. Sync the
+          # package databases and install only what we need.
+          pacman -Sy --noconfirm
+          pacman -S --needed --noconfirm cmake pkgconf ninja clang rust \
+            mold llvm libc++ qt6-base qt6-tools polkit-qt6 python git scx-manager ccache glib2
         shell: bash
 
       - name: Cache ccache

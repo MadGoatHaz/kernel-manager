@@ -15,16 +15,20 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ROOT="$(pwd)"
-BUILD="$ROOT/build"
+BUILD="$ROOT/${KM_BUILD_DIR:-build}"
+source "$ROOT/tests/common.sh"
+
+FMT_INC="$(resolve_fmt_include)" || exit 1
+FMT_LIB="$(resolve_fmt_lib)" || exit 1
 
 OUT="/tmp/km-test-k8"
 
-/usr/bin/c++ \
+${KM_CXX} \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB \
     -I"$ROOT/src" \
-    -I"$BUILD/_deps/fmt-src/include" \
+    -I"$FMT_INC" \
     -isystem /usr/include/qt6/QtWidgets \
     -isystem /usr/include/qt6/QtGui \
     -isystem /usr/include/qt6/QtCore \
@@ -33,16 +37,16 @@ OUT="/tmp/km-test-k8"
     -isystem /usr/include/glib-2.0 \
     -isystem /usr/lib/glib-2.0/include \
     -isystem /usr/include/sysprof-6 \
-    -O3 -flto -fwhole-program -fuse-linker-plugin \
-    -std=c++23 -fPIE -fdiagnostics-color=always -mno-direct-extern-access \
+    -O3 ${KM_LTO_FLAGS} \
+    -std=c++23 -fPIE -fdiagnostics-color=always \
     -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual \
     -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 \
-    -Wimplicit-fallthrough -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
-    -Wuseless-cast -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
-    -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
-    -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
-    -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
+    -Wimplicit-fallthrough -Wmisleading-indentation \
+    ${KM_GCC_WARNING_FLAGS} \
+    \
+    -Wdiv-by-zero ${KM_ANALYZER_FLAGS} \
     -D_FILE_OFFSET_BITS=64 -pthread \
+    $KM_CXX_FLAGS $KM_LINK_FLAGS \
     tests/test_k8_install_kernel.cpp \
     src/install_kernel.cpp \
     src/driver_gate.cpp \
@@ -51,7 +55,7 @@ OUT="/tmp/km-test-k8"
     src/boot_instructions.cpp \
     src/aur_kernel.cpp \
     src/utils.cpp \
-    "$BUILD/_deps/fmt-build/libfmt.a" \
+    "$FMT_LIB" \
     -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc \
     /usr/lib/libglib-2.0.so \
     /usr/lib/libQt6Widgets.so \

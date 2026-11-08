@@ -26,64 +26,49 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ROOT="$(pwd)"
-BUILD="$ROOT/build"
+BUILD="$ROOT/${KM_BUILD_DIR:-build}"
+source "$ROOT/tests/common.sh"
 
-# --- bootstrap the fmt + cxxbridge artifacts (run_k12 pattern) ---------
-# The standalone recipe needs the fmt include + static lib and the
-# cxxbridge static libs from the project's CMake build dir (the CMake
-# configure is their only producer; they are version-pinned). If this
-# worktree has no build/ of its own (or any piece is absent), copy them
-# from the main worktree's build.
-for f in \
-    "$BUILD/_deps/fmt-src/include" \
-    "$BUILD/_deps/fmt-build/libfmt.a" \
-    "$BUILD/_deps/frozen-src/include" \
-    "$BUILD/libconfig-option-lib-cxxbridge.a" \
-    "$BUILD/libconfig_option_lib.a" \
-    "$BUILD/corrosion_generated/cxxbridge/config-option-lib-cxxbridge/include"
-do
-    if [[ ! -e "$f" ]]; then
-        MAIN_ROOT="$(git -C "$ROOT" worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
-        REL="${f#"$BUILD"/}"
-        if [[ -n "${MAIN_ROOT}" && -e "${MAIN_ROOT}/build/${REL}" ]]; then
-            mkdir -p "$(dirname "$f")"
-            cp -r "${MAIN_ROOT}/build/${REL}" "$f"
-        else
-            echo "error: CMake artifact $f not found in $BUILD nor in the main worktree's build (run the CMake build first)" >&2
-            exit 1
-        fi
-    fi
-done
+# --- fmt + frozen + cxxbridge artifacts (run_k12 pattern) ----------------
+# resolve_* handles the Debug-postfix lib name (libfmtd.a), the CPM source
+# cache, and main-worktree bootstrap.
+FMT_INC="$(resolve_fmt_include)" || exit 1
+FMT_LIB="$(resolve_fmt_lib)" || exit 1
+FROZEN_INC="$(resolve_frozen_include)" || exit 1
+CXXBRIDGE_LIBS="$(resolve_cxxbridge_libs)" || exit 1
+CXXBRIDGE_LIB_A="$(printf '%s\n' "$CXXBRIDGE_LIBS" | sed -n '1p')"
+CXXBRIDGE_LIB_B="$(printf '%s\n' "$CXXBRIDGE_LIBS" | sed -n '2p')"
+CXXBRIDGE_INC="$(resolve_cxxbridge_include)" || exit 1
 
 OUT="/tmp/km-test-k21"
 LOG="$OUT-build.log"
 : > "$LOG"
 
-/usr/bin/c++ \
+${KM_CXX} \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -I"$ROOT/src" \
     -I"$BUILD" \
-    -I"$BUILD/_deps/fmt-src/include" \
-    -I"$BUILD/_deps/frozen-src/include" \
-    -I"$BUILD/corrosion_generated/cxxbridge/config-option-lib-cxxbridge/include" \
+    -I"$FMT_INC" \
+    -I"$FROZEN_INC" \
+    -I"$CXXBRIDGE_INC" \
     -isystem /usr/include/glib-2.0 \
     -isystem /usr/lib/glib-2.0/include \
-    -O3 -flto -fwhole-program -fuse-linker-plugin \
-    -std=c++23 -fPIE -fdiagnostics-color=always -mno-direct-extern-access \
+    -O3 ${KM_LTO_FLAGS} \
+    -std=c++23 -fPIE -fdiagnostics-color=always \
     -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual \
     -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 \
-    -Wimplicit-fallthrough -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
-    -Wuseless-cast -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
-    -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
-    -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
-    -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
+    -Wimplicit-fallthrough -Wmisleading-indentation \
+    ${KM_GCC_WARNING_FLAGS} \
+    \
+    -Wdiv-by-zero ${KM_ANALYZER_FLAGS} \
     -D_FILE_OFFSET_BITS=64 -pthread \
+    $KM_CXX_FLAGS $KM_LINK_FLAGS \
     tests/test_k21_config_options.cpp \
     src/config-options.cpp \
-    "$BUILD/_deps/fmt-build/libfmt.a" \
-    "$BUILD/libconfig-option-lib-cxxbridge.a" \
-    "$BUILD/libconfig_option_lib.a" \
+    "$FMT_LIB" \
+    "$CXXBRIDGE_LIB_A" \
+    "$CXXBRIDGE_LIB_B" \
     -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc \
     /usr/lib/libglib-2.0.so \
     -o "$OUT" 2>> "$LOG" \

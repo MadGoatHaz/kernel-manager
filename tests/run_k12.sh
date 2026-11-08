@@ -42,47 +42,34 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ROOT="$(pwd)"
-BUILD="$ROOT/build"
+BUILD="$ROOT/${KM_BUILD_DIR:-build}"
+source "$ROOT/tests/common.sh"
 
 # The harness needs the fmt + frozen + cxxbridge + codegen + autogen
 # artifacts from the project's CMake build dir (the autogen tree carries
-# both the uic-generated ui_* headers and the moc files). If this worktree
-# has no build/ of its own (or any piece is absent), copy them from the
-# main worktree's build — the CMake configure is their only producer and
-# they are version-pinned (run_k11 precedent).
-for f in \
-    "$BUILD/_deps/fmt-src/include" \
-    "$BUILD/_deps/fmt-build/libfmt.a" \
-    "$BUILD/_deps/frozen-src/include" \
-    "$BUILD/libconfig-option-lib-cxxbridge.a" \
-    "$BUILD/libconfig_option_lib.a" \
-    "$BUILD/compile_options.hpp" \
-    "$BUILD/corrosion_generated" \
-    "$BUILD/kernel-manager_autogen"
-do
-    if [[ ! -e "$f" ]]; then
-        MAIN_ROOT="$(git -C "$ROOT" worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
-        REL="${f#"$BUILD"/}"
-        if [[ -n "${MAIN_ROOT}" && -e "${MAIN_ROOT}/build/${REL}" ]]; then
-            mkdir -p "$(dirname "$f")"
-            cp -r "${MAIN_ROOT}/build/${REL}" "$f"
-        else
-            echo "error: CMake artifact $f not found in $BUILD nor in the main worktree's build (run the CMake build first)" >&2
-            exit 1
-        fi
-    fi
-done
+# both the uic-generated ui_* headers and the moc files). resolve_* handles
+# the Debug-postfix lib name (libfmtd.a), the CPM source cache, and
+# main-worktree bootstrap (run_k11 precedent).
+FMT_INC="$(resolve_fmt_include)" || exit 1
+FMT_LIB="$(resolve_fmt_lib)" || exit 1
+FROZEN_INC="$(resolve_frozen_include)" || exit 1
+CXXBRIDGE_LIBS="$(resolve_cxxbridge_libs)" || exit 1
+CXXBRIDGE_LIB_A="$(printf '%s\n' "$CXXBRIDGE_LIBS" | sed -n '1p')"
+CXXBRIDGE_LIB_B="$(printf '%s\n' "$CXXBRIDGE_LIBS" | sed -n '2p')"
+CXXBRIDGE_INC="$(resolve_cxxbridge_include)" || exit 1
+COMPILE_OPTIONS_H="$(resolve_compile_options_h)" || exit 1
+AUTODIR="$(resolve_autogen_dir)" || exit 1
 
 # The autogen hash dir differs per build tree; locate the mocs (the classes
 # are Q_OBJECTs — their vtables/meta-objects live in the generated mocs,
 # which the MainWindow/ConfWindow constructors need at link time).
-MOC_KM_WINDOW="$(ls "$BUILD/kernel-manager_autogen"/*/moc_km-window.cpp 2>/dev/null | head -n1 || true)"
-MOC_CONF_WINDOW="$(ls "$BUILD/kernel-manager_autogen"/*/moc_conf-window.cpp 2>/dev/null | head -n1 || true)"
-MOC_CONF_OPTIONS_PAGE="$(ls "$BUILD/kernel-manager_autogen"/*/moc_conf-options-page.cpp 2>/dev/null | head -n1 || true)"
-MOC_CONF_PATCHES_PAGE="$(ls "$BUILD/kernel-manager_autogen"/*/moc_conf-patches-page.cpp 2>/dev/null | head -n1 || true)"
-MOC_TRANSACTION_WORKER="$(ls "$BUILD/kernel-manager_autogen"/*/moc_transaction_worker.cpp 2>/dev/null | head -n1 || true)"
+MOC_KM_WINDOW="$(ls "$AUTODIR"/*/moc_km-window.cpp 2>/dev/null | head -n1 || true)"
+MOC_CONF_WINDOW="$(ls "$AUTODIR"/*/moc_conf-window.cpp 2>/dev/null | head -n1 || true)"
+MOC_CONF_OPTIONS_PAGE="$(ls "$AUTODIR"/*/moc_conf-options-page.cpp 2>/dev/null | head -n1 || true)"
+MOC_CONF_PATCHES_PAGE="$(ls "$AUTODIR"/*/moc_conf-patches-page.cpp 2>/dev/null | head -n1 || true)"
+MOC_TRANSACTION_WORKER="$(ls "$AUTODIR"/*/moc_transaction_worker.cpp 2>/dev/null | head -n1 || true)"
 if [[ -z "${MOC_KM_WINDOW}" || -z "${MOC_CONF_WINDOW}" || -z "${MOC_CONF_OPTIONS_PAGE}" || -z "${MOC_CONF_PATCHES_PAGE}" || -z "${MOC_TRANSACTION_WORKER}" ]]; then
-    echo "error: km-window/conf-window/page mocs not found under $BUILD/kernel-manager_autogen (run the CMake build first)" >&2
+    echo "error: km-window/conf-window/page mocs not found under $AUTODIR (run the CMake build first)" >&2
     exit 1
 fi
 
@@ -102,27 +89,26 @@ LOG="/tmp/km-test-k12-build.log"
 # The shared compiler settings: the original single command's flags,
 # verbatim, split into the compile phase (with the warning set) and the
 # LTO-link phase (without — the canonical cmake shape).
-COMPILE_FLAGS="-O3 -flto -fwhole-program -fuse-linker-plugin \
-    -std=c++23 -fPIE -fdiagnostics-color=always -mno-direct-extern-access \
+COMPILE_FLAGS="-O3 ${KM_LTO_FLAGS} \
+    -std=c++23 -fPIE -fdiagnostics-color=always \
     -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual \
     -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 \
-    -Wimplicit-fallthrough -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
-    -Wuseless-cast -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
-    -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
-    -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
-    -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
+    -Wimplicit-fallthrough -Wmisleading-indentation \
+    ${KM_GCC_WARNING_FLAGS} \
+    \
+    -Wdiv-by-zero ${KM_ANALYZER_FLAGS} \
     -D_FILE_OFFSET_BITS=64 -pthread"
 
 INCLUDES="-DAPP_VERSION=\"$APP_VERSION\" \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_DISABLE_DEPRECATED_BEFORE=0x050F00 -DQT_GUI_LIB -DQT_NO_DEBUG -DQT_WIDGETS_LIB \
-    -I"$BUILD/kernel-manager_autogen/include" \
+    -I"$AUTODIR/include" \
     -I"$ROOT/src" \
     -I"$BUILD" \
-    -I"$BUILD/_deps/fmt-src/include" \
-    -I"$BUILD/_deps/frozen-src/include" \
-    -I"$BUILD/corrosion_generated/cxxbridge/config-option-lib-cxxbridge/include" \
+    -I"$FMT_INC" \
+    -I"$FROZEN_INC" \
+    -I"$CXXBRIDGE_INC" \
     -isystem /usr/include/qt6/QtCore \
     -isystem /usr/include/qt6 \
     -isystem /usr/lib/qt6/mkspecs/linux-g++ \
@@ -162,17 +148,17 @@ OBJS=()
 : > "$LOG"
 for tu in "${TUS[@]}"; do
     obj="/tmp/km-test-k12-$(printf '%s' "$tu" | tr '/.' '__').o"
-    /usr/bin/c++ $INCLUDES $COMPILE_FLAGS -c "$tu" -o "$obj" 2>> "$LOG" \
+    ${KM_CXX} $INCLUDES $COMPILE_FLAGS $KM_CXX_FLAGS -c "$tu" -o "$obj" 2>> "$LOG" \
         || { echo "error: k12 compile of $tu failed:" >&2; tail -n 30 "$LOG" >&2; exit 1; }
     OBJS+=("$obj")
 done
 
 # Phase 2: the LTO link WITHOUT the -W flags (the link line never carries
 # code diagnostics — the cmake pipeline shape).
-/usr/bin/c++ -O3 -flto -fuse-linker-plugin -fPIE "${OBJS[@]}" \
-    "$BUILD/_deps/fmt-build/libfmt.a" \
-    "$BUILD/libconfig-option-lib-cxxbridge.a" \
-    "$BUILD/libconfig_option_lib.a" \
+${KM_CXX} -O3 -flto -fPIE $KM_LINK_FLAGS "${OBJS[@]}" \
+    "$FMT_LIB" \
+    "$CXXBRIDGE_LIB_A" \
+    "$CXXBRIDGE_LIB_B" \
     -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc \
     /usr/lib/libglib-2.0.so \
     /usr/lib/libQt6Widgets.so \

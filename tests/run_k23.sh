@@ -28,40 +28,25 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ROOT="$(pwd)"
-BUILD="$ROOT/build"
+BUILD="$ROOT/${KM_BUILD_DIR:-build}"
+source "$ROOT/tests/common.sh"
 
-# --- bootstrap the fmt artifacts (run_k12/k13 pattern) -------------------
-# The standalone recipe needs the fmt include dir + static lib from the
-# project's CMake build dir (the CMake configure is their only producer;
-# they are version-pinned). If this worktree has no build/ of its own,
-# copy them from the main worktree's build.
-for f in \
-    "$BUILD/_deps/fmt-src/include" \
-    "$BUILD/_deps/fmt-build/libfmt.a"
-do
-    if [[ ! -e "$f" ]]; then
-        MAIN_ROOT="$(git -C "$ROOT" worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
-        REL="${f#"$BUILD"/}"
-        if [[ -n "${MAIN_ROOT}" && -e "${MAIN_ROOT}/build/${REL}" ]]; then
-            mkdir -p "$(dirname "$f")"
-            cp -r "${MAIN_ROOT}/build/${REL}" "$f"
-        else
-            echo "error: CMake artifact $f not found in $BUILD nor in the main worktree's build (run the CMake build first)" >&2
-            exit 1
-        fi
-    fi
-done
+# --- fmt artifacts (run_k12/k13 pattern) ---------------------------------
+# resolve_* handles the Debug-postfix lib name (libfmtd.a), the CPM source
+# cache, and main-worktree bootstrap.
+FMT_INC="$(resolve_fmt_include)" || exit 1
+FMT_LIB="$(resolve_fmt_lib)" || exit 1
 
 OUT="/tmp/km-test-k23"
 LOG="$OUT-build.log"
 : > "$LOG"
 
-/usr/bin/c++ \
+${KM_CXX} \
     -DKM_HELPER_DIR=\"/usr/lib/kernel-manager\" \
     -DKM_IGNORE_REPO=\"\" \
     -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB \
     -I"$ROOT/src" \
-    -I"$BUILD/_deps/fmt-src/include" \
+    -I"$FMT_INC" \
     -isystem /usr/include/qt6/QtWidgets \
     -isystem /usr/include/qt6/QtGui \
     -isystem /usr/include/qt6/QtCore \
@@ -70,19 +55,19 @@ LOG="$OUT-build.log"
     -isystem /usr/include/glib-2.0 \
     -isystem /usr/lib/glib-2.0/include \
     -isystem /usr/include/sysprof-6 \
-    -O3 -flto -fwhole-program -fuse-linker-plugin \
-    -std=c++23 -fPIE -fdiagnostics-color=always -mno-direct-extern-access \
+    -O3 ${KM_LTO_FLAGS} \
+    -std=c++23 -fPIE -fdiagnostics-color=always \
     -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual \
     -Wpedantic -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 \
-    -Wimplicit-fallthrough -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op \
-    -Wuseless-cast -Wsuggest-attribute=cold -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
-    -Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
-    -Wsuggest-final-types -Wdiv-by-zero -Wanalyzer-double-fclose -Wanalyzer-double-free \
-    -Wanalyzer-malloc-leak -Wanalyzer-use-after-free \
+    -Wimplicit-fallthrough -Wmisleading-indentation \
+    ${KM_GCC_WARNING_FLAGS} \
+    \
+    -Wdiv-by-zero ${KM_ANALYZER_FLAGS} \
     -D_FILE_OFFSET_BITS=64 -pthread \
+    $KM_CXX_FLAGS $KM_LINK_FLAGS \
     tests/test_k23_pkgbuild_custom_name.cpp \
     src/utils.cpp \
-    "$BUILD/_deps/fmt-build/libfmt.a" \
+    "$FMT_LIB" \
     -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc \
     /usr/lib/libglib-2.0.so \
     /usr/lib/libQt6Widgets.so \
